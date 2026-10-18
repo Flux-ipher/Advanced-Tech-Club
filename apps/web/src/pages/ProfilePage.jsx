@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '@atc/shared/hooks/useAuth';
 import { useEvents } from '@atc/shared/hooks/useEvents';
 import { RoleBadge } from '../components/RoleBadge';
+import { ImageUploader } from '../components/ImageUploader';
 import { formatDateTime, formatDate } from '@atc/shared/utils/formatters';
 import {
   User,
@@ -54,6 +55,7 @@ export function ProfilePage() {
           <div className="relative group">
             <img
               src={
+                avatarUrl ||
                 user?.avatar_url ||
                 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
               }
@@ -174,15 +176,14 @@ export function ProfilePage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase text-neutral-700 mb-1">
-                  Avatar Photo URL
-                </label>
-                <input
-                  type="url"
+              {/* Profile Image Uploader (Strictly Images Only) */}
+              <div className="pt-2 border-t border-neutral-100">
+                <ImageUploader
+                  mode="avatar"
+                  label="Profile Picture / Avatar"
+                  helperText="Upload your real photo or avatar (PNG, JPG, WEBP, GIF up to 5MB). Other file types are prohibited."
                   value={avatarUrl}
-                  onChange={(e) => setAvatarUrl(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500"
+                  onChange={(newAvatar) => setAvatarUrl(newAvatar)}
                 />
               </div>
 

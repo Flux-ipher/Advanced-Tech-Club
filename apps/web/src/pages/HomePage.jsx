@@ -6,6 +6,7 @@ import { useEvents } from '@atc/shared/hooks/useEvents';
 import { useResources } from '@atc/shared/hooks/useResources';
 import { AnnouncementCard } from '../components/AnnouncementCard';
 import { Modal } from '../components/Modal';
+import { ImageUploader } from '../components/ImageUploader';
 import {
   Sparkles,
   Pin,
@@ -420,19 +421,18 @@ export function HomePage() {
           </div>
 
           <div>
-            <label className="block text-xs font-bold uppercase text-neutral-700 mb-1">
-              Media Image URL (Optional)
-            </label>
-            <div className="relative">
-              <ImageIcon className="w-4 h-4 text-neutral-400 absolute left-3 top-3" />
-              <input
-                type="url"
-                placeholder="https://example.com/image.jpg"
-                value={newMediaUrl}
-                onChange={(e) => setNewMediaUrl(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500"
-              />
-            </div>
+            <ImageUploader
+              mode="banner"
+              label="Announcement Media / Picture (Optional)"
+              helperText="Upload event flyer, workshop diagram, or hackathon graphic (PNG, JPG, WEBP, GIF up to 5MB)."
+              value={newMediaUrl}
+              onChange={(newMedia) => setNewMediaUrl(newMedia)}
+              presets={[
+                'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1200&q=80',
+                'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=1200&q=80',
+                'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=1200&q=80'
+              ]}
+            />
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-200">

@@ -1,6 +1,7 @@
 // Auth Zustand Store
 import { create } from 'zustand';
 import { initialProfiles } from '../mockData.js';
+import { mockDb } from '../supabaseClient.js';
 
 export const useAuthStore = create((set, get) => ({
   user: initialProfiles[0], // Defaults to Ritesh Mishra (Super Admin)
@@ -30,6 +31,12 @@ export const useAuthStore = create((set, get) => ({
     if (current) {
       const updated = { ...current, ...updates };
       set({ user: updated, session: { user: updated } });
+      if (mockDb?.storage?.profiles) {
+        const idx = mockDb.storage.profiles.findIndex((p) => p.id === current.id);
+        if (idx !== -1) {
+          mockDb.storage.profiles[idx] = updated;
+        }
+      }
     }
   },
 

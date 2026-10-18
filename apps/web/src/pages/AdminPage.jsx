@@ -5,6 +5,7 @@ import { useEvents } from '@atc/shared/hooks/useEvents';
 import { useResources } from '@atc/shared/hooks/useResources';
 import { getEventRegistrations } from '@atc/shared/api/events';
 import { formatDate } from '@atc/shared/utils/formatters';
+import { ImageUploader } from '../components/ImageUploader';
 import {
   Shield,
   PlusCircle,
@@ -326,15 +327,17 @@ export function AdminPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase text-neutral-700 mb-1">
-                  Media Image URL (Optional)
-                </label>
-                <input
-                  type="url"
-                  placeholder="https://images.unsplash.com/photo-..."
+                <ImageUploader
+                  mode="banner"
+                  label="Announcement Media / Picture (Optional)"
+                  helperText="Upload event flyer, workshop diagram, or hackathon graphic (PNG, JPG, WEBP, GIF up to 5MB)."
                   value={annMedia}
-                  onChange={(e) => setAnnMedia(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500"
+                  onChange={(newMedia) => setAnnMedia(newMedia)}
+                  presets={[
+                    'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1200&q=80',
+                    'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=1200&q=80',
+                    'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=1200&q=80'
+                  ]}
                 />
               </div>
 
@@ -497,15 +500,18 @@ export function AdminPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase text-neutral-700 mb-1">
-                Banner Image URL
-              </label>
-              <input
-                type="url"
-                placeholder="https://images.unsplash.com/photo-..."
+              <ImageUploader
+                mode="banner"
+                label="Event Cover Banner *"
+                helperText="Upload custom workshop or hackathon banner (PNG, JPG, WEBP, GIF up to 5MB)."
                 value={evtBanner}
-                onChange={(e) => setEvtBanner(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500"
+                onChange={(newBanner) => setEvtBanner(newBanner)}
+                presets={[
+                  'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1200&q=80',
+                  'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=1200&q=80',
+                  'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80',
+                  'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80'
+                ]}
               />
             </div>
 
