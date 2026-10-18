@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply bg-neutral-50 text-neutral-900 font-voodoo;
+    @apply bg-neutral-50 text-neutral-900 font-voodoo antialiased selection:bg-primary-100 selection:text-primary-900;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
@@ -24,30 +24,72 @@
 @layer components {
   /* VooDoo Clean Flat Card Principle */
   .voodoo-card {
-    @apply bg-white border border-neutral-200 rounded-xl transition-all duration-200;
+    @apply bg-white border border-neutral-200/90 rounded-2xl transition-all duration-200 shadow-[0_1px_3px_rgba(0,0,0,0.02)];
   }
 
   .voodoo-card-hover {
-    @apply bg-white border border-neutral-200 rounded-xl transition-all duration-200 hover:border-neutral-300 hover:shadow-sm;
+    @apply bg-white border border-neutral-200/90 rounded-2xl transition-all duration-300 hover:border-primary-200 hover:shadow-[0_10px_25px_-5px_rgba(5,151,255,0.08),0_8px_10px_-6px_rgba(0,0,0,0.03)] hover:-translate-y-0.5;
   }
 
-  /* VooDoo Primary Button */
+  /* Ultra-Premium Glassmorphic Surfaces */
+  .voodoo-glass {
+    @apply bg-white/80 backdrop-blur-xl border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)];
+  }
+
+  .voodoo-glass-dark {
+    @apply bg-neutral-900/85 backdrop-blur-xl border border-neutral-800/80 shadow-[0_12px_40px_rgb(0,0,0,0.3)];
+  }
+
+  /* VooDoo Primary Button with Smooth Gradient Glow */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-primary-500 text-white font-medium text-body transition-colors duration-150 hover:bg-primary-600 active:bg-primary-700 disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 text-white font-medium text-body shadow-sm shadow-primary-500/20 transition-all duration-200 hover:from-primary-600 hover:to-primary-700 hover:shadow-md hover:shadow-primary-500/30 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none;
   }
 
   /* VooDoo Secondary Button */
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-neutral-100 text-neutral-900 font-medium text-body border border-transparent transition-colors duration-150 hover:bg-neutral-200 active:bg-neutral-300 disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-100 text-neutral-900 font-medium text-body border border-neutral-200/60 transition-all duration-150 hover:bg-neutral-200/80 active:scale-[0.98] disabled:opacity-50;
   }
 
   /* VooDoo Outline Button */
   .btn-outline {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-white text-neutral-800 font-medium text-body border border-neutral-200 transition-colors duration-150 hover:bg-neutral-50 hover:border-neutral-300 active:bg-neutral-100;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/90 backdrop-blur-sm text-neutral-800 font-medium text-body border border-neutral-200 transition-all duration-150 hover:bg-neutral-50 hover:border-neutral-300 hover:shadow-sm active:scale-[0.98];
   }
 
   /* VooDoo Danger Button */
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-danger-50 text-danger-600 font-medium text-body border border-danger-200 transition-colors duration-150 hover:bg-danger-100 active:bg-danger-200;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-danger-50 text-danger-600 font-medium text-body border border-danger-200 transition-all duration-150 hover:bg-danger-100 active:scale-[0.98];
   }
+
+  /* Gradient Text Utility */
+  .text-gradient-primary {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-500 via-primary-600 to-primary-400;
+  }
+
+  .text-gradient-dark {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-neutral-900 via-neutral-800 to-neutral-700;
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #dadcdd;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #bcc0c2;
+}
+
+/* Subtle grid ambient pattern */
+.bg-grid-pattern {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(120, 129, 135, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(120, 129, 135, 0.05) 1px, transparent 1px);
 }

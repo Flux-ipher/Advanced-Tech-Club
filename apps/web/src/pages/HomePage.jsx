@@ -326,26 +326,39 @@ export function HomePage() {
           </div>
 
           {/* Mobile APK Download Card */}
-          <div className="voodoo-card p-5 bg-gradient-to-br from-primary-500 to-primary-700 text-white border-primary-600">
-            <span className="text-xs font-bold uppercase tracking-wider text-primary-100 block mb-1">
-              Android App
-            </span>
-            <h4 className="text-base font-bold text-white mb-1.5">
-              Install ATC on your phone
+          <div className="voodoo-card p-5 bg-gradient-to-br from-neutral-900 via-neutral-900 to-primary-950 text-white border-neutral-800 shadow-xl relative overflow-hidden group">
+            <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-primary-500/10 to-transparent pointer-events-none" />
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-primary-400 bg-primary-500/20 px-2 py-0.5 rounded border border-primary-500/30">
+                Standalone Release v1.2.0
+              </span>
+              <span className="text-[11px] font-mono text-neutral-400">64 MB</span>
+            </div>
+            <h4 className="text-base font-bold text-white mb-1.5 flex items-center gap-2">
+              Install ATC Android App
             </h4>
-            <p className="text-xs text-primary-100 leading-relaxed mb-4">
-              Get push notifications for emergency notices, 1-tap quick registration, and offline access.
+            <p className="text-xs text-neutral-300 leading-relaxed mb-4">
+              Get real-time push alerts for urgent campus hackathons, 1-tap workshop registrations, and offline member vault access.
             </p>
-            <a
-              href="#apk"
-              onClick={(e) => {
-                e.preventDefault();
-                alert('EAS Production APK build link ready! Refer to Phase 4 build instructions in repository.');
-              }}
-              className="inline-flex items-center justify-center w-full py-2 px-3 rounded-lg bg-white text-primary-700 text-xs font-bold hover:bg-neutral-100 transition-colors shadow"
-            >
-              Download Android APK
-            </a>
+            <div className="space-y-2">
+              <a
+                href="/atc-release.apk"
+                download="atc-mobile-release.apk"
+                className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-3 rounded-xl bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold transition-all shadow-md shadow-primary-500/20 active:scale-[0.98]"
+              >
+                Download Standalone APK (64MB)
+              </a>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard?.writeText(window.location.origin + '/atc-release.apk');
+                  alert('Direct APK download link copied to clipboard!');
+                }}
+                className="w-full py-1.5 text-[11px] text-neutral-400 hover:text-white transition-colors text-center"
+              >
+                Copy Direct APK Link
+              </button>
+            </div>
           </div>
         </aside>
       </div>

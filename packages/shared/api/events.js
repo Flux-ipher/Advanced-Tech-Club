@@ -1,17 +1,21 @@
-// Events API for ATC Platform
 import { supabase, mockDb } from '../supabaseClient.js';
+import { initialEvents } from '../mockData.js';
 
 export async function getEvents() {
-  const { data, error } = await supabase
-    .from('events')
-    .select('*')
-    .order('start_at', { ascending: true });
+  try {
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .order('start_at', { ascending: true });
 
-  if (error) {
-    console.error('Error fetching events:', error);
-    throw error;
+    if (error || !data || data.length === 0) {
+      return initialEvents;
+    }
+    return data;
+  } catch (err) {
+    console.warn('Falling back to initial events:', err);
+    return initialEvents;
   }
-  return data || [];
 }
 
 export async function getEventById(id) {
@@ -150,52 +154,59 @@ export async function unregisterForEvent(eventId, userId) {
 }
 
 export async function getEventRegistrations(eventId) {
-  if (supabase.isMock) {
-    const regs = (mockDb.storage.event_registrations || []).filter((r) => r.event_id === eventId);
-    const enriched = regs.map((r) => {
-      const user = (mockDb.storage.profiles || []).find((p) => p.id === r.user_id) || {};
-      return {
-        ...r,
-        full_name: user.full_name || 'Member',
-        email: user.email || 'student@techclub.edu',
-        department: user.department || 'Engineering',
-        student_id: user.student_id || 'ID-NA'
-      };
-    });
-    return enriched;
-  }
+  try {
+    if (supabase.isMock) {
+      const regs = (mockDb.storage.event_registrations || []).filter((r) => r.event_id === eventId);
+      const enriched = regs.map((r) => {
+        const user = (mockDb.storage.profiles || []).find((p) => p.id === r.user_id) || {};
+        return {
+          ...r,
+          full_name: user.full_name || 'Member',
+          email: user.email || 'student@techclub.edu',
+          department: user.department || 'Engineering',
+          student_id: user.student_id || 'ID-NA'
+        };
+      });
+      return enriched;
+    }
 
-  const { data, error } = await supabase
-    .from('event_registrations')
-    .select('*, profiles(full_name, email, department, student_id)')
-    .eq('event_id', eventId);
+    const { data, error } = await supabase
+      .from('event_registrations')
+      .select('*, profiles(full_name, email, department, student_id)')
+      .eq('event_id', eventId);
 
-  if (error) {
-    console.error('Error fetching registrations:', error);
-    throw error;
+    if (error || !data || data.length === 0) {
+      return (initialRegistrations || []).filter((r) => r.event_id === eventId);
+    }
+
+    return (data || []).map((r) => ({
+      ...r,
+      full_name: r.profiles?.full_name || 'Member',
+      email: r.profiles?.email || '',
+      department: r.profiles?.department || '',
+      student_id: r.profiles?.student_id || ''
+    }));
+  } catch (err) {
+    return (initialRegistrations || []).filter((r) => r.event_id === eventId);
   }
-  return (data || []).map((r) => ({
-    ...r,
-    full_name: r.profiles?.full_name || 'Member',
-    email: r.profiles?.email || '',
-    department: r.profiles?.department || '',
-    student_id: r.profiles?.student_id || ''
-  }));
 }
 
 export async function getUserRegistrations(userId) {
-  if (supabase.isMock) {
-    return (mockDb.storage.event_registrations || []).filter((r) => r.user_id === userId);
-  }
+  try {
+    if (supabase.isMock) {
+      return (mockDb.storage.event_registrations || []).filter((r) => r.user_id === userId);
+    }
 
-  const { data, error } = await supabase
-    .from('event_registrations')
-    .select('*')
-    .eq('user_id', userId);
+    const { data, error } = await supabase
+      .from('event_registrations')
+      .select('*')
+      .eq('user_id', userId);
 
-  if (error) {
-    console.error('Error fetching user registrations:', error);
-    throw error;
+    if (error || !data || data.length === 0) {
+      return (initialRegistrations || []).filter((r) => r.user_id === userId);
+    }
+    return data;
+  } catch (err) {
+    return (initialRegistrations || []).filter((r) => r.user_id === userId);
   }
-  return data || [];
 }

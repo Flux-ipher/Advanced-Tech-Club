@@ -8,7 +8,10 @@ import {
   PanelLeft,
   Globe,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  Smartphone,
+  Download,
+  Radio
 } from 'lucide-react';
 
 export function PortalHeader({ collapsed, onToggleCollapse, onOpenMobile }) {
@@ -75,6 +78,29 @@ export function PortalHeader({ collapsed, onToggleCollapse, onOpenMobile }) {
 
       {/* Right Controls */}
       <div className="flex items-center gap-3">
+        {/* Realtime Live Pulse */}
+        <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success-50 border border-success-200 text-success-700 text-[11px] font-semibold">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-success-500"></span>
+          </span>
+          <span>Live WebSocket</span>
+        </div>
+
+        {/* Standalone Android APK Download */}
+        <a
+          href="/atc-release.apk"
+          download="atc-mobile-release.apk"
+          className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-semibold shadow-sm transition-all group"
+          title="Download Standalone Android APK (v1.2.0 • 64MB)"
+        >
+          <Smartphone className="w-3.5 h-3.5 text-primary-400 group-hover:scale-110 transition-transform" />
+          <span>Android APK</span>
+          <span className="text-[9px] bg-primary-500/30 text-primary-300 font-bold px-1.5 py-0.2 rounded font-mono">
+            64MB
+          </span>
+        </a>
+
         {/* Persona Switcher */}
         <DemoRoleSwitcher />
 

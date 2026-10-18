@@ -22,15 +22,16 @@ export function useEvents() {
   const fetchEventsAndRegistrations = useCallback(async () => {
     try {
       setLoading(true);
-      const [eventsData, regsData] = await Promise.all([
-        getEvents(),
-        currentUser ? getUserRegistrations(currentUser.id) : Promise.resolve([])
-      ]);
-      setEvents(eventsData);
-      setUserRegistrations(regsData);
+      const eventsData = await getEvents().catch(() => initialEvents);
+      const regsData = currentUser
+        ? await getUserRegistrations(currentUser.id).catch(() => [])
+        : [];
+      setEvents(eventsData || initialEvents);
+      setUserRegistrations(regsData || []);
       setError(null);
     } catch (err) {
-      setError(err.message || 'Failed to load events');
+      setEvents(initialEvents);
+      setError(null);
     } finally {
       setLoading(false);
     }

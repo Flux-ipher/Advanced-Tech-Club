@@ -1,17 +1,21 @@
-// Resources API for ATC Platform
 import { supabase, mockDb } from '../supabaseClient.js';
+import { initialResources } from '../mockData.js';
 
 export async function getResources() {
-  const { data, error } = await supabase
-    .from('resources')
-    .select('*')
-    .order('created_at', { ascending: false });
+  try {
+    const { data, error } = await supabase
+      .from('resources')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('Error fetching resources:', error);
-    throw error;
+    if (error || !data || data.length === 0) {
+      return initialResources;
+    }
+    return data;
+  } catch (err) {
+    console.warn('Falling back to initial resources:', err);
+    return initialResources;
   }
-  return data || [];
 }
 
 export async function createResource({

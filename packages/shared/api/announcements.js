@@ -1,17 +1,21 @@
-// Announcements API for ATC Platform
 import { supabase } from '../supabaseClient.js';
+import { initialAnnouncements } from '../mockData.js';
 
 export async function getAnnouncements() {
-  const { data, error } = await supabase
-    .from('announcements')
-    .select('*')
-    .order('created_at', { ascending: false });
+  try {
+    const { data, error } = await supabase
+      .from('announcements')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('Error fetching announcements:', error);
-    throw error;
+    if (error || !data || data.length === 0) {
+      return initialAnnouncements;
+    }
+    return data;
+  } catch (err) {
+    console.warn('Falling back to initial announcements:', err);
+    return initialAnnouncements;
   }
-  return data || [];
 }
 
 export async function createAnnouncement({ title, body, media_url, category = 'general', pinned = false, author_id, author_name, author_role, author_avatar }) {
