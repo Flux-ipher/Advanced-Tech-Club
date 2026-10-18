@@ -112,7 +112,7 @@ export function Navbar() {
                   </NavLink>
 
                   {isAdmin && (
-                    <NavLink to="/admin" className={navLinkClass}>
+                    <NavLink to="/admin" end className={navLinkClass}>
                       <span className="flex items-center gap-1.5 text-warning-700">
                         <Shield className="w-3.5 h-3.5" />
                         Admin
@@ -258,7 +258,7 @@ export function Navbar() {
                   </NavLink>
 
                   {isAdmin && (
-                    <NavLink to="/admin" onClick={() => setMobileMenuOpen(false)} className={mobileLinkClass}>
+                    <NavLink to="/admin" end onClick={() => setMobileMenuOpen(false)} className={mobileLinkClass}>
                       <Shield className="w-4 h-4 text-warning-600" /> Admin Studio
                     </NavLink>
                   )}

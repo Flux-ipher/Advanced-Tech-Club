@@ -30,7 +30,7 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
   const pendingCount = pendingMembers?.length || 0;
 
   const navItemClass = ({ isActive }) =>
-    `flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 ${
+    `flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-primary-400 ${
       isActive
         ? 'bg-primary-500 text-white shadow-sm'
         : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
@@ -179,6 +179,7 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
               <div className="space-y-1">
                 <NavLink
                   to="/admin"
+                  end
                   onClick={onCloseMobile}
                   className={navItemClass}
                   title="Admin Studio"
