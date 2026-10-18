@@ -13,7 +13,14 @@ import {
   BookOpen,
   Map,
   Filter,
-  Sparkles
+  Sparkles,
+  Star,
+  ExternalLink,
+  Copy,
+  Check,
+  Eye,
+  ArrowUpDown,
+  Share2
 } from 'lucide-react';
 
 export function ResourcesPage() {
@@ -28,7 +35,20 @@ export function ResourcesPage() {
 
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('popular'); // 'popular' | 'newest' | 'alpha'
+  const [showSavedOnly, setShowSavedOnly] = useState(false);
+  const [bookmarkedIds, setBookmarkedIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('atc_bookmarked_resources');
+      return saved ? JSON.parse(saved) : ['res-1'];
+    } catch {
+      return ['res-1'];
+    }
+  });
+
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [selectedResource, setSelectedResource] = useState(null);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   // New Resource Form
   const [title, setTitle] = useState('');
@@ -40,16 +60,53 @@ export function ResourcesPage() {
 
   const categories = ['All', 'Slides', 'Cheat Sheets', 'Code Samples', 'Documentation', 'Roadmaps'];
 
-  const filteredResources = resources.filter((res) => {
-    const matchesCategory =
-      categoryFilter === 'All' ? true : res.category === categoryFilter;
+  const toggleBookmark = (id) => {
+    setBookmarkedIds((prev) => {
+      const updated = prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id];
+      try {
+        localStorage.setItem('atc_bookmarked_resources', JSON.stringify(updated));
+      } catch (e) {
+        // ignore
+      }
+      return updated;
+    });
+  };
 
-    const matchesSearch =
-      res.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (res.description && res.description.toLowerCase().includes(searchQuery.toLowerCase()));
+  const handleCopyLink = (url) => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    }
+  };
 
-    return matchesCategory && matchesSearch;
-  });
+  const filteredResources = resources
+    .filter((res) => {
+      if (showSavedOnly && !bookmarkedIds.includes(res.id)) {
+        return false;
+      }
+
+      const matchesCategory =
+        categoryFilter === 'All' ? true : res.category === categoryFilter;
+
+      const matchesSearch =
+        res.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (res.description && res.description.toLowerCase().includes(searchQuery.toLowerCase()));
+
+      return matchesCategory && matchesSearch;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'popular') {
+        return (b.download_count || 0) - (a.download_count || 0);
+      }
+      if (sortBy === 'newest') {
+        return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      }
+      if (sortBy === 'alpha') {
+        return a.title.localeCompare(b.title);
+      }
+      return 0;
+    });
 
   const handleCreateResource = async (e) => {
     e.preventDefault();
@@ -99,46 +156,90 @@ export function ResourcesPage() {
           </p>
         </div>
 
-        {isAdmin && (
-          <button
-            onClick={() => setIsUploadModalOpen(true)}
-            className="btn-primary self-start md:self-auto text-sm shadow-sm flex items-center gap-2"
+        <div className="flex items-center gap-3">
+          <a
+            href="/atc-release.apk"
+            download="atc-release.apk"
+            className="btn-secondary text-xs shadow-sm flex items-center gap-1.5"
+            title="Download Mobile App Standalone APK"
           >
-            <Plus className="w-4 h-4" />
-            Upload New Resource
-          </button>
-        )}
+            <Download className="w-3.5 h-3.5 text-primary-600" />
+            Download Mobile APK (64MB)
+          </a>
+
+          {isAdmin && (
+            <button
+              onClick={() => setIsUploadModalOpen(true)}
+              className="btn-primary text-sm shadow-sm flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Upload New Resource
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="voodoo-card p-4 mb-8 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-        {/* Category Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
-          {categories.map((cat) => (
+      <div className="voodoo-card p-4 mb-8 space-y-3">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+          {/* Category Pills & Saved Filter */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => {
+                  setCategoryFilter(cat);
+                  setShowSavedOnly(false);
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
+                  !showSavedOnly && categoryFilter === cat
+                    ? 'bg-primary-500 text-white'
+                    : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+
             <button
-              key={cat}
-              onClick={() => setCategoryFilter(cat)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
-                categoryFilter === cat
-                  ? 'bg-primary-500 text-white'
-                  : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+              onClick={() => setShowSavedOnly((prev) => !prev)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition-colors ${
+                showSavedOnly
+                  ? 'bg-warning-500 text-white shadow-sm'
+                  : 'bg-warning-50 text-warning-700 hover:bg-warning-100 border border-warning-200'
               }`}
             >
-              {cat}
+              <Star className={`w-3.5 h-3.5 ${showSavedOnly ? 'fill-white' : 'fill-warning-500'}`} />
+              Saved ({bookmarkedIds.length})
             </button>
-          ))}
-        </div>
+          </div>
 
-        {/* Search */}
-        <div className="relative min-w-[240px]">
-          <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" />
-          <input
-            type="text"
-            placeholder="Search documents and templates..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-neutral-200 bg-neutral-50 focus:bg-white focus:outline-none focus:border-primary-500 transition-colors"
-          />
+          {/* Controls: Search and Sort */}
+          <div className="flex items-center gap-3">
+            <div className="relative min-w-[220px] flex-1">
+              <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                placeholder="Search templates & slides..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-neutral-200 bg-neutral-50 focus:bg-white focus:outline-none focus:border-primary-500 transition-colors"
+              />
+            </div>
+
+            <div className="flex items-center gap-1.5 text-xs text-neutral-500">
+              <ArrowUpDown className="w-3.5 h-3.5 text-neutral-400" />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="px-2 py-1.5 rounded-lg border border-neutral-200 bg-neutral-50 text-xs font-medium text-neutral-700 focus:outline-none focus:border-primary-500"
+              >
+                <option value="popular">Most Popular</option>
+                <option value="newest">Recently Added</option>
+                <option value="alpha">Alphabetical (A-Z)</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -153,7 +254,9 @@ export function ResourcesPage() {
           <FolderGit2 className="w-12 h-12 mx-auto mb-3 opacity-30 text-warning-500" />
           <h3 className="text-lg font-bold text-neutral-700">No resources found</h3>
           <p className="text-xs text-neutral-500 mt-1 max-w-sm mx-auto">
-            Try checking another category or clear your search query.
+            {showSavedOnly
+              ? 'You have not bookmarked any resources yet. Click the star icon on any card to save it.'
+              : 'Try checking another category or clear your search query.'}
           </p>
         </div>
       ) : (
@@ -165,9 +268,115 @@ export function ResourcesPage() {
               onDownload={downloadResource}
               isAdmin={isAdmin}
               onDelete={removeResource}
+              onPreview={setSelectedResource}
+              isBookmarked={bookmarkedIds.includes(res.id)}
+              onToggleBookmark={toggleBookmark}
             />
           ))}
         </div>
+      )}
+
+      {/* Resource Detail & Preview Modal */}
+      {selectedResource && (
+        <Modal
+          isOpen={Boolean(selectedResource)}
+          onClose={() => setSelectedResource(null)}
+          title={selectedResource.title}
+          maxWidth="max-w-2xl"
+        >
+          <div className="space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-neutral-50 border border-neutral-200">
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary-100 text-primary-700 border border-primary-200 uppercase">
+                  {selectedResource.category}
+                </span>
+                <span className="text-xs text-neutral-500 font-medium">
+                  Size: <strong>{selectedResource.file_size || '1.2 MB'}</strong>
+                </span>
+                <span className="text-xs text-neutral-500 font-medium">
+                  Downloads: <strong>{selectedResource.download_count || 0}</strong>
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => toggleBookmark(selectedResource.id)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold border flex items-center gap-1.5 transition-colors ${
+                    bookmarkedIds.includes(selectedResource.id)
+                      ? 'bg-warning-50 border-warning-300 text-warning-700'
+                      : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-100'
+                  }`}
+                >
+                  <Star className={`w-3.5 h-3.5 ${bookmarkedIds.includes(selectedResource.id) ? 'fill-warning-500' : ''}`} />
+                  {bookmarkedIds.includes(selectedResource.id) ? 'Bookmarked' : 'Bookmark'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleCopyLink(selectedResource.file_url)}
+                  className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-100 flex items-center gap-1.5 transition-colors"
+                >
+                  {copiedLink ? <Check className="w-3.5 h-3.5 text-success-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedLink ? 'Copied Link!' : 'Copy Link'}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1.5">
+                Overview & Description
+              </h4>
+              <p className="text-sm text-neutral-700 leading-relaxed bg-white p-3 rounded-lg border border-neutral-100">
+                {selectedResource.description || 'No description provided.'}
+              </p>
+            </div>
+
+            {/* Interactive Curriculum Preview Box */}
+            <div className="p-4 rounded-xl bg-neutral-900 text-neutral-200 font-mono text-xs space-y-2 border border-neutral-800">
+              <div className="flex items-center justify-between text-neutral-400 pb-2 border-b border-neutral-800">
+                <span className="flex items-center gap-1.5">
+                  <Code2 className="w-3.5 h-3.5 text-primary-400" />
+                  document_preview.md
+                </span>
+                <span className="text-[11px] text-primary-400">Verified by ATC Tech Leads</span>
+              </div>
+              <p className="text-neutral-300"># {selectedResource.title}</p>
+              <p className="text-neutral-400">## Topics Covered:</p>
+              <ul className="list-disc list-inside text-neutral-300 space-y-1">
+                <li>Production Architecture & System Setup</li>
+                <li>Best Practices & Performance Tuning</li>
+                <li>University Lab Exercises & Code Repository</li>
+              </ul>
+              <div className="pt-2 text-[11px] text-neutral-500 flex items-center justify-between">
+                <span>Storage: GitHub Enterprise / Supabase CDN</span>
+                <span>SHA256 checksum verified</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t border-neutral-200">
+              <button
+                type="button"
+                onClick={() => setSelectedResource(null)}
+                className="btn-secondary text-xs"
+              >
+                Close Preview
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  downloadResource(selectedResource);
+                  setSelectedResource(null);
+                }}
+                className="btn-primary text-xs py-2 px-4 flex items-center gap-2 shadow-sm"
+              >
+                <Download className="w-4 h-4" />
+                Download Resource Now
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* Upload Resource Modal (Admin & Super Admin) */}

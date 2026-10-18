@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '@atc/shared/hooks/useAuth';
 import { useEvents } from '@atc/shared/hooks/useEvents';
 import { RoleBadge } from '../components/RoleBadge';
+import { Modal } from '../components/Modal';
 import { ImageUploader } from '../components/ImageUploader';
 import { formatDateTime, formatDate } from '@atc/shared/utils/formatters';
 import {
@@ -15,7 +16,11 @@ import {
   Save,
   CheckCircle,
   ExternalLink,
-  Smartphone
+  Smartphone,
+  QrCode,
+  Download,
+  Printer,
+  Sparkles
 } from 'lucide-react';
 
 export function ProfilePage() {
@@ -28,6 +33,7 @@ export function ProfilePage() {
   const [bio, setBio] = useState(user?.bio || '');
   const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url || '');
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [isPassModalOpen, setIsPassModalOpen] = useState(false);
 
   // Filter events registered by current user
   const myRegisteredEvents = events.filter((e) =>
@@ -68,7 +74,7 @@ export function ProfilePage() {
           </div>
 
           <div className="flex-1 text-center sm:text-left space-y-2">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">
                   {user?.full_name}
@@ -79,9 +85,18 @@ export function ProfilePage() {
               </div>
 
               <div className="flex items-center gap-2 self-center sm:self-auto">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-success-50 text-success-700 border border-success-200">
-                  <CheckCircle className="w-3.5 h-3.5" />
-                  Account Active
+                <button
+                  type="button"
+                  onClick={() => setIsPassModalOpen(true)}
+                  className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5 shadow-sm"
+                >
+                  <QrCode className="w-3.5 h-3.5" />
+                  Digital Member Pass
+                </button>
+
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-success-50 text-success-700 border border-success-200">
+                  <CheckCircle className="w-3 h-3" />
+                  Active
                 </span>
               </div>
             </div>
@@ -235,8 +250,40 @@ export function ProfilePage() {
           </div>
         </div>
 
-        {/* Right 1 Col: Permissions & Notifications */}
+        {/* Right 1 Col: Mobile App & Permissions */}
         <div className="space-y-6">
+          {/* Mobile Companion App Card */}
+          <div className="voodoo-card p-5 bg-gradient-to-br from-primary-900 to-neutral-950 text-white border-primary-800 shadow-md">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-primary-300 flex items-center gap-1.5">
+                <Smartphone className="w-4 h-4 text-primary-400" />
+                Android Companion App
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary-500/20 text-primary-300 border border-primary-500/30">
+                v1.4.0 APK
+              </span>
+            </div>
+
+            <h4 className="text-base font-bold text-white mb-1.5">
+              ATC Mobile Hub
+            </h4>
+            <p className="text-xs text-neutral-300 leading-relaxed mb-4">
+              Take the club with you. Check into workshops with your digital pass, get instant push alerts, and browse the vault offline.
+            </p>
+
+            <a
+              href="/atc-release.apk"
+              download="atc-release.apk"
+              className="w-full btn-primary text-xs py-2 px-3 flex items-center justify-center gap-2 shadow-sm font-semibold"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Download Standalone APK (64MB)
+            </a>
+            <p className="text-[10px] text-neutral-400 text-center mt-2">
+              Standalone Release · No Metro or Google Play Required
+            </p>
+          </div>
+
           {/* Role & Permissions Card */}
           <div className="voodoo-card p-5">
             <h4 className="text-xs font-bold text-neutral-900 uppercase tracking-wider mb-3 flex items-center gap-1.5">
@@ -293,6 +340,108 @@ export function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Digital Member ID & QR Check-in Pass Modal */}
+      {isPassModalOpen && (
+        <Modal
+          isOpen={isPassModalOpen}
+          onClose={() => setIsPassModalOpen(false)}
+          title="Digital Campus Member ID & Entry Pass"
+          maxWidth="max-w-md"
+        >
+          <div className="space-y-5">
+            <div className="p-6 rounded-2xl bg-gradient-to-br from-neutral-900 via-neutral-900 to-primary-950 text-white shadow-xl border border-neutral-700 relative overflow-hidden">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="w-7 h-7 rounded-lg bg-primary-500 flex items-center justify-center font-black text-white text-xs">
+                    ATC
+                  </span>
+                  <div>
+                    <h3 className="text-xs font-bold tracking-tight text-white leading-tight">
+                      ADVANCED TECH CLUB
+                    </h3>
+                    <p className="text-[10px] text-neutral-400">STUDENT INNOVATION HUB</p>
+                  </div>
+                </div>
+
+                <RoleBadge role={user?.role} size="sm" />
+              </div>
+
+              <div className="flex items-center gap-4 py-3 border-y border-neutral-800">
+                <img
+                  src={
+                    user?.avatar_url ||
+                    avatarUrl ||
+                    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
+                  }
+                  alt={user?.full_name}
+                  className="w-16 h-16 rounded-xl object-cover border-2 border-primary-500"
+                />
+                <div>
+                  <h4 className="text-base font-bold text-white">{user?.full_name}</h4>
+                  <p className="text-xs text-primary-300 font-mono mt-0.5">
+                    {user?.student_id || 'CS2023-001'}
+                  </p>
+                  <p className="text-[11px] text-neutral-400">
+                    {user?.department || 'Computer Science & Engineering'}
+                  </p>
+                </div>
+              </div>
+
+              {/* High-density QR Matrix Simulation */}
+              <div className="pt-4 flex flex-col items-center">
+                <div className="p-3 bg-white rounded-xl shadow-inner border border-neutral-200">
+                  <div className="w-40 h-40 grid grid-cols-10 gap-0.5 p-1 bg-white">
+                    {Array.from({ length: 100 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className={`w-full h-full rounded-[1px] ${
+                          (i % 2 === 0 && i % 3 === 0) ||
+                          (i < 30 && i % 7 === 0) ||
+                          i % 5 === 0 ||
+                          i === 42 ||
+                          i === 55 ||
+                          i === 88
+                            ? 'bg-neutral-900'
+                            : 'bg-white'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <p className="text-[10px] font-mono text-neutral-400 mt-2">
+                  PASS-TOKEN: {user?.id || 'usr-ritesh-admin'}-2026-ATC
+                </p>
+                <div className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold text-success-400">
+                  <CheckCircle className="w-3 h-3 text-success-400" />
+                  AUTHENTICATED CAMPUS MEMBER · SPRING 2026
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              <button
+                type="button"
+                onClick={() => setIsPassModalOpen(false)}
+                className="btn-secondary text-xs"
+              >
+                Done
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  window.print();
+                }}
+                className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5 shadow-sm"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                Print / Save Pass
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

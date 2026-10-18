@@ -1,12 +1,15 @@
 import React from 'react';
-import { Download, FileText, Code2, BookOpen, Map, Trash2, HardDrive } from 'lucide-react';
+import { Download, FileText, Code2, BookOpen, Map, Trash2, HardDrive, Star, Eye, ExternalLink } from 'lucide-react';
 import { formatRelativeTime } from '@atc/shared/utils/formatters';
 
 export function ResourceCard({
   resource,
   onDownload,
   isAdmin = false,
-  onDelete
+  onDelete,
+  onPreview,
+  isBookmarked = false,
+  onToggleBookmark
 }) {
   const {
     id,
@@ -53,33 +56,58 @@ export function ResourceCard({
   };
 
   return (
-    <div className="voodoo-card-hover p-5 flex flex-col justify-between">
+    <div
+      onClick={() => onPreview && onPreview(resource)}
+      className="voodoo-card-hover p-5 flex flex-col justify-between cursor-pointer group transition-all duration-200"
+    >
       <div>
         <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="p-2.5 rounded-xl bg-neutral-100 border border-neutral-200">
+          <div className="p-2.5 rounded-xl bg-neutral-100 border border-neutral-200 group-hover:border-primary-300 group-hover:bg-primary-50/50 transition-colors">
             {getCategoryIcon()}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <span
               className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border uppercase tracking-wider ${getCategoryBg()}`}
             >
               {category}
             </span>
 
+            {onToggleBookmark && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleBookmark(id);
+                }}
+                title={isBookmarked ? 'Remove bookmark' : 'Bookmark resource'}
+                className={`p-1.5 rounded-lg border transition-all ${
+                  isBookmarked
+                    ? 'bg-warning-50 border-warning-300 text-warning-600'
+                    : 'bg-neutral-50 border-neutral-200 text-neutral-400 hover:text-warning-600 hover:bg-warning-50'
+                }`}
+              >
+                <Star className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-warning-500' : ''}`} />
+              </button>
+            )}
+
             {isAdmin && onDelete && (
               <button
-                onClick={() => onDelete(id)}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(id);
+                }}
                 title="Delete resource"
-                className="p-1 text-neutral-400 hover:text-danger-600 rounded hover:bg-danger-50 transition-colors"
+                className="p-1.5 text-neutral-400 hover:text-danger-600 rounded-lg hover:bg-danger-50 transition-colors"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
         </div>
 
-        <h3 className="text-base font-bold text-neutral-900 mb-1.5 leading-snug">
+        <h3 className="text-base font-bold text-neutral-900 mb-1.5 leading-snug group-hover:text-primary-600 transition-colors">
           {title}
         </h3>
         <p className="text-xs text-neutral-500 line-clamp-2 mb-4 leading-relaxed">
@@ -88,7 +116,7 @@ export function ResourceCard({
       </div>
 
       <div className="pt-3 border-t border-neutral-100 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 text-xs text-neutral-400">
+        <div className="flex items-center gap-2 text-xs text-neutral-400">
           <span className="flex items-center gap-1 font-medium text-neutral-600">
             <HardDrive className="w-3.5 h-3.5 text-neutral-400" />
             {file_size}
@@ -97,13 +125,31 @@ export function ResourceCard({
           <span>{download_count} downloads</span>
         </div>
 
-        <button
-          onClick={() => onDownload(resource)}
-          className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5 shadow-sm"
-        >
-          <Download className="w-3.5 h-3.5" />
-          Download
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onPreview) onPreview(resource);
+            }}
+            className="p-1.5 text-neutral-500 hover:text-primary-600 rounded-lg hover:bg-primary-50 transition-colors"
+            title="Preview resource"
+          >
+            <Eye className="w-4 h-4" />
+          </button>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDownload(resource);
+            }}
+            className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5 shadow-sm"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Download
+          </button>
+        </div>
       </div>
     </div>
   );
