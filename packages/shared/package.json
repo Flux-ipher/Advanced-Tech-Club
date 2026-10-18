@@ -1,0 +1,21 @@
+{
+  "name": "@atc/shared",
+  "version": "1.0.0",
+  "description": "Shared platform-agnostic logic, API client, hooks, and theme for ATC",
+  "main": "index.js",
+  "module": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./theme": "./theme.js",
+    "./supabaseClient": "./supabaseClient.js",
+    "./mockData": "./mockData.js",
+    "./api/*": "./api/*.js",
+    "./hooks/*": "./hooks/*.js",
+    "./store/*": "./store/*.js",
+    "./utils/*": "./utils/*.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.8",
+    "zustand": "^4.5.2"
+  }
+}

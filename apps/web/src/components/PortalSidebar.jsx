@@ -1,0 +1,264 @@
+import React, { useState } from 'react';
+import { NavLink, Link, useLocation } from 'react-router-dom';
+import { useAuth } from '@atc/shared/hooks/useAuth';
+import { useMembers } from '@atc/shared/hooks/useMembers';
+import { RoleBadge } from './RoleBadge';
+import {
+  Bell,
+  Calendar,
+  FolderGit2,
+  User,
+  Shield,
+  BarChart3,
+  ChevronLeft,
+  ChevronRight,
+  Globe,
+  Radio,
+  Clock,
+  Sparkles,
+  Smartphone,
+  LogOut,
+  Layers,
+  ChevronDown
+} from 'lucide-react';
+
+export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile }) {
+  const { user, isAdmin, logout } = useAuth();
+  const { pendingMembers } = useMembers();
+  const location = useLocation();
+
+  const pendingCount = pendingMembers?.length || 0;
+
+  const navItemClass = ({ isActive }) =>
+    `flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 ${
+      isActive
+        ? 'bg-primary-500 text-white shadow-sm'
+        : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100'
+    } ${collapsed ? 'justify-center px-2' : ''}`;
+
+  return (
+    <>
+      {/* Mobile Backdrop */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-neutral-950/40 backdrop-blur-sm lg:hidden animate-in fade-in duration-200"
+          onClick={onCloseMobile}
+        />
+      )}
+
+      {/* Sidebar Container */}
+      <aside
+        className={`fixed top-0 bottom-0 left-0 z-40 flex flex-col bg-white border-r border-neutral-200 transition-all duration-300 ease-in-out ${
+          collapsed ? 'w-20' : 'w-64'
+        } ${
+          mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
+      >
+        {/* Brand Header */}
+        <div className="h-16 px-4 border-b border-neutral-200 flex items-center justify-between shrink-0">
+          <Link
+            to="/portal"
+            className={`flex items-center gap-3 overflow-hidden ${
+              collapsed ? 'justify-center w-full' : ''
+            }`}
+          >
+            <div className="w-9 h-9 rounded-xl bg-primary-500 text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+              ATC
+            </div>
+            {!collapsed && (
+              <div className="overflow-hidden">
+                <span className="font-extrabold text-sm text-neutral-900 tracking-tight block leading-none truncate">
+                  Advanced Tech Club
+                </span>
+                <span className="text-[10px] font-semibold text-neutral-400 block mt-1 leading-none uppercase tracking-wider">
+                  Club Portal Hub
+                </span>
+              </div>
+            )}
+          </Link>
+
+          {/* Desktop Collapse Toggle */}
+          {!collapsed && (
+            <button
+              onClick={onToggleCollapse}
+              className="hidden lg:flex p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
+              title="Collapse sidebar"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Collapsed expand toggle button */}
+        {collapsed && (
+          <div className="hidden lg:flex justify-center py-2 border-b border-neutral-100">
+            <button
+              onClick={onToggleCollapse}
+              className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
+              title="Expand sidebar"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Navigation Groups */}
+        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+          {/* GROUP 1: COMMUNITY & FEED */}
+          <div>
+            {!collapsed && (
+              <p className="px-3 text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-2">
+                Community
+              </p>
+            )}
+            <div className="space-y-1">
+              <NavLink
+                to="/portal"
+                end
+                onClick={onCloseMobile}
+                className={navItemClass}
+                title="Announcements"
+              >
+                <Radio className="w-4 h-4 shrink-0" />
+                {!collapsed && <span>Announcements</span>}
+              </NavLink>
+
+              <NavLink
+                to="/portal/events"
+                onClick={onCloseMobile}
+                className={navItemClass}
+                title="Workshops & Events"
+              >
+                <Calendar className="w-4 h-4 shrink-0" />
+                {!collapsed && <span>Workshops & Sprints</span>}
+              </NavLink>
+            </div>
+          </div>
+
+          {/* GROUP 2: KNOWLEDGE VAULT */}
+          <div>
+            {!collapsed && (
+              <p className="px-3 text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-2">
+                Resources
+              </p>
+            )}
+            <div className="space-y-1">
+              <NavLink
+                to="/portal/resources"
+                onClick={onCloseMobile}
+                className={navItemClass}
+                title="Vault Resources"
+              >
+                <FolderGit2 className="w-4 h-4 shrink-0" />
+                {!collapsed && <span>Vault Library</span>}
+              </NavLink>
+
+              <NavLink
+                to="/portal/profile"
+                onClick={onCloseMobile}
+                className={navItemClass}
+                title="My Profile"
+              >
+                <User className="w-4 h-4 shrink-0" />
+                {!collapsed && <span>My Profile</span>}
+              </NavLink>
+            </div>
+          </div>
+
+          {/* GROUP 3: ADMINISTRATION (Role-Gated) */}
+          {isAdmin && (
+            <div>
+              {!collapsed && (
+                <p className="px-3 text-[10px] font-bold text-warning-700 uppercase tracking-wider mb-2 flex items-center justify-between">
+                  <span>Administration</span>
+                  <span className="text-[9px] bg-warning-100 text-warning-800 px-1.5 py-0.2 rounded font-mono font-bold">
+                    Admin
+                  </span>
+                </p>
+              )}
+              <div className="space-y-1">
+                <NavLink
+                  to="/admin"
+                  onClick={onCloseMobile}
+                  className={navItemClass}
+                  title="Admin Studio"
+                >
+                  <Shield className="w-4 h-4 text-warning-600 shrink-0" />
+                  {!collapsed && <span>Admin Studio</span>}
+                </NavLink>
+
+                <NavLink
+                  to="/admin/members"
+                  onClick={onCloseMobile}
+                  className={navItemClass}
+                  title="Student Verifications"
+                >
+                  <Clock className="w-4 h-4 text-primary-500 shrink-0" />
+                  {!collapsed && (
+                    <span className="flex-1 flex items-center justify-between">
+                      <span>Verifications</span>
+                      {pendingCount > 0 && (
+                        <span className="px-1.5 py-0.2 text-[10px] font-bold bg-warning-500 text-white rounded-full">
+                          {pendingCount}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </NavLink>
+
+                <NavLink
+                  to="/analytics"
+                  onClick={onCloseMobile}
+                  className={navItemClass}
+                  title="Growth Analytics"
+                >
+                  <BarChart3 className="w-4 h-4 text-primary-500 shrink-0" />
+                  {!collapsed && <span>Analytics</span>}
+                </NavLink>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Sidebar Footer */}
+        <div className="p-3 border-t border-neutral-200 bg-neutral-50/50 space-y-2 shrink-0">
+          {/* Back to Public Site Link */}
+          <Link
+            to="/"
+            onClick={onCloseMobile}
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-colors ${
+              collapsed ? 'justify-center px-1' : ''
+            }`}
+            title="Return to Public Website"
+          >
+            <Globe className="w-4 h-4 text-neutral-500 shrink-0" />
+            {!collapsed && <span>Exit to Public Site</span>}
+          </Link>
+
+          {/* User Mini Card */}
+          <div
+            className={`flex items-center gap-2.5 p-2 rounded-xl bg-white border border-neutral-200 ${
+              collapsed ? 'justify-center p-1.5' : ''
+            }`}
+          >
+            <img
+              src={user?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80'}
+              alt={user?.full_name}
+              className="w-8 h-8 rounded-full object-cover border border-neutral-200 shrink-0"
+            />
+            {!collapsed && (
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-neutral-900 truncate">{user?.full_name}</p>
+                <p className="text-[10px] font-semibold text-primary-600 uppercase tracking-wider">
+                  {user?.role === 'super_admin' || user?.role === 'admin' ? 'Admin' : 'Member'}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+export default PortalSidebar;

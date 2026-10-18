@@ -1,0 +1,26 @@
+{
+  "name": "atc-platform",
+  "version": "1.0.0",
+  "description": "Advanced Tech Club - Web & Mobile Platform",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=@atc/web",
+    "dev:web": "npm run dev --workspace=@atc/web",
+    "build:web": "npm run build --workspace=@atc/web",
+    "preview:web": "npm run preview --workspace=@atc/web",
+    "start:mobile": "npm run start --workspace=@atc/mobile"
+  },
+  "keywords": [
+    "atc",
+    "club",
+    "react",
+    "react-native",
+    "supabase"
+  ],
+  "author": "Ritesh Mishra",
+  "license": "MIT"
+}

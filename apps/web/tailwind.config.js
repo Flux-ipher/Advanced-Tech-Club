@@ -1,0 +1,108 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+    "../../packages/shared/**/*.{js,jsx}"
+  ],
+  theme: {
+    extend: {
+      colors: {
+        // Exact VooDoo ramps extracted from Overview.png
+        primary: {
+          50: '#f2f8fd',
+          100: '#e5f2fb',
+          200: '#c1e5ff',
+          300: '#90cdf9',
+          400: '#45b0fc',
+          500: '#0597ff',
+          600: '#0180da',
+          700: '#0368b0',
+          800: '#054c7f',
+          900: '#072f4b',
+          950: '#061a28'
+        },
+        neutral: {
+          50: '#f7f7f8',
+          100: '#ecedee',
+          200: '#dadcdd',
+          300: '#bcc0c2',
+          400: '#989fa4',
+          500: '#788187',
+          600: '#656c72',
+          700: '#51585c',
+          800: '#3e4346',
+          900: '#27292b',
+          950: '#161718'
+        },
+        info: {
+          50: '#fdf2f3',
+          100: '#fbe5e8',
+          200: '#f9c8ce',
+          300: '#ff8f9d',
+          400: '#fc4a62',
+          500: '#ff0a2b',
+          600: '#df011f',
+          700: '#b0031a',
+          800: '#840616',
+          900: '#4b0710',
+          950: '#28060a'
+        },
+        success: {
+          50: '#f4fbf7',
+          100: '#e4f6ec',
+          200: '#ccf0db',
+          300: '#a1e8be',
+          400: '#70e19f',
+          500: '#3fd97f',
+          600: '#27c468',
+          700: '#219c54',
+          800: '#1b7440',
+          900: '#134427',
+          950: '#0b2315'
+        },
+        warning: {
+          50: '#fdf8f2',
+          100: '#faf0e0',
+          200: '#f9e1be',
+          300: '#f9cd8a',
+          400: '#ffb341',
+          500: '#ff9b05',
+          600: '#da8301',
+          700: '#ab6803',
+          800: '#7f4e05',
+          900: '#4b3007',
+          950: '#281a06'
+        },
+        danger: {
+          50: '#fdf2f2',
+          100: '#fae0e0',
+          200: '#f9bebe',
+          300: '#f98585',
+          400: '#fd3f3f',
+          500: '#ff0000',
+          600: '#d50101',
+          700: '#aa0303',
+          800: '#7f0505',
+          900: '#4b0707',
+          950: '#280606'
+        }
+      },
+      fontFamily: {
+        voodoo: ['Inter', 'Outfit', 'system-ui', '-apple-system', 'sans-serif'],
+      },
+      fontSize: {
+        'h1': ['48px', { lineHeight: '1.15', fontWeight: '700', letterSpacing: '-0.02em' }],
+        'h2': ['36px', { lineHeight: '1.2', fontWeight: '700', letterSpacing: '-0.015em' }],
+        'h3': ['28px', { lineHeight: '1.3', fontWeight: '500', letterSpacing: '-0.01em' }],
+        'body': ['16px', { lineHeight: '1.5', fontWeight: '400' }],
+        'label': ['12px', { lineHeight: '1.3', fontWeight: '700', letterSpacing: '0.04em' }],
+      },
+      boxShadow: {
+        'card': '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03)',
+        'modal': '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+      }
+    },
+  },
+  plugins: [],
+}

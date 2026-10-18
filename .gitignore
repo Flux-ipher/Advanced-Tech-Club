@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment variables & secrets (Strictly prevent any secrets leakage)
+.env
+.env*
+*.env*
+**/.env*
+!**/.env.example
+secrets.*
+credentials.*
+*.pem
+*.key
+*.cert
+
+# Excluded document file formats per repository guidelines (no txt, pdf, md)
+*.txt
+*.pdf
+*.md
+**/*.txt
+**/*.pdf
+**/*.md
+
+# Build outputs
+dist/
+dist-ssr/
+build/
+*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Expo & React Native
+.expo/
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+*.orig.*
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
