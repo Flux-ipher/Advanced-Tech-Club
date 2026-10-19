@@ -380,6 +380,8 @@ export default function App() {
         }
       ]
     );
+  };
+
   // Google Sign-In Sheet Bottom Modal
   const renderGoogleModal = () => (
     <Modal visible={isGoogleModalOpen} animationType="slide" transparent>
@@ -2650,5 +2652,4 @@ export default function App() {
       {renderGoogleModal()}
     </SafeAreaView>
   );
-}
 }
