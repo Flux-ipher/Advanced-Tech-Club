@@ -31,13 +31,6 @@ import {
 export function LandingPage() {
   const { user, isVerified, isSuperAdmin } = useAuth();
   const publicEvents = initialEvents.slice(0, 3);
-  const [copiedApk, setCopiedApk] = useState(false);
-
-  const handleCopyApkLink = () => {
-    navigator.clipboard?.writeText(window.location.origin + '/atc-release.apk');
-    setCopiedApk(true);
-    setTimeout(() => setCopiedApk(false), 2500);
-  };
 
   return (
     <div className="space-y-24 pb-24">
@@ -72,7 +65,7 @@ export function LandingPage() {
           </p>
 
           {/* Main Action Trays */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 max-w-xl mx-auto">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 max-w-md mx-auto">
             <Link
               to="/apply"
               className="w-full sm:w-auto btn-primary px-8 py-3.5 text-sm font-bold shadow-md hover:shadow-lg flex items-center justify-center gap-2 group"
@@ -82,26 +75,12 @@ export function LandingPage() {
             </Link>
 
             <Link
-              to="/portal"
+              to={user ? '/portal' : '/login?mode=register'}
               className="w-full sm:w-auto btn-outline px-7 py-3.5 text-sm font-bold flex items-center justify-center gap-2 shadow-sm hover:border-neutral-300"
             >
-              Launch Club Portal
+              {user ? 'Open Club Portal' : 'Sign Up for Portal'}
               <ArrowUpRight className="w-4 h-4 text-neutral-400" />
             </Link>
-
-            {/* Direct APK Download Capsule */}
-            <a
-              href="/atc-release.apk"
-              download="atc-mobile-release.apk"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl bg-neutral-900 text-white hover:bg-neutral-800 text-sm font-semibold transition-all shadow-sm group"
-              title="Download Standalone Android APK (v1.2.0 • 64MB)"
-            >
-              <Smartphone className="w-4 h-4 text-primary-400 group-hover:scale-110 transition-transform" />
-              <span>Android APK</span>
-              <span className="text-[10px] uppercase font-bold bg-primary-500/30 text-primary-300 px-1.5 py-0.5 rounded">
-                64MB
-              </span>
-            </a>
           </div>
 
           {/* Security & Access Guard Note */}
@@ -453,10 +432,10 @@ export function LandingPage() {
                 Start Application
               </Link>
               <Link
-                to="/portal"
+                to={user ? '/portal' : '/login?mode=register'}
                 className="px-8 py-3.5 rounded-xl bg-primary-800/80 text-white font-bold text-sm hover:bg-primary-900 transition-all border border-primary-400/60 active:scale-95"
               >
-                Member Portal Login
+                {user ? 'Open Member Portal' : 'Member Portal Sign Up'}
               </Link>
             </div>
           </div>

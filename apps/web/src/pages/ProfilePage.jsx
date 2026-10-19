@@ -268,36 +268,39 @@ export function ProfilePage() {
 
         {/* Right 1 Col: Mobile App & Permissions */}
         <div className="space-y-6">
-          {/* Mobile Companion App Card */}
-          <div className="voodoo-card p-5 bg-gradient-to-br from-primary-900 to-neutral-950 text-white border-primary-800 shadow-md">
+          {/* Mobile Companion App Card (Exclusive to Logged-in Members) */}
+          <div className="voodoo-card p-5 bg-gradient-to-br from-primary-950 via-neutral-900 to-neutral-950 text-white border-primary-700/60 shadow-lg relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary-500/10 rounded-full blur-2xl pointer-events-none" />
+
             <div className="flex items-center justify-between gap-2 mb-3">
               <span className="text-[11px] font-bold uppercase tracking-wider text-primary-300 flex items-center gap-1.5">
                 <Smartphone className="w-4 h-4 text-primary-400" />
-                Android Companion App
+                Member Mobile App
               </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary-500/20 text-primary-300 border border-primary-500/30">
-                v1.4.0 APK
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-success-500/20 text-success-300 border border-success-500/30">
+                Verified APK
               </span>
             </div>
 
             <h4 className="text-base font-bold text-white mb-1.5">
-              ATC Mobile Hub
+              Official Android Release (v1.4.0)
             </h4>
             <p className="text-xs text-neutral-300 leading-relaxed mb-4">
-              Take the club with you. Check into workshops with your digital pass, get instant push alerts, and browse the vault offline.
+              Access workshops offline, flash your digital QR pass at campus check-in, and receive real-time push alerts.
             </p>
 
             <a
               href="/atc-release.apk"
-              download="atc-release.apk"
-              className="w-full btn-primary text-xs py-2 px-3 flex items-center justify-center gap-2 shadow-sm font-semibold"
+              download="atc-mobile-release.apk"
+              className="w-full btn-primary text-xs py-2.5 px-3 flex items-center justify-center gap-2 shadow-md font-bold hover:scale-[1.01] active:scale-[0.98] transition-transform"
             >
-              <Download className="w-3.5 h-3.5" />
-              Download Standalone APK (64MB)
+              <Download className="w-4 h-4" />
+              Download Android APK (64MB)
             </a>
-            <p className="text-[10px] text-neutral-400 text-center mt-2">
-              Standalone Release · No Metro or Google Play Required
-            </p>
+            <div className="flex items-center justify-between text-[10px] text-neutral-400 mt-2.5 px-0.5">
+              <span>Standalone Gradle Build</span>
+              <span>SHA-256 Verified</span>
+            </div>
           </div>
 
           {/* Role & Permissions Card */}
