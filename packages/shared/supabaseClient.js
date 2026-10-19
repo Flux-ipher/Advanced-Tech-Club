@@ -12,23 +12,8 @@ import {
   initialNotifications
 } from './mockData.js';
 
-// Resolve environment variables safely across Web (import.meta.env or process.env) and Expo (process.env)
-const getEnvVar = (webKey, expoKey) => {
-  if (typeof process !== 'undefined' && process?.env) {
-    if (process.env[webKey]) return process.env[webKey];
-    if (process.env[expoKey]) return process.env[expoKey];
-  }
-  try {
-    const meta = (new Function('return typeof import.meta !== "undefined" ? import.meta : {}'))();
-    if (meta?.env && meta.env[webKey]) return meta.env[webKey];
-  } catch (e) {
-    // import.meta not available in Hermes / Node
-  }
-  return '';
-};
-
-const supabaseUrl = getEnvVar('VITE_SUPABASE_URL', 'EXPO_PUBLIC_SUPABASE_URL');
-const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY', 'EXPO_PUBLIC_SUPABASE_ANON_KEY');
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
 const isRealSupabaseConfigured = Boolean(
   supabaseUrl &&
