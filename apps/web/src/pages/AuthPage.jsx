@@ -8,7 +8,7 @@ import { Lock, Mail, User, Sparkles, Shield, ArrowRight, Check } from 'lucide-re
 
 export function AuthPage() {
   const navigate = useNavigate();
-  const { setUser, switchDemoUser } = useAuth();
+  const { setUser, switchDemoUser, signInWithEmail, signUpWithEmail } = useAuth();
 
   const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [email, setEmail] = useState('');
@@ -25,21 +25,11 @@ export function AuthPage() {
 
     try {
       if (mode === 'login') {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        setUser(data.user);
+        await signInWithEmail(email, password);
       } else {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { full_name: fullName, department }
-          }
-        });
-        if (error) throw error;
-        setUser(data.user);
+        await signUpWithEmail(email, password, fullName, department);
       }
-      navigate('/');
+      navigate('/portal');
     } catch (err) {
       setErrorMsg(err.message || 'Authentication failed');
     } finally {
@@ -205,7 +195,9 @@ export function AuthPage() {
                     />
                     <div>
                       <span className="font-semibold text-neutral-900 block leading-tight">{p.full_name}</span>
-                      <span className="text-[10px] text-neutral-400 capitalize">{p.role.replace('_', ' ')}</span>
+                      <span className="text-[10px] text-neutral-400 capitalize">
+                        {p.role === 'admin' || p.role === 'super_admin' ? 'Admin' : 'Member'}
+                      </span>
                     </div>
                   </div>
                   <ArrowRight className="w-3.5 h-3.5 text-neutral-400" />

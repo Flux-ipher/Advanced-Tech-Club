@@ -14,12 +14,15 @@ import {
 
 // Resolve environment variables safely across Web (import.meta.env or process.env) and Expo (process.env)
 const getEnvVar = (webKey, expoKey) => {
-  if (typeof import.meta !== 'undefined' && import.meta.env) {
-    if (import.meta.env[webKey]) return import.meta.env[webKey];
-  }
-  if (typeof process !== 'undefined' && process.env) {
+  if (typeof process !== 'undefined' && process?.env) {
     if (process.env[webKey]) return process.env[webKey];
     if (process.env[expoKey]) return process.env[expoKey];
+  }
+  try {
+    const meta = (new Function('return typeof import.meta !== "undefined" ? import.meta : {}'))();
+    if (meta?.env && meta.env[webKey]) return meta.env[webKey];
+  } catch (e) {
+    // import.meta not available in Hermes / Node
   }
   return '';
 };
@@ -238,4 +241,36 @@ export const supabase = isRealSupabaseConfigured
 
 export const isLiveSupabase = isRealSupabaseConfigured;
 export { mockDb };
+
+// Firebase Auth + Supabase JWT Bridge Client Factory
+// Passes Firebase ID Token to Supabase as Bearer token to satisfy RLS policies using auth.uid()
+export function getSupabaseClient(firebaseIdToken) {
+  if (!isRealSupabaseConfigured) {
+    return supabase;
+  }
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    global: {
+      headers: firebaseIdToken ? { Authorization: `Bearer ${firebaseIdToken}` } : {},
+    },
+    auth: { persistSession: false }, // Firebase manages session lifecycle
+  });
+}
+
+// Executes a query with an auto-refreshed Firebase ID token
+export async function supabaseQuery(firebaseUser, queryFn) {
+  if (!firebaseUser) {
+    return queryFn(supabase);
+  }
+  try {
+    const token = typeof firebaseUser.getIdToken === 'function'
+      ? await firebaseUser.getIdToken()
+      : null;
+    const client = getSupabaseClient(token);
+    return queryFn(client);
+  } catch (err) {
+    console.warn('[ATC Supabase] Error acquiring Firebase ID token:', err);
+    return queryFn(supabase);
+  }
+}
+
 export default supabase;

@@ -15,10 +15,16 @@ import {
 } from 'react-native';
 import { initialProfiles, initialAnnouncements, initialEvents, initialResources } from '@atc/shared/mockData';
 import { colors } from '@atc/shared/theme';
+import { Analytics } from '@atc/shared/utils/analytics';
 
 export default function App() {
   // Navigation State
   const [currentTab, setCurrentTab] = useState('home'); // 'home' | 'events' | 'resources' | 'profile'
+
+  const handleSwitchTab = (tab) => {
+    setCurrentTab(tab);
+    Analytics.screenView(tab);
+  };
 
   // Active User Profile
   const [currentUser, setCurrentUser] = useState(initialProfiles[0]); // Default: Ritesh Mishra
@@ -96,6 +102,7 @@ export default function App() {
             : e
         )
       );
+      Analytics.eventUnregistered(eventId);
       triggerToast('RSVP Cancelled');
     } else {
       setRegisteredEventIds((prev) => [...prev, eventId]);
@@ -106,6 +113,7 @@ export default function App() {
             : e
         )
       );
+      Analytics.eventRegistered(eventId);
       triggerToast('RSVP Confirmed! 🎉 Pass Unlocked');
     }
   };
@@ -158,6 +166,7 @@ export default function App() {
     setNewAnnTitle('');
     setNewAnnBody('');
     setNewAnnPinned(false);
+    Analytics.adminPostedAnnouncement();
     triggerToast('Broadcast Pushed to Campus Devices 📢');
   };
 
@@ -1748,7 +1757,7 @@ export default function App() {
         }}
       >
         <TouchableOpacity
-          onPress={() => setCurrentTab('home')}
+          onPress={() => handleSwitchTab('home')}
           style={{
             alignItems: 'center',
             paddingHorizontal: 16,
@@ -1773,7 +1782,7 @@ export default function App() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => setCurrentTab('events')}
+          onPress={() => handleSwitchTab('events')}
           style={{
             alignItems: 'center',
             paddingHorizontal: 16,
@@ -1798,7 +1807,7 @@ export default function App() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => setCurrentTab('resources')}
+          onPress={() => handleSwitchTab('resources')}
           style={{
             alignItems: 'center',
             paddingHorizontal: 16,
@@ -1823,7 +1832,7 @@ export default function App() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => setCurrentTab('profile')}
+          onPress={() => handleSwitchTab('profile')}
           style={{
             alignItems: 'center',
             paddingHorizontal: 16,

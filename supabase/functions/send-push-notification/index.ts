@@ -1,6 +1,6 @@
 // Supabase Edge Function: send-push-notification
 // Trigger: DB webhook on announcements INSERT
-// Sends Expo push notifications to all users with a registered push_token
+// Delivers notifications to registered devices via FCM and Expo Push API
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
@@ -31,55 +31,92 @@ serve(async (req: Request) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const firebaseServerKey = Deno.env.get("FIREBASE_SERVER_KEY");
+    const firebaseProjectId = Deno.env.get("FIREBASE_PROJECT_ID");
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Fetch all profiles with valid push tokens
+    // Fetch all profiles with valid push/fcm tokens
     const { data: profiles, error: profileErr } = await supabase
       .from("profiles")
-      .select("id, push_token")
-      .not("push_token", "is", null);
+      .select("id, push_token, fcm_token");
 
     if (profileErr) {
       throw profileErr;
     }
 
-    // Filter valid Expo push tokens
-    const tokens = (profiles || [])
+    const allProfiles = profiles || [];
+    const fcmTokens = allProfiles
+      .map((p) => p.fcm_token || p.push_token)
+      .filter((token): token is string => Boolean(token && !token.startsWith("ExponentPushToken")));
+
+    const expoTokens = allProfiles
       .map((p) => p.push_token)
       .filter((token): token is string => Boolean(token && token.startsWith("ExponentPushToken")));
 
-    // Batch send via Expo Push API
-    if (tokens.length > 0) {
-      const messages = tokens.map((token) => ({
-        to: token,
-        sound: "default",
-        title: `📢 New ATC Announcement: ${record.title}`,
-        body: record.body.length > 120 ? `${record.body.slice(0, 117)}...` : record.body,
-        data: {
-          type: "announcement",
-          id: record.id,
-        },
-      }));
-
-      await fetch("https://exp.host/--/api/v2/push/send", {
-        method: "POST",
-        headers: {
-          "Accept": "application/json",
-          "Accept-encoding": "gzip, deflate",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(messages),
-      });
+    // 1. Deliver via Firebase Cloud Messaging (FCM Legacy / v1 Server Key)
+    if (firebaseServerKey && fcmTokens.length > 0) {
+      try {
+        await fetch("https://fcm.googleapis.com/fcm/send", {
+          method: "POST",
+          headers: {
+            Authorization: `key=${firebaseServerKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            registration_ids: fcmTokens,
+            notification: {
+              title: `📢 New ATC Announcement: ${record.title}`,
+              body: record.body.length > 120 ? `${record.body.slice(0, 117)}...` : record.body,
+              sound: "default",
+            },
+            data: {
+              type: "announcement",
+              id: record.id,
+            },
+          }),
+        });
+      } catch (fcmErr) {
+        console.warn("[FCM Send Error]:", fcmErr);
+      }
     }
 
-    // Also insert records into notifications_log for in-app bell
-    if (profiles && profiles.length > 0) {
-      const logs = profiles.map((p) => ({
+    // 2. Deliver via Expo Push API
+    if (expoTokens.length > 0) {
+      try {
+        const messages = expoTokens.map((token) => ({
+          to: token,
+          sound: "default",
+          title: `📢 New ATC Announcement: ${record.title}`,
+          body: record.body.length > 120 ? `${record.body.slice(0, 117)}...` : record.body,
+          data: {
+            type: "announcement",
+            id: record.id,
+          },
+        }));
+
+        await fetch("https://exp.host/--/api/v2/push/send", {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Accept-encoding": "gzip, deflate",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(messages),
+        });
+      } catch (expoErr) {
+        console.warn("[Expo Push Error]:", expoErr);
+      }
+    }
+
+    // 3. Log in-app bell notification
+    if (allProfiles.length > 0) {
+      const logs = allProfiles.map((p) => ({
         user_id: p.id,
         title: `New Announcement: ${record.title}`,
         message: record.body.slice(0, 100),
         type: "announcement",
-        link_url: "/",
+        link_url: "/portal",
         read: false,
       }));
 
@@ -89,8 +126,9 @@ serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         success: true,
-        notifiedTokens: tokens.length,
-        notifiedUsers: profiles?.length || 0,
+        fcmCount: fcmTokens.length,
+        expoCount: expoTokens.length,
+        totalUsers: allProfiles.length,
       }),
       { headers: { "Content-Type": "application/json" } }
     );

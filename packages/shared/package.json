@@ -8,6 +8,7 @@
     ".": "./index.js",
     "./theme": "./theme.js",
     "./supabaseClient": "./supabaseClient.js",
+    "./firebaseClient": "./firebaseClient.js",
     "./mockData": "./mockData.js",
     "./api/*": "./api/*.js",
     "./hooks/*": "./hooks/*.js",
@@ -16,6 +17,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.8",
+    "firebase": "^13.0.0",
     "zustand": "^4.5.2"
   }
 }

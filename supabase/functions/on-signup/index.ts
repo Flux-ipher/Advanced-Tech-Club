@@ -1,18 +1,81 @@
 // Supabase Edge Function: on-signup
-// Trigger: Auth webhook or fallback endpoint for creating user profiles with role 'member'
+// Triggered on student sign-up with Firebase Auth or DB webhook
+// Inserts or upserts the profile row into public.profiles using the Service Role Key
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 
-serve(async (req: Request) => {
-  try {
-    const payload = await req.json();
-    const user = payload.record || payload.user;
+interface OnSignupPayload {
+  idToken?: string;
+  fullName?: string;
+  department?: string;
+  avatarUrl?: string;
+  user?: {
+    id: string;
+    email?: string;
+    user_metadata?: { full_name?: string; department?: string; avatar_url?: string };
+  };
+  record?: {
+    id: string;
+    email?: string;
+    raw_user_meta_data?: { full_name?: string; department?: string };
+  };
+}
 
-    if (!user || !user.id) {
-      return new Response(JSON.stringify({ error: "Missing user object" }), {
+serve(async (req: Request) => {
+  // CORS Headers
+  if (req.method === "OPTIONS") {
+    return new Response("ok", {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+      },
+    });
+  }
+
+  try {
+    const payload: OnSignupPayload = await req.json();
+    let uid = "";
+    let email = "";
+    let fullName = payload.fullName || "";
+    let department = payload.department || "Computer Science & Engineering";
+    let avatarUrl = payload.avatarUrl || null;
+
+    // 1. If Firebase idToken is passed, decode JWT payload
+    if (payload.idToken) {
+      try {
+        const parts = payload.idToken.split(".");
+        if (parts.length === 3) {
+          const decoded = JSON.parse(atob(parts[1]));
+          uid = decoded.user_id || decoded.sub || "";
+          email = decoded.email || "";
+          if (!fullName && decoded.name) fullName = decoded.name;
+        }
+      } catch (tokenErr) {
+        console.warn("Could not parse JWT token claims:", tokenErr);
+      }
+    }
+
+    // 2. Fallback to user/record payload
+    if (!uid) {
+      const userObj = payload.user || payload.record;
+      if (userObj?.id) {
+        uid = userObj.id;
+        email = userObj.email || "";
+        fullName =
+          fullName ||
+          userObj.user_metadata?.full_name ||
+          userObj.raw_user_meta_data?.full_name ||
+          email.split("@")[0] ||
+          "Club Member";
+      }
+    }
+
+    if (!uid) {
+      return new Response(JSON.stringify({ error: "Missing user UID or idToken" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
       });
     }
 
@@ -20,29 +83,32 @@ serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const fullName =
-      user.user_metadata?.full_name ||
-      user.raw_user_meta_data?.full_name ||
-      user.email?.split("@")[0] ||
-      "Club Member";
+    // Upsert profile record with default 'member' role and active status
+    const { data, error } = await supabase.from("profiles").upsert(
+      {
+        id: uid,
+        full_name: fullName || "Club Member",
+        role: "member",
+        department,
+        avatar_url: avatarUrl,
+        is_verified: true,
+        verification_status: "verified",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" }
+    );
 
-    const { data, error } = await supabase.from("profiles").upsert({
-      id: user.id,
-      full_name: fullName,
-      role: "member",
-      avatar_url: user.user_metadata?.avatar_url || null,
-      updated_at: new Date().toISOString(),
-    });
-
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
 
     return new Response(JSON.stringify({ success: true, profile: data }), {
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
   }
 });

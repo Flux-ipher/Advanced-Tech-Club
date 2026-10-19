@@ -19,6 +19,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { AdminPage } from './pages/AdminPage';
 import { MembersAdminPage } from './pages/MembersAdminPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
+import { useAuthListener } from '@atc/shared/hooks/useAuth';
 
 // Clean Public Layout for Main Domain Pages
 function PublicLayout({ children }) {
@@ -34,6 +35,8 @@ function PublicLayout({ children }) {
 }
 
 export function App() {
+  useAuthListener();
+
   return (
     <Routes>
       {/* ========================================================= */}
