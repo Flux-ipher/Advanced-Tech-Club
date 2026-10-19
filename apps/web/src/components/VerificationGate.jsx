@@ -41,7 +41,7 @@ export function VerificationGate({ children }) {
           </h2>
 
           <p className="text-sm text-neutral-600 leading-relaxed max-w-md mx-auto">
-            Welcome, <strong>{user?.full_name}</strong>. Because the club app operates on our private internal subdomain, all memberships are verified by Club Admin <strong>Ritesh Mishra</strong>.
+            Welcome, <strong>{user?.full_name}</strong>. Because club resources and event check-ins are restricted to active members, all applications are verified by Club Admin <strong>Ritesh Mishra</strong>.
           </p>
         </div>
 

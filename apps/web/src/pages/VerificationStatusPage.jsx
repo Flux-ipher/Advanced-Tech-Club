@@ -78,7 +78,7 @@ export function VerificationStatusPage() {
               <input
                 type="text"
                 required
-                placeholder="e.g. ECE2026-077 or tyler.smith@techclub.edu"
+                placeholder="e.g. ECE2026-077 or applicant email"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500"
@@ -151,7 +151,7 @@ export function VerificationStatusPage() {
                       to="/portal"
                       className="w-full btn-primary text-sm py-2.5 flex items-center justify-center gap-2 font-bold"
                     >
-                      Enter Subdomain Club Portal <ArrowRight className="w-4 h-4" />
+                      Enter Club Portal <ArrowRight className="w-4 h-4" />
                     </Link>
                   </div>
                 </div>

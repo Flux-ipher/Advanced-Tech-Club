@@ -197,7 +197,7 @@ export function MembersAdminPage() {
         <div className="space-y-4">
           <div className="p-4 rounded-xl bg-neutral-100 border border-neutral-200 text-xs text-neutral-700 flex items-center justify-between">
             <p>
-              Students listed here registered through the public website or mobile app and cannot access the club subdomain until you approve them.
+              Students listed here registered through the website or mobile app and cannot access member features until you approve them.
             </p>
           </div>
 

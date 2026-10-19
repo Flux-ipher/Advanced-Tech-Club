@@ -73,11 +73,6 @@ export function PortalHeader({ collapsed, onToggleCollapse, onOpenMobile }) {
             {getPageTitle()}
           </h2>
         </div>
-
-        {/* Subdomain Indicator Badge */}
-        <span className="hidden xl:inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-primary-50 text-primary-700 border border-primary-200">
-          app.techclub.edu
-        </span>
       </div>
 
       {/* Right Controls */}

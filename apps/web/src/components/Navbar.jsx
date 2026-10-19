@@ -84,20 +84,10 @@ export function Navbar() {
                   Advanced Tech Club
                 </span>
                 <span className="text-[11px] font-semibold text-neutral-400 tracking-wide mt-1 leading-none">
-                  {isPortalSection ? 'Club Subdomain Portal' : 'Official Campus Platform'}
+                  {isPortalSection ? 'Club Portal' : 'Official Campus Platform'}
                 </span>
               </div>
             </Link>
-
-            {/* Subdomain / Main domain badge */}
-            <span className={`hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-mono font-bold uppercase ${
-              isPortalSection
-                ? 'bg-primary-50 text-primary-700 border border-primary-200'
-                : 'bg-neutral-100 text-neutral-600 border border-neutral-200'
-            }`}>
-              <Globe className="w-3 h-3" />
-              {isPortalSection ? 'app.techclub.edu' : 'techclub.edu (Main)'}
-            </span>
 
             {/* Desktop Navigation Links */}
             <nav className="hidden md:flex items-center gap-1">
@@ -256,7 +246,7 @@ export function Navbar() {
         <div className="md:hidden border-t border-neutral-200 bg-white px-4 pt-3 pb-6 space-y-3">
           <div className="pt-2 border-t border-neutral-100">
             <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-2">
-              {isPortalSection ? 'Club Subdomain Navigation' : 'Public Main Domain Navigation'}
+              {isPortalSection ? 'Portal Navigation' : 'Navigation'}
             </p>
             <div className="space-y-1">
               {!isPortalSection ? (

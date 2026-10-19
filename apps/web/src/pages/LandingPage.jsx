@@ -293,7 +293,7 @@ export function LandingPage() {
                 </span>
                 <h3 className="text-lg font-bold text-white mb-2">Club Portal & APK Unlocked</h3>
                 <p className="text-xs text-neutral-300 leading-relaxed">
-                  Access the Subdomain Hub (<code className="text-primary-300 font-mono">/portal</code>), install the distributed Android APK, and RSVP with 1-tap.
+                  Access the Member Portal (<code className="text-primary-300 font-mono">/portal</code>), install the companion Android APK, and RSVP with 1-tap.
                 </p>
               </div>
             </div>

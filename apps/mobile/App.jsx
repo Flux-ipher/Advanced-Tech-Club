@@ -1289,7 +1289,7 @@ export default function App() {
               </View>
             </View>
             <Text style={{ fontSize: 11, color: colors.neutral[500], marginBottom: 12 }}>
-              Signed in as {currentUser.full_name} ({currentUser.email || `${currentUser.student_id?.toLowerCase()}@techclub.edu`})
+              Signed in as {currentUser.full_name} ({currentUser.email || currentUser.student_id})
             </Text>
 
             <View style={{ gap: 8 }}>
@@ -1299,7 +1299,7 @@ export default function App() {
                   triggerToast('Google Account Synchronized');
                   Alert.alert(
                     'Google Sign-In Active',
-                    `Authenticated with Firebase project at-club-001.\n\nAccount: ${currentUser.full_name} (${currentUser.email || 'student@techclub.edu'})\nStudent ID: ${currentUser.student_id}\nProvider: Google Firebase Auth`
+                    `Authenticated with Firebase project at-club-001.\n\nAccount: ${currentUser.full_name} (${currentUser.email || currentUser.student_id})\nStudent ID: ${currentUser.student_id}\nProvider: Google Firebase Auth`
                   );
                 }}
                 style={{
