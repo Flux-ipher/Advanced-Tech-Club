@@ -8,7 +8,7 @@ export function AuthPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { signInWithEmail, signUpWithEmail, signInWithGoogle } = useAuth();
+  const { user, isVerified, signInWithEmail, signUpWithEmail, signInWithGoogle } = useAuth();
 
   const queryMode = searchParams.get('mode');
   const initialMode = queryMode === 'register' || location.state?.mode === 'register' ? 'register' : 'login';
@@ -19,6 +19,12 @@ export function AuthPage() {
       setMode('register');
     }
   }, [queryMode, location.state]);
+
+  useEffect(() => {
+    if (user && isVerified) {
+      navigate(isPortalSubdomain() ? '/' : '/portal');
+    }
+  }, [user, isVerified, navigate]);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
