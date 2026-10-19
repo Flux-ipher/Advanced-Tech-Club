@@ -25,6 +25,7 @@
       },
       "package": "advancedtechclub.vercel.app",
       "permissions": [
+        "CAMERA",
         "NOTIFICATIONS",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE"

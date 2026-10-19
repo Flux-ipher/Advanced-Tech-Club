@@ -17,9 +17,11 @@ import {
   Alert,
   Platform,
   Share,
-  ActivityIndicator
+  ActivityIndicator,
+  StyleSheet
 } from 'react-native';
 import * as FileSystem from 'expo-file-system';
+import { BarCodeScanner } from 'expo-barcode-scanner';
 import { supabase } from '@atc/shared/supabaseClient';
 import { initialProfiles, initialAnnouncements, initialEvents, initialResources } from '@atc/shared/mockData';
 import { colors } from '@atc/shared/theme';
@@ -36,6 +38,31 @@ try {
 }
 
 const SESSION_FILE = `${FileSystem.documentDirectory}atc_mobile_session.json`;
+const SAVED_ACCOUNTS_FILE = `${FileSystem.documentDirectory}atc_saved_google_accounts.json`;
+
+const DEFAULT_GOOGLE_ACCOUNTS = [
+  {
+    email: 'fluxipher@gmail.com',
+    name: 'Ritesh Kumar Mishra',
+    role: 'admin',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+    tag: 'Admin'
+  },
+  {
+    email: 'ritesh.mishra@gmail.com',
+    name: 'Ritesh Mishra',
+    role: 'admin',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+    tag: 'Admin'
+  },
+  {
+    email: 'alex.rivera@techclub.edu',
+    name: 'Alex Rivera',
+    role: 'member',
+    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80',
+    tag: 'Member'
+  }
+];
 
 export default function App() {
   // Navigation Tab: 'home' | 'events' | 'resources' | 'profile'
@@ -65,6 +92,28 @@ export default function App() {
   const [customGoogleEmail, setCustomGoogleEmail] = useState('');
   const [customGoogleName, setCustomGoogleName] = useState('');
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
+  const [savedGoogleAccounts, setSavedGoogleAccounts] = useState(DEFAULT_GOOGLE_ACCOUNTS);
+  const [showManualGoogleInput, setShowManualGoogleInput] = useState(false);
+
+  // Admin QR Event Attendance Scanner State
+  const [isAdminScannerOpen, setIsAdminScannerOpen] = useState(false);
+  const [hasCameraPermission, setHasCameraPermission] = useState(null);
+  const [scannerEventId, setScannerEventId] = useState('');
+  const [scannedStudent, setScannedStudent] = useState(null);
+  const [scannedRegStatus, setScannedRegStatus] = useState(null); // 'attended' | 'confirmed' | 'walkin' | 'not_found'
+  const [isScanningPaused, setIsScanningPaused] = useState(false);
+  const [manualScanCode, setManualScanCode] = useState('');
+  const [scannerCheckingIn, setScannerCheckingIn] = useState(false);
+  const [scannerFeedback, setScannerFeedback] = useState(null);
+  const [scanHistory, setScanHistory] = useState([
+    {
+      studentId: 'CS2026-088',
+      studentName: 'Alex Rivera',
+      time: '10:42 AM',
+      eventTitle: 'Cloud Architecture Workshop',
+      status: 'Attended'
+    }
+  ]);
 
   const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
 
@@ -90,11 +139,53 @@ export default function App() {
     }
   };
 
-  // Restore authenticated session on app cold boot
+  // Helper: Remember newly logged-in Google / Member accounts for 1-tap fast access
+  const persistGoogleAccount = async (email, name, avatar = '') => {
+    if (!email) return;
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+      const isRitesh = cleanEmail.includes('ritesh') || cleanEmail.includes('fluxipher');
+      const newEntry = {
+        email: cleanEmail,
+        name: name || (isRitesh ? 'Ritesh Kumar Mishra' : cleanEmail.split('@')[0].replace('.', ' ')),
+        role: isRitesh ? 'admin' : 'member',
+        avatar: avatar || (isRitesh
+          ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
+          : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'),
+        tag: isRitesh ? 'Admin' : 'Member'
+      };
+
+      setSavedGoogleAccounts((prev) => {
+        const filtered = prev.filter((acc) => acc.email.toLowerCase() !== cleanEmail);
+        const updated = [newEntry, ...filtered];
+        FileSystem.writeAsStringAsync(SAVED_ACCOUNTS_FILE, JSON.stringify(updated)).catch(() => {});
+        return updated;
+      });
+    } catch (err) {
+      console.warn('[ATC Mobile] Persist google account error:', err);
+    }
+  };
+
+  // Restore authenticated session and saved accounts on app cold boot
   useEffect(() => {
     let isMounted = true;
     async function restoreMobileSession() {
       try {
+        // 1. Restore Saved Google Accounts for 1-tap login
+        try {
+          const accInfo = await FileSystem.getInfoAsync(SAVED_ACCOUNTS_FILE);
+          if (accInfo.exists) {
+            const rawAcc = await FileSystem.readAsStringAsync(SAVED_ACCOUNTS_FILE);
+            const parsedAcc = JSON.parse(rawAcc);
+            if (Array.isArray(parsedAcc) && parsedAcc.length > 0 && isMounted) {
+              setSavedGoogleAccounts(parsedAcc);
+            }
+          }
+        } catch (accErr) {
+          console.warn('[ATC Mobile] Saved accounts restore notice:', accErr);
+        }
+
+        // 2. Restore active session
         const info = await FileSystem.getInfoAsync(SESSION_FILE);
         if (info.exists) {
           const raw = await FileSystem.readAsStringAsync(SESSION_FILE);
@@ -333,7 +424,7 @@ export default function App() {
       console.warn('[ATC Mobile] Supabase check warning:', sbErr);
     }
 
-    const isRitesh = cleanEmail.includes('ritesh');
+    const isRitesh = cleanEmail.includes('ritesh') || cleanEmail.includes('fluxipher');
     const shouldBeSuperAdmin = isRitesh || isFirstUser || existingProfile?.role === 'super_admin';
     const resolvedRole = shouldBeSuperAdmin ? 'super_admin' : (existingProfile?.role || 'member');
     const isVerified = shouldBeSuperAdmin ? true : (existingProfile?.is_verified ?? false);
@@ -342,13 +433,15 @@ export default function App() {
     const resolved = {
       id: existingProfile?.id || `usr-${Date.now()}`,
       email: cleanEmail,
-      full_name: existingProfile?.full_name || fullName || (isRitesh ? 'Ritesh Mishra' : cleanEmail.split('@')[0]),
+      full_name: existingProfile?.full_name || fullName || (isRitesh ? 'Ritesh Kumar Mishra' : cleanEmail.split('@')[0].replace('.', ' ')),
       role: resolvedRole,
       is_verified: isVerified,
       verification_status: verificationStatus,
       department: existingProfile?.department || 'Computer Science & Engineering',
       student_id: existingProfile?.student_id || (isRitesh ? 'ADMIN-001' : ''),
-      avatar_url: existingProfile?.avatar_url || avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+      avatar_url: existingProfile?.avatar_url || avatarUrl || (isRitesh
+        ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
+        : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'),
       interests: existingProfile?.interests || ['AI & Machine Learning', 'Mobile Development']
     };
 
@@ -374,6 +467,7 @@ export default function App() {
       setCurrentUser(user);
       setIsGuest(false);
       await saveMobileSession(user);
+      await persistGoogleAccount(user.email, user.full_name, user.avatar_url);
       triggerToast(`Welcome back, ${user.full_name}! 👋`);
     } catch (err) {
       Alert.alert('Login Error', err.message || 'Could not log in');
@@ -394,6 +488,7 @@ export default function App() {
       setCurrentUser(newUser);
       setIsGuest(false);
       await saveMobileSession(newUser);
+      await persistGoogleAccount(newUser.email, newUser.full_name, newUser.avatar_url);
       triggerToast('Account Created! 🚀 Welcome to ATC.');
 
       if (newUser.role !== 'super_admin' && !newUser.student_id) {
@@ -441,6 +536,7 @@ export default function App() {
       setCurrentUser(user);
       setIsGuest(false);
       await saveMobileSession(user);
+      await persistGoogleAccount(accountEmail, accountName, accountAvatar);
       setIsGoogleModalOpen(false);
       triggerToast(`Signed in with Google as ${user.full_name} ✓`);
 
@@ -476,7 +572,7 @@ export default function App() {
     );
   };
 
-  // Google Sign-In Sheet Bottom Modal
+  // Google Sign-In Sheet Bottom Modal (1-Tap Saved Account Selection)
   const renderGoogleModal = () => (
     <Modal visible={isGoogleModalOpen} animationType="slide" transparent>
       <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' }}>
@@ -490,7 +586,7 @@ export default function App() {
           }}
         >
           {/* Google Header */}
-          <View style={{ alignItems: 'center', marginBottom: 18 }}>
+          <View style={{ alignItems: 'center', marginBottom: 16 }}>
             <View
               style={{
                 width: 48,
@@ -515,186 +611,186 @@ export default function App() {
               Sign in with Google
             </Text>
             <Text style={{ fontSize: 12, color: colors.neutral[500], textAlign: 'center', marginTop: 4 }}>
-              Choose an account to continue to Advanced Tech Club
+              Tap any saved account to sign in instantly without typing
             </Text>
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
-            {/* Account Option 1: Admin Account */}
-            <TouchableOpacity
-              onPress={() =>
-                handleSelectGoogleAccount(
-                  'ritesh.mishra@gmail.com',
-                  'Ritesh Mishra',
-                  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
-                )
-              }
-              disabled={googleSubmitting}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                padding: 14,
-                borderRadius: 14,
-                backgroundColor: colors.neutral[50],
-                borderWidth: 1,
-                borderColor: colors.neutral[200],
-                marginBottom: 10
-              }}
-            >
-              <View
-                style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 21,
-                  backgroundColor: colors.primary[500],
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  marginRight: 12
-                }}
-              >
-                <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 16 }}>RM</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.neutral[900] }}>
-                    Ritesh Mishra
-                  </Text>
-                  <View
+            {/* 1-Tap Saved Google Accounts */}
+            <View style={{ gap: 8, marginBottom: 12 }}>
+              {savedGoogleAccounts.map((account) => {
+                const isAccAdmin = account.role === 'admin' || account.email.includes('fluxipher') || account.email.includes('ritesh');
+                const initials = account.name
+                  ? account.name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase()
+                  : account.email.substring(0, 2).toUpperCase();
+
+                return (
+                  <TouchableOpacity
+                    key={account.email}
+                    onPress={() =>
+                      handleSelectGoogleAccount(account.email, account.name, account.avatar)
+                    }
+                    disabled={googleSubmitting}
                     style={{
-                      backgroundColor: '#f5f3ff',
-                      paddingHorizontal: 6,
-                      paddingVertical: 2,
-                      borderRadius: 6,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      padding: 13,
+                      borderRadius: 14,
+                      backgroundColor: colors.neutral[50],
                       borderWidth: 1,
-                      borderColor: '#ddd6fe'
+                      borderColor: colors.neutral[200]
                     }}
                   >
-                    <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#6d28d9' }}>Admin</Text>
-                  </View>
-                </View>
-                <Text style={{ fontSize: 12, color: colors.neutral[500], marginTop: 2 }}>
-                  ritesh.mishra@gmail.com
-                </Text>
-              </View>
-              <Text style={{ fontSize: 20, color: colors.neutral[400] }}>›</Text>
-            </TouchableOpacity>
+                    {account.avatar ? (
+                      <Image
+                        source={{ uri: account.avatar }}
+                        style={{ width: 42, height: 42, borderRadius: 21, marginRight: 12 }}
+                      />
+                    ) : (
+                      <View
+                        style={{
+                          width: 42,
+                          height: 42,
+                          borderRadius: 21,
+                          backgroundColor: isAccAdmin ? '#6d28d9' : colors.neutral[800],
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          marginRight: 12
+                        }}
+                      >
+                        <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 15 }}>
+                          {initials}
+                        </Text>
+                      </View>
+                    )}
 
-            {/* Account Option 2: Active Student Account */}
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.neutral[900] }}>
+                          {account.name}
+                        </Text>
+                        <View
+                          style={{
+                            backgroundColor: isAccAdmin ? '#f5f3ff' : colors.primary[50],
+                            paddingHorizontal: 6,
+                            paddingVertical: 2,
+                            borderRadius: 6,
+                            borderWidth: 1,
+                            borderColor: isAccAdmin ? '#ddd6fe' : colors.primary[200]
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 'bold',
+                              color: isAccAdmin ? '#6d28d9' : colors.primary[700]
+                            }}
+                          >
+                            {isAccAdmin ? 'Admin' : 'Member'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={{ fontSize: 12, color: colors.neutral[500], marginTop: 2 }}>
+                        {account.email}
+                      </Text>
+                    </View>
+
+                    <Text style={{ fontSize: 20, color: colors.neutral[400] }}>›</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Toggle Manual Entry */}
             <TouchableOpacity
-              onPress={() =>
-                handleSelectGoogleAccount(
-                  'student.tech@gmail.com',
-                  'Alex Rivera',
-                  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'
-                )
-              }
-              disabled={googleSubmitting}
+              onPress={() => setShowManualGoogleInput(!showManualGoogleInput)}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                padding: 14,
-                borderRadius: 14,
-                backgroundColor: colors.neutral[50],
-                borderWidth: 1,
-                borderColor: colors.neutral[200],
-                marginBottom: 14
+                justifyContent: 'center',
+                paddingVertical: 10,
+                marginBottom: showManualGoogleInput ? 10 : 4
               }}
             >
-              <View
-                style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 21,
-                  backgroundColor: colors.neutral[800],
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  marginRight: 12
-                }}
-              >
-                <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 16 }}>AR</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.neutral[900] }}>
-                  Alex Rivera
-                </Text>
-                <Text style={{ fontSize: 12, color: colors.neutral[500], marginTop: 2 }}>
-                  student.tech@gmail.com
-                </Text>
-              </View>
-              <Text style={{ fontSize: 20, color: colors.neutral[400] }}>›</Text>
+              <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.primary[600] }}>
+                {showManualGoogleInput ? '▲ Hide manual entry' : '+ Use another Google account'}
+              </Text>
             </TouchableOpacity>
 
-            {/* Divider */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-              <View style={{ flex: 1, height: 1, backgroundColor: colors.neutral[200] }} />
-              <Text style={{ color: colors.neutral[400], fontSize: 10, marginHorizontal: 8, fontWeight: 'bold' }}>
-                OR USE YOUR GOOGLE ACCOUNT
-              </Text>
-              <View style={{ flex: 1, height: 1, backgroundColor: colors.neutral[200] }} />
-            </View>
-
-            {/* Custom Google Inputs */}
-            <View style={{ gap: 8, marginBottom: 12 }}>
-              <TextInput
-                placeholder="Google Email (e.g. yourname@gmail.com)"
-                placeholderTextColor={colors.neutral[400]}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                value={customGoogleEmail}
-                onChangeText={setCustomGoogleEmail}
+            {/* Collapsed Manual Google Inputs */}
+            {showManualGoogleInput && (
+              <View
                 style={{
                   backgroundColor: colors.neutral[50],
+                  padding: 12,
+                  borderRadius: 12,
                   borderWidth: 1,
-                  borderColor: colors.neutral[300],
-                  borderRadius: 10,
-                  paddingHorizontal: 12,
-                  paddingVertical: 10,
-                  fontSize: 13,
-                  color: colors.neutral[900]
-                }}
-              />
-              <TextInput
-                placeholder="Full Name (e.g. John Doe)"
-                placeholderTextColor={colors.neutral[400]}
-                value={customGoogleName}
-                onChangeText={setCustomGoogleName}
-                style={{
-                  backgroundColor: colors.neutral[50],
-                  borderWidth: 1,
-                  borderColor: colors.neutral[300],
-                  borderRadius: 10,
-                  paddingHorizontal: 12,
-                  paddingVertical: 10,
-                  fontSize: 13,
-                  color: colors.neutral[900]
-                }}
-              />
-              <TouchableOpacity
-                onPress={() => {
-                  if (!customGoogleEmail.trim()) {
-                    Alert.alert('Required', 'Please enter your Google email address.');
-                    return;
-                  }
-                  handleSelectGoogleAccount(customGoogleEmail.trim(), customGoogleName.trim());
-                }}
-                disabled={googleSubmitting}
-                style={{
-                  backgroundColor: colors.primary[500],
-                  paddingVertical: 12,
-                  borderRadius: 10,
-                  alignItems: 'center',
-                  marginTop: 4
+                  borderColor: colors.neutral[200],
+                  gap: 8,
+                  marginBottom: 12
                 }}
               >
-                {googleSubmitting ? (
-                  <ActivityIndicator color="#ffffff" size="small" />
-                ) : (
-                  <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
-                    Continue with this Google Account
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </View>
+                <TextInput
+                  placeholder="Google Email (e.g. yourname@gmail.com)"
+                  placeholderTextColor={colors.neutral[400]}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  value={customGoogleEmail}
+                  onChangeText={setCustomGoogleEmail}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    borderWidth: 1,
+                    borderColor: colors.neutral[300],
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 9,
+                    fontSize: 13,
+                    color: colors.neutral[900]
+                  }}
+                />
+                <TextInput
+                  placeholder="Full Name (optional)"
+                  placeholderTextColor={colors.neutral[400]}
+                  value={customGoogleName}
+                  onChangeText={setCustomGoogleName}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    borderWidth: 1,
+                    borderColor: colors.neutral[300],
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 9,
+                    fontSize: 13,
+                    color: colors.neutral[900]
+                  }}
+                />
+                <TouchableOpacity
+                  onPress={() => {
+                    if (!customGoogleEmail.trim()) {
+                      Alert.alert('Required', 'Please enter your Google email address.');
+                      return;
+                    }
+                    handleSelectGoogleAccount(customGoogleEmail.trim(), customGoogleName.trim());
+                  }}
+                  disabled={googleSubmitting}
+                  style={{
+                    backgroundColor: colors.primary[500],
+                    paddingVertical: 11,
+                    borderRadius: 10,
+                    alignItems: 'center',
+                    marginTop: 2
+                  }}
+                >
+                  {googleSubmitting ? (
+                    <ActivityIndicator color="#ffffff" size="small" />
+                  ) : (
+                    <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
+                      Continue with this Google Account
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
           </ScrollView>
 
           {/* Cancel */}
@@ -714,6 +810,687 @@ export default function App() {
       </View>
     </Modal>
   );
+
+  // =========================================================================
+  // ADMIN QR EVENT ATTENDANCE SCANNER HANDLERS & MODAL
+  // =========================================================================
+  const openAdminScanner = async (targetEventId = null) => {
+    const selected = targetEventId || scannerEventId || events[0]?.id || 'evt-1';
+    setScannerEventId(selected);
+    setIsAdminScannerOpen(true);
+    setIsScanningPaused(false);
+    setScannedStudent(null);
+    setScannedRegStatus(null);
+    setScannerFeedback(null);
+
+    try {
+      const { status } = await BarCodeScanner.requestPermissionsAsync();
+      setHasCameraPermission(status === 'granted');
+    } catch (permErr) {
+      console.warn('[ATC Mobile] Camera permission error:', permErr);
+      setHasCameraPermission(false);
+    }
+  };
+
+  const handleBarCodeScanned = async ({ type, data }) => {
+    if (isScanningPaused || !data) return;
+    setIsScanningPaused(true);
+    await processStudentScan(data);
+  };
+
+  const processStudentScan = async (rawCode) => {
+    if (!rawCode || !rawCode.trim()) {
+      setIsScanningPaused(false);
+      return;
+    }
+    const cleanRaw = rawCode.trim();
+    let lookupKey = cleanRaw;
+    if (cleanRaw.startsWith('ATC-')) {
+      lookupKey = cleanRaw.replace('ATC-', '');
+    } else if (cleanRaw.includes('PASS-TOKEN:')) {
+      const match = cleanRaw.match(/PASS-TOKEN:\s*([^\s]+)/i);
+      if (match) lookupKey = match[1];
+    } else if (cleanRaw.startsWith('{') && cleanRaw.endsWith('}')) {
+      try {
+        const parsed = JSON.parse(cleanRaw);
+        lookupKey = parsed.student_id || parsed.id || parsed.email || cleanRaw;
+      } catch (e) {}
+    } else if (cleanRaw.includes('?')) {
+      try {
+        const urlParams = new URLSearchParams(cleanRaw.split('?')[1]);
+        lookupKey = urlParams.get('student_id') || urlParams.get('pass') || urlParams.get('id') || cleanRaw;
+      } catch (e) {}
+    }
+
+    setScannerFeedback('🔍 Verifying student pass in database...');
+    try {
+      // 1. Search Supabase profiles
+      let matchedProfile = null;
+      try {
+        const { data: dbMatches } = await supabase
+          .from('profiles')
+          .select('*')
+          .or(`student_id.ilike.%${lookupKey}%,id.eq.${lookupKey},email.ilike.%${lookupKey}%`)
+          .limit(1);
+        if (dbMatches && dbMatches.length > 0) {
+          matchedProfile = dbMatches[0];
+        }
+      } catch (err) {}
+
+      // Fallback search in initialProfiles / pendingMembers
+      if (!matchedProfile) {
+        matchedProfile = [...initialProfiles, ...pendingMembers].find(
+          (p) =>
+            (p.student_id && p.student_id.toLowerCase() === lookupKey.toLowerCase()) ||
+            (p.id && p.id.toLowerCase() === lookupKey.toLowerCase()) ||
+            (p.email && p.email.toLowerCase() === lookupKey.toLowerCase()) ||
+            (lookupKey.toLowerCase().includes('admin') && p.role === 'super_admin')
+        );
+      }
+
+      // If still not found, construct a temporary student attendee card for walk-ins
+      if (!matchedProfile) {
+        matchedProfile = {
+          id: `usr-${Date.now()}`,
+          student_id: lookupKey.toUpperCase(),
+          full_name: `Attendee (${lookupKey})`,
+          department: 'Computer Science & Engineering',
+          role: 'member',
+          is_verified: false,
+          avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80',
+          email: `${lookupKey.toLowerCase().replace(/[^a-z0-9]/g, '')}@student.edu`
+        };
+      }
+
+      setScannedStudent(matchedProfile);
+
+      // 2. Check registration for the selected event
+      const curEventId = scannerEventId || events[0]?.id || 'evt-1';
+      let regStatus = 'walkin';
+
+      try {
+        const { data: reg } = await supabase
+          .from('event_registrations')
+          .select('*')
+          .eq('event_id', curEventId)
+          .eq('user_id', matchedProfile.id)
+          .maybeSingle();
+
+        if (reg) {
+          regStatus = reg.status === 'attended' ? 'attended' : 'confirmed';
+        }
+      } catch (regErr) {
+        if (registeredEventIds.includes(curEventId)) {
+          regStatus = 'confirmed';
+        }
+      }
+
+      setScannedRegStatus(regStatus);
+      setScannerFeedback(null);
+    } catch (err) {
+      console.warn('[ATC Mobile] Scan processing error:', err);
+      setScannerFeedback('⚠️ Error looking up pass. Try manual lookup.');
+      setIsScanningPaused(false);
+    }
+  };
+
+  const handleManualStudentLookup = async () => {
+    if (!manualScanCode.trim()) {
+      Alert.alert('Required', 'Please enter a Student ID, email, or pass code to verify.');
+      return;
+    }
+    setIsScanningPaused(true);
+    await processStudentScan(manualScanCode.trim());
+  };
+
+  const handleConfirmAttendanceCheckIn = async () => {
+    if (!scannedStudent) return;
+    setScannerCheckingIn(true);
+    const curEventId = scannerEventId || events[0]?.id || 'evt-1';
+    const curEvent = events.find((e) => e.id === curEventId) || events[0];
+
+    try {
+      // 1. Record attendance in Supabase
+      try {
+        await supabase.from('event_registrations').upsert(
+          {
+            event_id: curEventId,
+            user_id: scannedStudent.id,
+            status: 'attended',
+            registered_at: new Date().toISOString()
+          },
+          { onConflict: 'event_id,user_id' }
+        );
+      } catch (saveErr) {
+        console.warn('[ATC Mobile] Attendance record warning:', saveErr);
+      }
+
+      // 2. Add to scanHistory
+      const newEntry = {
+        studentId: scannedStudent.student_id || 'ATC-MEMBER',
+        studentName: scannedStudent.full_name,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        eventTitle: curEvent?.title || 'Workshop Check-in',
+        status: 'Attended'
+      };
+      setScanHistory((prev) => [newEntry, ...prev]);
+
+      // 3. Mark attended locally
+      setScannedRegStatus('attended');
+      setScannerFeedback(`✓ ${scannedStudent.full_name} checked in successfully!`);
+      triggerToast(`✓ Checked in: ${scannedStudent.full_name}`);
+    } catch (err) {
+      Alert.alert('Check-in Error', err.message || 'Could not record attendance');
+    } finally {
+      setScannerCheckingIn(false);
+    }
+  };
+
+  const handleResetScannerForNext = () => {
+    setScannedStudent(null);
+    setScannedRegStatus(null);
+    setManualScanCode('');
+    setScannerFeedback(null);
+    setIsScanningPaused(false);
+  };
+
+  const renderAdminScannerModal = () => {
+    const curEventId = scannerEventId || events[0]?.id || 'evt-1';
+    const curEvent = events.find((e) => e.id === curEventId) || events[0];
+
+    return (
+      <Modal visible={isAdminScannerOpen} animationType="slide" transparent>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#090d16' }}>
+          {/* Header Bar */}
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              borderBottomWidth: 1,
+              borderBottomColor: '#1e293b',
+              backgroundColor: '#0f172a'
+            }}
+          >
+            <View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#ffffff' }}>
+                  📷 Event Attendance Scanner
+                </Text>
+                <View
+                  style={{
+                    backgroundColor: '#6d28d9',
+                    paddingHorizontal: 6,
+                    paddingVertical: 2,
+                    borderRadius: 4
+                  }}
+                >
+                  <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#ffffff' }}>Admin</Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                Advanced Tech Club • Live Student Check-in Terminal
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => setIsAdminScannerOpen(false)}
+              style={{
+                backgroundColor: '#1e293b',
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: '#334155'
+              }}
+            >
+              <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>✕ Close</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+            {/* Event Selector Strip */}
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#94a3b8', marginBottom: 8, letterSpacing: 0.5 }}>
+                SELECT ACTIVE EVENT / WORKSHOP:
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                {events.map((evt) => {
+                  const isSelected = evt.id === curEventId;
+                  return (
+                    <TouchableOpacity
+                      key={evt.id}
+                      onPress={() => {
+                        setScannerEventId(evt.id);
+                        handleResetScannerForNext();
+                      }}
+                      style={{
+                        backgroundColor: isSelected ? '#6d28d9' : '#1e293b',
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: isSelected ? '#a855f7' : '#334155',
+                        maxWidth: 220
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 'bold',
+                          color: '#ffffff'
+                        }}
+                        numberOfLines={1}
+                      >
+                        {evt.title}
+                      </Text>
+                      <Text style={{ fontSize: 10, color: isSelected ? '#e9d5ff' : '#94a3b8', marginTop: 2 }}>
+                        📍 {evt.location || 'Turing Lab'}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            {/* Viewfinder Reticle Frame */}
+            <View
+              style={{
+                height: 270,
+                backgroundColor: '#020617',
+                borderRadius: 20,
+                overflow: 'hidden',
+                borderWidth: 2,
+                borderColor: '#6d28d9',
+                position: 'relative',
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginBottom: 16
+              }}
+            >
+              {hasCameraPermission ? (
+                <>
+                  <BarCodeScanner
+                    onBarCodeScanned={isScanningPaused ? undefined : handleBarCodeScanned}
+                    style={StyleSheet.absoluteFillObject}
+                  />
+
+                  {/* High-Tech Reticle Overlay */}
+                  <View
+                    pointerEvents="none"
+                    style={{
+                      width: 200,
+                      height: 200,
+                      borderWidth: 2,
+                      borderColor: '#10b981',
+                      borderRadius: 14,
+                      position: 'relative',
+                      justifyContent: 'center',
+                      alignItems: 'center'
+                    }}
+                  >
+                    {/* Glowing Reticle Laser Indicator */}
+                    <View
+                      style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: 0,
+                        right: 0,
+                        height: 2,
+                        backgroundColor: '#10b981',
+                        shadowColor: '#10b981',
+                        shadowOffset: { width: 0, height: 0 },
+                        shadowOpacity: 0.8,
+                        shadowRadius: 6,
+                        elevation: 5
+                      }}
+                    />
+                  </View>
+
+                  <View
+                    style={{
+                      position: 'absolute',
+                      bottom: 10,
+                      backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                      paddingHorizontal: 12,
+                      paddingVertical: 5,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: '#334155'
+                    }}
+                  >
+                    <Text style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 'bold' }}>
+                      {isScanningPaused ? '⏸️ Scanner Paused' : '🎯 Align student QR code within reticle'}
+                    </Text>
+                  </View>
+                </>
+              ) : (
+                <View style={{ alignItems: 'center', padding: 20 }}>
+                  <Text style={{ fontSize: 36, marginBottom: 8 }}>📷</Text>
+                  <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 14, textAlign: 'center' }}>
+                    {hasCameraPermission === false
+                      ? 'Camera Permission Not Granted'
+                      : 'Requesting Camera Access...'}
+                  </Text>
+                  <Text style={{ color: '#94a3b8', fontSize: 11, textAlign: 'center', marginTop: 4, marginBottom: 14 }}>
+                    Camera allows scanning student QR passes directly from their phones.
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => openAdminScanner()}
+                    style={{
+                      backgroundColor: '#6d28d9',
+                      paddingHorizontal: 16,
+                      paddingVertical: 9,
+                      borderRadius: 8
+                    }}
+                  >
+                    <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>
+                      Enable Camera Access
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
+            {/* Scanner Feedback Toast */}
+            {scannerFeedback && (
+              <View
+                style={{
+                  backgroundColor: scannerFeedback.includes('✓') ? '#064e3b' : '#1e293b',
+                  borderWidth: 1,
+                  borderColor: scannerFeedback.includes('✓') ? '#10b981' : '#475569',
+                  borderRadius: 10,
+                  padding: 10,
+                  marginBottom: 14,
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: 'bold' }}>
+                  {scannerFeedback}
+                </Text>
+              </View>
+            )}
+
+            {/* STUDENT VERIFICATION CARD (WHEN SCANNED) */}
+            {scannedStudent && (
+              <View
+                style={{
+                  backgroundColor: '#0f172a',
+                  borderWidth: 1,
+                  borderColor: scannedRegStatus === 'attended' ? '#10b981' : '#6d28d9',
+                  borderRadius: 16,
+                  padding: 16,
+                  marginBottom: 16
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <Image
+                    source={{ uri: scannedStudent.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80' }}
+                    style={{ width: 56, height: 56, borderRadius: 28, borderWidth: 2, borderColor: '#6d28d9' }}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#ffffff' }}>
+                      {scannedStudent.full_name}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>
+                      ID: {scannedStudent.student_id || 'N/A'} • {scannedStudent.department || 'CSE'}
+                    </Text>
+                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
+                      <View
+                        style={{
+                          backgroundColor: scannedStudent.is_verified ? '#064e3b' : '#78350f',
+                          paddingHorizontal: 6,
+                          paddingVertical: 2,
+                          borderRadius: 4
+                        }}
+                      >
+                        <Text style={{ fontSize: 9, fontWeight: 'bold', color: scannedStudent.is_verified ? '#34d399' : '#fcd34d' }}>
+                          {scannedStudent.is_verified ? '✓ Verified Member' : '⏳ Pending'}
+                        </Text>
+                      </View>
+
+                      <View
+                        style={{
+                          backgroundColor:
+                            scannedRegStatus === 'attended'
+                              ? '#064e3b'
+                              : scannedRegStatus === 'confirmed'
+                              ? '#1e1b4b'
+                              : '#451a03',
+                          paddingHorizontal: 6,
+                          paddingVertical: 2,
+                          borderRadius: 4
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 9,
+                            fontWeight: 'bold',
+                            color:
+                              scannedRegStatus === 'attended'
+                                ? '#34d399'
+                                : scannedRegStatus === 'confirmed'
+                                ? '#a5b4fc'
+                                : '#fb923c'
+                          }}
+                        >
+                          {scannedRegStatus === 'attended'
+                            ? '✅ Already Attended'
+                            : scannedRegStatus === 'confirmed'
+                            ? '🎟️ RSVP Confirmed'
+                            : '⚡ Walk-In Attendee'}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Event Check-in Target Display */}
+                <View
+                  style={{
+                    backgroundColor: '#1e293b',
+                    padding: 10,
+                    borderRadius: 10,
+                    marginTop: 12,
+                    borderWidth: 1,
+                    borderColor: '#334155'
+                  }}
+                >
+                  <Text style={{ fontSize: 11, color: '#94a3b8' }}>Target Event Check-in:</Text>
+                  <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#ffffff', marginTop: 2 }}>
+                    {curEvent?.title}
+                  </Text>
+                </View>
+
+                {/* Action Buttons */}
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
+                  <TouchableOpacity
+                    onPress={handleConfirmAttendanceCheckIn}
+                    disabled={scannerCheckingIn}
+                    style={{
+                      flex: 2,
+                      backgroundColor: scannedRegStatus === 'attended' ? '#059669' : '#10b981',
+                      paddingVertical: 12,
+                      borderRadius: 10,
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {scannerCheckingIn ? (
+                      <ActivityIndicator color="#ffffff" size="small" />
+                    ) : (
+                      <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
+                        {scannedRegStatus === 'attended'
+                          ? '✓ Checked In (Re-verify)'
+                          : '✓ Confirm Check-in & Mark Attended'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={handleResetScannerForNext}
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#1e293b',
+                      paddingVertical: 12,
+                      borderRadius: 10,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 1,
+                      borderColor: '#475569'
+                    }}
+                  >
+                    <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>
+                      Next ❯
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* MANUAL STUDENT ID / PASS CODE ENTRY FALLBACK */}
+            <View
+              style={{
+                backgroundColor: '#0f172a',
+                borderWidth: 1,
+                borderColor: '#1e293b',
+                borderRadius: 16,
+                padding: 16,
+                marginBottom: 16
+              }}
+            >
+              <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#ffffff', marginBottom: 4 }}>
+                ⌨️ Manual Student ID / Pass Lookup
+              </Text>
+              <Text style={{ fontSize: 11, color: '#94a3b8', marginBottom: 10 }}>
+                For cracked screens or manual check-in, type or select student ID:
+              </Text>
+
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
+                <TextInput
+                  placeholder="e.g. CS2026-088 or student email"
+                  placeholderTextColor="#64748b"
+                  value={manualScanCode}
+                  onChangeText={setManualScanCode}
+                  autoCapitalize="characters"
+                  style={{
+                    flex: 1,
+                    backgroundColor: '#1e293b',
+                    borderWidth: 1,
+                    borderColor: '#334155',
+                    borderRadius: 8,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    fontSize: 13,
+                    color: '#ffffff'
+                  }}
+                />
+
+                <TouchableOpacity
+                  onPress={handleManualStudentLookup}
+                  style={{
+                    backgroundColor: '#6d28d9',
+                    paddingHorizontal: 14,
+                    borderRadius: 8,
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                  }}
+                >
+                  <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>
+                    Verify
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Quick Test Chips */}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                {['CS2026-088', 'CS2026-002', 'ADMIN-001', 'alex.rivera@techclub.edu'].map((chip) => (
+                  <TouchableOpacity
+                    key={chip}
+                    onPress={() => {
+                      setManualScanCode(chip);
+                      processStudentScan(chip);
+                    }}
+                    style={{
+                      backgroundColor: '#1e293b',
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 6,
+                      borderWidth: 1,
+                      borderColor: '#334155'
+                    }}
+                  >
+                    <Text style={{ color: '#a5b4fc', fontSize: 10, fontWeight: 'bold' }}>
+                      {chip}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* RECENT CHECK-IN ATTENDANCE STREAM */}
+            <View
+              style={{
+                backgroundColor: '#0f172a',
+                borderWidth: 1,
+                borderColor: '#1e293b',
+                borderRadius: 16,
+                padding: 16
+              }}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#ffffff' }}>
+                  📋 Live Check-in Stream ({scanHistory.length})
+                </Text>
+                <View style={{ backgroundColor: '#064e3b', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                  <Text style={{ color: '#34d399', fontSize: 10, fontWeight: 'bold' }}>
+                    Active Session
+                  </Text>
+                </View>
+              </View>
+
+              <View style={{ gap: 8 }}>
+                {scanHistory.map((item, idx) => (
+                  <View
+                    key={`${item.studentId}-${idx}`}
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      paddingVertical: 8,
+                      borderBottomWidth: idx < scanHistory.length - 1 ? 1 : 0,
+                      borderBottomColor: '#1e293b'
+                    }}
+                  >
+                    <View>
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#ffffff' }}>
+                        {item.studentName}
+                      </Text>
+                      <Text style={{ fontSize: 10, color: '#94a3b8' }}>
+                        {item.studentId} • {item.eventTitle}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <View style={{ backgroundColor: '#064e3b', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                        <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#34d399' }}>
+                          ✓ Attended
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 9, color: '#64748b', marginTop: 2 }}>
+                        {item.time}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+    );
+  };
 
   // Guest action gate
   const requireAuth = (actionName = 'access this feature') => {
@@ -1355,6 +2132,26 @@ export default function App() {
                   🎟️ Pass
                 </Text>
               </TouchableOpacity>
+
+              {/* Admin Event Attendance QR Scanner Fast Trigger */}
+              {isAdmin && (
+                <TouchableOpacity
+                  onPress={() => openAdminScanner()}
+                  style={{
+                    backgroundColor: '#6d28d9',
+                    paddingHorizontal: 8,
+                    paddingVertical: 5,
+                    borderRadius: 8,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 3
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#ffffff' }}>
+                    📷 Scan
+                  </Text>
+                </TouchableOpacity>
+              )}
 
               {/* Role Pill (strictly Admin or Member per Rule 4) */}
               <View
@@ -2085,6 +2882,26 @@ export default function App() {
                         </Text>
                       </TouchableOpacity>
                     </View>
+
+                    {/* Admin Event Attendance QR Scanner Button */}
+                    <TouchableOpacity
+                      onPress={() => openAdminScanner()}
+                      style={{
+                        backgroundColor: '#f5f3ff',
+                        padding: 11,
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: '#ddd6fe',
+                        alignItems: 'center',
+                        flexDirection: 'row',
+                        justifyContent: 'center',
+                        gap: 6
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#6d28d9' }}>
+                        📷 Scan Student Event QR Pass
+                      </Text>
+                    </TouchableOpacity>
                   </View>
                 )}
 
@@ -2870,6 +3687,7 @@ export default function App() {
         </TouchableOpacity>
       </View>
       {renderGoogleModal()}
+      {renderAdminScannerModal()}
     </SafeAreaView>
   );
 }
