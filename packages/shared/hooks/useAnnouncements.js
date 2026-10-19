@@ -9,16 +9,38 @@ import {
   togglePinAnnouncement
 } from '../api/announcements.js';
 
+const CACHE_KEY = 'atc_cache_announcements';
+
+function loadCachedAnnouncements() {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(CACHE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveCachedAnnouncements(data) {
+  if (typeof window === 'undefined' || !Array.isArray(data)) return;
+  try {
+    window.localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+  } catch (e) {}
+}
+
 export function useAnnouncements() {
-  const [announcements, setAnnouncements] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [announcements, setAnnouncements] = useState(() => loadCachedAnnouncements());
+  const [loading, setLoading] = useState(() => loadCachedAnnouncements().length === 0);
   const [error, setError] = useState(null);
 
   const fetchAnnouncements = useCallback(async () => {
     try {
-      setLoading(true);
+      if (loadCachedAnnouncements().length === 0) {
+        setLoading(true);
+      }
       const data = await getAnnouncements();
       setAnnouncements(data);
+      saveCachedAnnouncements(data);
       setError(null);
     } catch (err) {
       setError(err.message || 'Failed to load announcements');

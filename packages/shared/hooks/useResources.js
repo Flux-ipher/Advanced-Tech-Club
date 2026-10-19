@@ -2,16 +2,38 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getResources, createResource, deleteResource, incrementDownloadCount } from '../api/resources.js';
 
+const CACHE_KEY = 'atc_cache_resources';
+
+function loadCachedResources() {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(CACHE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveCachedResources(data) {
+  if (typeof window === 'undefined' || !Array.isArray(data)) return;
+  try {
+    window.localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+  } catch (e) {}
+}
+
 export function useResources() {
-  const [resources, setResources] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [resources, setResources] = useState(() => loadCachedResources());
+  const [loading, setLoading] = useState(() => loadCachedResources().length === 0);
   const [error, setError] = useState(null);
 
   const fetchResources = useCallback(async () => {
     try {
-      setLoading(true);
+      if (loadCachedResources().length === 0) {
+        setLoading(true);
+      }
       const data = await getResources();
       setResources(data);
+      saveCachedResources(data);
       setError(null);
     } catch (err) {
       setError(err.message || 'Failed to load resources');

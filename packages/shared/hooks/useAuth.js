@@ -76,7 +76,11 @@ export function useAuthListener() {
     if (!isFirebaseConfigured || !firebaseAuth) return;
 
     let isMounted = true;
-    useAuthStore.getState().setLoading(true);
+    // Only set loading to true if we do not already have a valid cached user
+    // This prevents route-guards (VerificationGate) from flashing or redirecting to /login on page reload
+    if (!useAuthStore.getState().user) {
+      useAuthStore.getState().setLoading(true);
+    }
 
     const unsubscribe = firebaseAuth.onAuthStateChanged(async (user) => {
       if (!isMounted) return;

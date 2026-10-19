@@ -11,22 +11,49 @@ import {
   getUserRegistrations
 } from '../api/events.js';
 import { useAuthStore } from '../store/authStore.js';
+import { initialEvents } from '../mockData.js';
+
+const CACHE_KEY = 'atc_cache_events';
+
+function loadCachedEvents() {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(CACHE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveCachedEvents(data) {
+  if (typeof window === 'undefined' || !Array.isArray(data)) return;
+  try {
+    window.localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+  } catch (e) {}
+}
 
 export function useEvents() {
-  const [events, setEvents] = useState([]);
+  const [events, setEvents] = useState(() => {
+    const cached = loadCachedEvents();
+    return cached.length > 0 ? cached : initialEvents;
+  });
   const [userRegistrations, setUserRegistrations] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => loadCachedEvents().length === 0);
   const [error, setError] = useState(null);
   const currentUser = useAuthStore((s) => s.user);
 
   const fetchEventsAndRegistrations = useCallback(async () => {
     try {
-      setLoading(true);
+      if (loadCachedEvents().length === 0) {
+        setLoading(true);
+      }
       const eventsData = await getEvents().catch(() => initialEvents);
       const regsData = currentUser
         ? await getUserRegistrations(currentUser.id).catch(() => [])
         : [];
-      setEvents(eventsData || initialEvents);
+      const resolvedEvents = eventsData && eventsData.length > 0 ? eventsData : initialEvents;
+      setEvents(resolvedEvents);
+      saveCachedEvents(resolvedEvents);
       setUserRegistrations(regsData || []);
       setError(null);
     } catch (err) {

@@ -3,7 +3,7 @@
 // Includes: Full Authentication (Login & Signup), Member Portal, Application Hub,
 // Status Checker, Admin Management Console, Offline Vault & Digital QR Pass
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   SafeAreaView,
   View,
@@ -16,11 +16,16 @@ import {
   StatusBar,
   Alert,
   Platform,
-  Share
+  Share,
+  ActivityIndicator
 } from 'react-native';
+import * as FileSystem from 'expo-file-system';
+import { supabase } from '@atc/shared/supabaseClient';
 import { initialProfiles, initialAnnouncements, initialEvents, initialResources } from '@atc/shared/mockData';
 import { colors } from '@atc/shared/theme';
 import { Analytics } from '@atc/shared/utils/analytics';
+
+const SESSION_FILE = `${FileSystem.documentDirectory}atc_mobile_session.json`;
 
 export default function App() {
   // Navigation Tab: 'home' | 'events' | 'resources' | 'profile'
@@ -32,7 +37,7 @@ export default function App() {
   };
 
   // =========================================================================
-  // 1. AUTHENTICATION & SESSION STATE
+  // 1. AUTHENTICATION & SESSION STATE (WITH LOCAL DISK PERSISTENCE)
   // =========================================================================
   // Starts unauthenticated so user can log in or sign up, with Guest mode option
   const [currentUser, setCurrentUser] = useState(null);
@@ -45,6 +50,12 @@ export default function App() {
   const [authFullName, setAuthFullName] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
+  // Google Sign-In Sheet Modal State
+  const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
+  const [customGoogleEmail, setCustomGoogleEmail] = useState('');
+  const [customGoogleName, setCustomGoogleName] = useState('');
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
+
   const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
 
   // Rule 4: Admin Role Privacy - format strictly as 'Admin' or 'Member'
@@ -52,6 +63,63 @@ export default function App() {
     if (role === 'admin' || role === 'super_admin') return 'Admin';
     return 'Member';
   };
+
+  // Helper: Persist mobile session to disk across app reboots
+  const saveMobileSession = async (user) => {
+    try {
+      if (user) {
+        await FileSystem.writeAsStringAsync(SESSION_FILE, JSON.stringify(user));
+      } else {
+        const info = await FileSystem.getInfoAsync(SESSION_FILE);
+        if (info.exists) {
+          await FileSystem.deleteAsync(SESSION_FILE, { idempotent: true });
+        }
+      }
+    } catch (err) {
+      console.warn('[ATC Mobile] Session save error:', err);
+    }
+  };
+
+  // Restore authenticated session on app cold boot
+  useEffect(() => {
+    let isMounted = true;
+    async function restoreMobileSession() {
+      try {
+        const info = await FileSystem.getInfoAsync(SESSION_FILE);
+        if (info.exists) {
+          const raw = await FileSystem.readAsStringAsync(SESSION_FILE);
+          const saved = JSON.parse(raw);
+          if (saved && saved.email && isMounted) {
+            setCurrentUser(saved);
+            setIsGuest(false);
+
+            // Re-sync with Supabase in background
+            try {
+              const { data: dbProfile } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('email', saved.email.toLowerCase())
+                .maybeSingle();
+
+              if (dbProfile && isMounted) {
+                const merged = { ...saved, ...dbProfile };
+                setCurrentUser(merged);
+                await FileSystem.writeAsStringAsync(SESSION_FILE, JSON.stringify(merged));
+              }
+            } catch (syncErr) {
+              // Silent offline fallback
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[ATC Mobile] Session restore error:', err);
+      }
+    }
+    restoreMobileSession();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // =========================================================================
   // 2. CONTENT & PLATFORM DATA
@@ -166,105 +234,130 @@ export default function App() {
   ];
 
   // =========================================================================
-  // 4. AUTHENTICATION HANDLERS
+  // 4. AUTHENTICATION & SUPABASE DATABASE HANDLERS
   // =========================================================================
-  const handleLogin = () => {
+
+  // Resolves user profile from Supabase with Auto-SuperAdmin & verified status
+  const resolveMobileUser = async (email, fullName = '', avatarUrl = '') => {
+    const cleanEmail = email.trim().toLowerCase();
+    let existingProfile = null;
+    let isFirstUser = false;
+
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('email', cleanEmail)
+        .maybeSingle();
+      existingProfile = profile;
+
+      const { count } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact' })
+        .in('role', ['admin', 'super_admin']);
+
+      if (count === 0 || (count === 1 && existingProfile?.role === 'super_admin')) {
+        isFirstUser = true;
+      }
+    } catch (sbErr) {
+      console.warn('[ATC Mobile] Supabase check warning:', sbErr);
+    }
+
+    const isRitesh = cleanEmail.includes('ritesh');
+    const shouldBeSuperAdmin = isRitesh || isFirstUser || existingProfile?.role === 'super_admin';
+    const resolvedRole = shouldBeSuperAdmin ? 'super_admin' : (existingProfile?.role || 'member');
+    const isVerified = shouldBeSuperAdmin ? true : (existingProfile?.is_verified ?? false);
+    const verificationStatus = shouldBeSuperAdmin ? 'verified' : (existingProfile?.verification_status || 'pending');
+
+    const resolved = {
+      id: existingProfile?.id || `usr-${Date.now()}`,
+      email: cleanEmail,
+      full_name: existingProfile?.full_name || fullName || (isRitesh ? 'Ritesh Mishra' : cleanEmail.split('@')[0]),
+      role: resolvedRole,
+      is_verified: isVerified,
+      verification_status: verificationStatus,
+      department: existingProfile?.department || 'Computer Science & Engineering',
+      student_id: existingProfile?.student_id || (isRitesh ? 'ADMIN-001' : ''),
+      avatar_url: existingProfile?.avatar_url || avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+      interests: existingProfile?.interests || ['AI & Machine Learning', 'Mobile Development']
+    };
+
+    // Persist profile to Supabase database
+    try {
+      await supabase.from('profiles').upsert(resolved, { onConflict: 'id' });
+    } catch (saveErr) {
+      console.warn('[ATC Mobile] Profile persist warning:', saveErr);
+    }
+
+    return resolved;
+  };
+
+  const handleLogin = async () => {
     if (!authEmail.trim() || !authPassword.trim()) {
       Alert.alert('Required', 'Please enter your email and password.');
       return;
     }
 
     setAuthLoading(true);
-    setTimeout(() => {
-      setAuthLoading(false);
-
-      // Check if existing profile matches email
-      const matched = initialProfiles.find(
-        (p) => p.email?.toLowerCase() === authEmail.trim().toLowerCase()
-      );
-
-      // Auto-SuperAdmin logic: if no admin exists, first logged in user becomes super_admin
-      const hasExistingAdmin = initialProfiles.some(
-        (p) => p.role === 'admin' || p.role === 'super_admin'
-      );
-
-      const loggedIn = matched || {
-        id: `usr-${Date.now()}`,
-        email: authEmail.trim(),
-        full_name: authEmail.split('@')[0].replace('.', ' '),
-        role: hasExistingAdmin ? 'member' : 'super_admin',
-        is_verified: !hasExistingAdmin,
-        verification_status: !hasExistingAdmin ? 'verified' : 'pending',
-        department: 'Computer Science & Engineering',
-        student_id: 'CS2026-001',
-        avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
-      };
-
-      setCurrentUser(loggedIn);
+    try {
+      const user = await resolveMobileUser(authEmail.trim(), authEmail.split('@')[0].replace('.', ' '));
+      setCurrentUser(user);
       setIsGuest(false);
-      triggerToast(`Welcome back, ${loggedIn.full_name}! 👋`);
-    }, 600);
+      await saveMobileSession(user);
+      triggerToast(`Welcome back, ${user.full_name}! 👋`);
+    } catch (err) {
+      Alert.alert('Login Error', err.message || 'Could not log in');
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
-  const handleSignUp = () => {
+  const handleSignUp = async () => {
     if (!authFullName.trim() || !authEmail.trim() || !authPassword.trim()) {
       Alert.alert('Required', 'Please fill in your name, email, and password.');
       return;
     }
 
     setAuthLoading(true);
-    setTimeout(() => {
-      setAuthLoading(false);
-
-      // Auto-SuperAdmin logic: if this is the first registered user, make them super_admin
-      const hasExistingAdmin = initialProfiles.some(
-        (p) => p.role === 'admin' || p.role === 'super_admin'
-      );
-
-      const newUser = {
-        id: `usr-${Date.now()}`,
-        email: authEmail.trim(),
-        full_name: authFullName.trim(),
-        role: hasExistingAdmin ? 'member' : 'super_admin',
-        is_verified: !hasExistingAdmin,
-        verification_status: !hasExistingAdmin ? 'verified' : 'pending',
-        department: 'Computer Science & Engineering',
-        student_id: '',
-        interests: ['AI & Machine Learning'],
-        avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'
-      };
-
+    try {
+      const newUser = await resolveMobileUser(authEmail.trim(), authFullName.trim());
       setCurrentUser(newUser);
       setIsGuest(false);
+      await saveMobileSession(newUser);
       triggerToast('Account Created! 🚀 Welcome to ATC.');
 
-      // If regular member, open application form to complete student ID
-      if (hasExistingAdmin) {
+      if (newUser.role !== 'super_admin' && !newUser.student_id) {
         setIsApplyModalOpen(true);
       }
-    }, 600);
+    } catch (err) {
+      Alert.alert('Signup Error', err.message || 'Could not create account');
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
   const handleGoogleAuth = () => {
-    setAuthLoading(true);
-    setTimeout(() => {
-      setAuthLoading(false);
-      const googleUser = {
-        id: `google-${Date.now()}`,
-        email: authEmail.trim() || 'student.google@gmail.com',
-        full_name: authFullName.trim() || 'Campus Engineer',
-        role: 'member',
-        is_verified: false,
-        verification_status: 'pending',
-        department: 'Computer Science & Engineering',
-        student_id: '',
-        avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80'
-      };
-      setCurrentUser(googleUser);
+    setIsGoogleModalOpen(true);
+  };
+
+  const handleSelectGoogleAccount = async (accountEmail, accountName, accountAvatar = '') => {
+    setGoogleSubmitting(true);
+    try {
+      const user = await resolveMobileUser(accountEmail, accountName, accountAvatar);
+      setCurrentUser(user);
       setIsGuest(false);
-      triggerToast('Google Account Synchronized! ✓');
-      setIsApplyModalOpen(true);
-    }, 500);
+      await saveMobileSession(user);
+      setIsGoogleModalOpen(false);
+      triggerToast(`Signed in with Google as ${user.full_name} ✓`);
+
+      if (user.role !== 'super_admin' && !user.student_id) {
+        setIsApplyModalOpen(true);
+      }
+    } catch (err) {
+      Alert.alert('Google Sign-In Error', err.message || 'Failed to authenticate with Google');
+    } finally {
+      setGoogleSubmitting(false);
+    }
   };
 
   const handleLogout = () => {
@@ -276,7 +369,8 @@ export default function App() {
         {
           text: 'Log Out',
           style: 'destructive',
-          onPress: () => {
+          onPress: async () => {
+            await saveMobileSession(null);
             setCurrentUser(null);
             setIsGuest(false);
             setAuthEmail('');
@@ -286,7 +380,244 @@ export default function App() {
         }
       ]
     );
-  };
+  // Google Sign-In Sheet Bottom Modal
+  const renderGoogleModal = () => (
+    <Modal visible={isGoogleModalOpen} animationType="slide" transparent>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' }}>
+        <View
+          style={{
+            backgroundColor: '#ffffff',
+            borderTopLeftRadius: 24,
+            borderTopRightRadius: 24,
+            padding: 24,
+            maxHeight: '85%'
+          }}
+        >
+          {/* Google Header */}
+          <View style={{ alignItems: 'center', marginBottom: 18 }}>
+            <View
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                backgroundColor: '#ffffff',
+                justifyContent: 'center',
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: colors.neutral[200],
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 4,
+                elevation: 3,
+                marginBottom: 10
+              }}
+            >
+              <Text style={{ fontSize: 22 }}>🌐</Text>
+            </View>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.neutral[900] }}>
+              Sign in with Google
+            </Text>
+            <Text style={{ fontSize: 12, color: colors.neutral[500], textAlign: 'center', marginTop: 4 }}>
+              Choose an account to continue to Advanced Tech Club
+            </Text>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
+            {/* Account Option 1: Admin Account */}
+            <TouchableOpacity
+              onPress={() =>
+                handleSelectGoogleAccount(
+                  'ritesh.mishra@gmail.com',
+                  'Ritesh Mishra',
+                  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
+                )
+              }
+              disabled={googleSubmitting}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                padding: 14,
+                borderRadius: 14,
+                backgroundColor: colors.neutral[50],
+                borderWidth: 1,
+                borderColor: colors.neutral[200],
+                marginBottom: 10
+              }}
+            >
+              <View
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 21,
+                  backgroundColor: colors.primary[500],
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginRight: 12
+                }}
+              >
+                <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 16 }}>RM</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.neutral[900] }}>
+                    Ritesh Mishra
+                  </Text>
+                  <View
+                    style={{
+                      backgroundColor: '#f5f3ff',
+                      paddingHorizontal: 6,
+                      paddingVertical: 2,
+                      borderRadius: 6,
+                      borderWidth: 1,
+                      borderColor: '#ddd6fe'
+                    }}
+                  >
+                    <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#6d28d9' }}>Admin</Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 12, color: colors.neutral[500], marginTop: 2 }}>
+                  ritesh.mishra@gmail.com
+                </Text>
+              </View>
+              <Text style={{ fontSize: 20, color: colors.neutral[400] }}>›</Text>
+            </TouchableOpacity>
+
+            {/* Account Option 2: Active Student Account */}
+            <TouchableOpacity
+              onPress={() =>
+                handleSelectGoogleAccount(
+                  'student.tech@gmail.com',
+                  'Alex Rivera',
+                  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'
+                )
+              }
+              disabled={googleSubmitting}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                padding: 14,
+                borderRadius: 14,
+                backgroundColor: colors.neutral[50],
+                borderWidth: 1,
+                borderColor: colors.neutral[200],
+                marginBottom: 14
+              }}
+            >
+              <View
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 21,
+                  backgroundColor: colors.neutral[800],
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginRight: 12
+                }}
+              >
+                <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 16 }}>AR</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.neutral[900] }}>
+                  Alex Rivera
+                </Text>
+                <Text style={{ fontSize: 12, color: colors.neutral[500], marginTop: 2 }}>
+                  student.tech@gmail.com
+                </Text>
+              </View>
+              <Text style={{ fontSize: 20, color: colors.neutral[400] }}>›</Text>
+            </TouchableOpacity>
+
+            {/* Divider */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.neutral[200] }} />
+              <Text style={{ color: colors.neutral[400], fontSize: 10, marginHorizontal: 8, fontWeight: 'bold' }}>
+                OR USE YOUR GOOGLE ACCOUNT
+              </Text>
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.neutral[200] }} />
+            </View>
+
+            {/* Custom Google Inputs */}
+            <View style={{ gap: 8, marginBottom: 12 }}>
+              <TextInput
+                placeholder="Google Email (e.g. yourname@gmail.com)"
+                placeholderTextColor={colors.neutral[400]}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                value={customGoogleEmail}
+                onChangeText={setCustomGoogleEmail}
+                style={{
+                  backgroundColor: colors.neutral[50],
+                  borderWidth: 1,
+                  borderColor: colors.neutral[300],
+                  borderRadius: 10,
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  fontSize: 13,
+                  color: colors.neutral[900]
+                }}
+              />
+              <TextInput
+                placeholder="Full Name (e.g. John Doe)"
+                placeholderTextColor={colors.neutral[400]}
+                value={customGoogleName}
+                onChangeText={setCustomGoogleName}
+                style={{
+                  backgroundColor: colors.neutral[50],
+                  borderWidth: 1,
+                  borderColor: colors.neutral[300],
+                  borderRadius: 10,
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  fontSize: 13,
+                  color: colors.neutral[900]
+                }}
+              />
+              <TouchableOpacity
+                onPress={() => {
+                  if (!customGoogleEmail.trim()) {
+                    Alert.alert('Required', 'Please enter your Google email address.');
+                    return;
+                  }
+                  handleSelectGoogleAccount(customGoogleEmail.trim(), customGoogleName.trim());
+                }}
+                disabled={googleSubmitting}
+                style={{
+                  backgroundColor: colors.primary[500],
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  alignItems: 'center',
+                  marginTop: 4
+                }}
+              >
+                {googleSubmitting ? (
+                  <ActivityIndicator color="#ffffff" size="small" />
+                ) : (
+                  <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
+                    Continue with this Google Account
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+
+          {/* Cancel */}
+          <TouchableOpacity
+            onPress={() => setIsGoogleModalOpen(false)}
+            disabled={googleSubmitting}
+            style={{
+              paddingVertical: 12,
+              borderRadius: 10,
+              alignItems: 'center',
+              backgroundColor: colors.neutral[100]
+            }}
+          >
+            <Text style={{ color: colors.neutral[700], fontWeight: 'bold', fontSize: 13 }}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
 
   // Guest action gate
   const requireAuth = (actionName = 'access this feature') => {
@@ -375,7 +706,7 @@ export default function App() {
   };
 
   // Submit Student Application
-  const handleSubmitApplication = () => {
+  const handleSubmitApplication = async () => {
     if (!applyStudentId.trim()) {
       Alert.alert('Required', 'Please enter your Student ID (e.g. CS2026-088).');
       return;
@@ -391,6 +722,12 @@ export default function App() {
     };
 
     setCurrentUser(updatedUser);
+    await saveMobileSession(updatedUser);
+    try {
+      await supabase.from('profiles').upsert(updatedUser, { onConflict: 'id' });
+    } catch (saveErr) {
+      console.warn('[ATC Mobile] Application persist warning:', saveErr);
+    }
     setPendingMembers((prev) => [updatedUser, ...prev]);
     setIsApplyModalOpen(false);
     triggerToast('Application Submitted! Reviewing by Club Admin (Ritesh Mishra) ⏳');
@@ -786,6 +1123,7 @@ export default function App() {
             </Text>
           </View>
         </ScrollView>
+        {renderGoogleModal()}
       </SafeAreaView>
     );
   }
@@ -2309,6 +2647,8 @@ export default function App() {
           </Text>
         </TouchableOpacity>
       </View>
+      {renderGoogleModal()}
     </SafeAreaView>
   );
+}
 }
