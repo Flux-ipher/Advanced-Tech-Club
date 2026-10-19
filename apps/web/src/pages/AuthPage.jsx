@@ -36,9 +36,13 @@ export function AuthPage() {
         await signInWithEmail(email, password);
         navigate('/portal');
       } else {
-        await signUpWithEmail(email, password, fullName);
-        // Take new signups directly to the Apply page to fill up their data
-        navigate('/apply');
+        const res = await signUpWithEmail(email, password, fullName);
+        if (res?.profile?.role === 'super_admin' || res?.profile?.role === 'admin') {
+          navigate('/portal');
+        } else {
+          // Take new member signups directly to the Apply page to fill up their data
+          navigate('/apply');
+        }
       }
     } catch (err) {
       setErrorMsg(err.message || 'Authentication failed');
@@ -52,8 +56,11 @@ export function AuthPage() {
     setGoogleLoading(true);
     try {
       const res = await signInWithGoogle();
-      // If user has not completed their application details, route to apply page
-      if (res?.isNewUser || !res?.profile?.student_id) {
+      // If user is super_admin or admin, route straight to portal
+      if (res?.profile?.role === 'super_admin' || res?.profile?.role === 'admin') {
+        navigate('/portal');
+      } else if (res?.isNewUser || !res?.profile?.student_id) {
+        // If user has not completed their application details, route to apply page
         navigate('/apply');
       } else {
         navigate('/portal');

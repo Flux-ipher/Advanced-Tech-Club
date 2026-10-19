@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@atc/shared/hooks/useAuth';
 import { useMembers } from '@atc/shared/hooks/useMembers';
 import { RoleBadge } from '../components/RoleBadge';
@@ -52,12 +53,12 @@ export function MembersAdminPage() {
           Only the Club Admin (<strong>Ritesh Mishra</strong>) has permission to verify student applicants and manage club access.
         </p>
         <div className="pt-2">
-          <button
-            onClick={() => switchDemoUser('super_admin')}
-            className="btn-primary text-xs w-full py-2.5"
+          <Link
+            to="/portal"
+            className="btn-primary text-xs w-full py-2.5 inline-block text-center"
           >
-            Switch to Admin (Ritesh Mishra)
-          </button>
+            Return to Club Portal
+          </Link>
         </div>
       </div>
     );

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@atc/shared/hooks/useAuth';
 import { useAnnouncements } from '@atc/shared/hooks/useAnnouncements';
 import { useEvents } from '@atc/shared/hooks/useEvents';
@@ -92,12 +93,12 @@ export function AdminPage() {
           You are currently signed in as a standard member (<strong>{user?.full_name}</strong>). Only club leads and administrators have access to publishing tools.
         </p>
         <div className="pt-2">
-          <button
-            onClick={() => switchDemoUser('admin')}
-            className="btn-primary text-xs w-full py-2.5"
+          <Link
+            to="/portal"
+            className="btn-primary text-xs w-full py-2.5 inline-block text-center"
           >
-            Switch to Admin (Sarah Chen) to Continue
-          </button>
+            Return to Club Portal
+          </Link>
         </div>
       </div>
     );

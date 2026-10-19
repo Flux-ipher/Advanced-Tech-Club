@@ -267,7 +267,45 @@ CREATE POLICY "Notifications can be updated"
   USING (true)
   WITH CHECK (true);
 
--- 9. PERMISSIONS GRANT
+-- 9. AUTO-PROMOTION FOR FIRST REGISTERED USER AS SUPER_ADMIN
+CREATE OR REPLACE FUNCTION public.handle_first_user_superadmin()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- If no super_admin exists in profiles yet (other than this record), auto-promote
+  IF NOT EXISTS (
+    SELECT 1 FROM public.profiles 
+    WHERE role = 'super_admin' AND id <> NEW.id
+  ) THEN
+    NEW.role := 'super_admin';
+    NEW.is_verified := true;
+    NEW.verification_status := 'verified';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS tr_first_user_superadmin ON public.profiles;
+CREATE TRIGGER tr_first_user_superadmin
+  BEFORE INSERT ON public.profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_first_user_superadmin();
+
+-- If profiles already exist without any super_admin, promote the first registered user
+DO $$
+DECLARE
+  v_first_uid TEXT;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE role = 'super_admin') THEN
+    SELECT id INTO v_first_uid FROM public.profiles ORDER BY created_at ASC LIMIT 1;
+    IF v_first_uid IS NOT NULL THEN
+      UPDATE public.profiles
+      SET role = 'super_admin', is_verified = true, verification_status = 'verified'
+      WHERE id = v_first_uid;
+    END IF;
+  END IF;
+END $$;
+
+-- 10. PERMISSIONS GRANT
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;

@@ -83,12 +83,22 @@ serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Upsert profile record with default 'member' role and active status
+    // Check if this is the first registered user / no super_admin exists yet
+    const { count } = await supabase
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("role", "super_admin");
+
+    const isFirstUser = (count === 0);
+    const assignedRole = isFirstUser ? "super_admin" : "member";
+
+    // Upsert profile record
     const { data, error } = await supabase.from("profiles").upsert(
       {
         id: uid,
-        full_name: fullName || "Club Member",
-        role: "member",
+        email,
+        full_name: fullName || (isFirstUser ? "Club Admin" : "Club Member"),
+        role: assignedRole,
         department,
         avatar_url: avatarUrl,
         is_verified: true,

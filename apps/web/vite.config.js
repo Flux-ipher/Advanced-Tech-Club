@@ -25,6 +25,7 @@ export default defineConfig(({ mode }) => {
       'process.env.VITE_FIREBASE_STORAGE_BUCKET': JSON.stringify(env.VITE_FIREBASE_STORAGE_BUCKET || ''),
       'process.env.VITE_FIREBASE_MESSAGING_SENDER_ID': JSON.stringify(env.VITE_FIREBASE_MESSAGING_SENDER_ID || ''),
       'process.env.VITE_FIREBASE_APP_ID': JSON.stringify(env.VITE_FIREBASE_APP_ID || ''),
+      'process.env.VITE_ADMIN_EMAIL': JSON.stringify(env.VITE_ADMIN_EMAIL || ''),
       'process.env.EXPO_PUBLIC_SUPABASE_URL': JSON.stringify(''),
       'process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY': JSON.stringify(''),
       'process.env.EXPO_PUBLIC_FIREBASE_API_KEY': JSON.stringify(''),

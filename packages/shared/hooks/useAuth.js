@@ -6,6 +6,69 @@ import { useAuthStore, isAdmin as checkIsAdmin, isSuperAdmin as checkIsSuperAdmi
 import { getSupabaseClient, supabase } from '../supabaseClient.js';
 import { firebaseAuth, isFirebaseConfigured } from '../firebaseClient.js';
 
+// Helper: Checks if the user should be super_admin (first registered email or configured admin)
+export async function resolveRoleAndProfile(client, firebaseUser, existingProfile) {
+  const configuredAdminEmail = (
+    (typeof process !== 'undefined' && process?.env?.VITE_ADMIN_EMAIL) ||
+    ''
+  ).trim().toLowerCase();
+
+  const userEmail = (firebaseUser.email || '').trim().toLowerCase();
+  const isExplicitAdmin = Boolean(configuredAdminEmail && userEmail === configuredAdminEmail);
+
+  let isFirstUser = false;
+  if (!isExplicitAdmin && client) {
+    try {
+      // Check if any admin or super_admin exists in profiles
+      const { data: admins, count, error } = await client
+        .from('profiles')
+        .select('id, email, role', { count: 'exact' })
+        .in('role', ['admin', 'super_admin']);
+
+      if (!error) {
+        // If 0 admins exist in profiles OR the only admin is this user
+        if (count === 0 || (count === 1 && admins?.[0]?.id === firebaseUser.uid)) {
+          isFirstUser = true;
+        }
+      }
+    } catch (cntErr) {
+      console.warn('[ATC Auth] Could not check existing admin count:', cntErr?.message);
+    }
+  }
+
+  const shouldBeSuperAdmin = isExplicitAdmin || isFirstUser || existingProfile?.role === 'super_admin';
+
+  const resolvedRole = shouldBeSuperAdmin ? 'super_admin' : (existingProfile?.role || 'member');
+  const isVerified = shouldBeSuperAdmin ? true : (existingProfile?.is_verified ?? false);
+  const verificationStatus = shouldBeSuperAdmin ? 'verified' : (existingProfile?.verification_status || 'pending');
+
+  const resolved = {
+    id: firebaseUser.uid,
+    email: firebaseUser.email,
+    full_name: existingProfile?.full_name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || (shouldBeSuperAdmin ? 'Club Admin' : 'Club Member'),
+    avatar_url: existingProfile?.avatar_url || firebaseUser.photoURL || '',
+    department: existingProfile?.department || 'Computer Science & Engineering',
+    student_id: existingProfile?.student_id || null,
+    interests: existingProfile?.interests || [],
+    role: resolvedRole,
+    is_verified: isVerified,
+    verification_status: verificationStatus
+  };
+
+  // If newly promoted to super_admin or profile record didn't exist in Supabase, persist immediately
+  if (client && (shouldBeSuperAdmin || !existingProfile)) {
+    try {
+      await client
+        .from('profiles')
+        .upsert(resolved, { onConflict: 'id' });
+    } catch (saveErr) {
+      console.warn('[ATC Auth] Could not persist profile to Supabase:', saveErr?.message);
+    }
+  }
+
+  return resolved;
+}
+
 // Global Auth State Listener
 // Auto-rehydrates session and profile from Firebase ID Token & Supabase
 export function useAuthListener() {
@@ -22,8 +85,9 @@ export function useAuthListener() {
         try {
           const token = await user.getIdToken();
           let profile = null;
+          let client = null;
           try {
-            const client = getSupabaseClient(token);
+            client = getSupabaseClient(token);
             const { data } = await client
               .from('profiles')
               .select('*')
@@ -34,16 +98,12 @@ export function useAuthListener() {
             console.warn('[ATC Auth] Could not fetch Supabase profile:', fetchErr?.message);
           }
 
+          const resolved = await resolveRoleAndProfile(client, user, profile);
+
           useAuthStore.getState().setUser({
             firebaseUser: user,
             token,
-            profile: profile || {
-              id: user.uid,
-              email: user.email,
-              full_name: user.displayName || user.email?.split('@')[0] || 'Club Member',
-              role: 'member',
-              is_verified: true
-            }
+            profile: resolved
           });
         } catch (err) {
           console.error('[ATC Auth] Auth rehydration error:', err);
@@ -95,9 +155,9 @@ export function useAuth() {
         const { signInWithEmailAndPassword } = await import('firebase/auth');
         const cred = await signInWithEmailAndPassword(firebaseAuth, email, password);
         const idToken = await cred.user.getIdToken();
+        const client = getSupabaseClient(idToken);
         let profileRow = null;
         try {
-          const client = getSupabaseClient(idToken);
           const { data } = await client
             .from('profiles')
             .select('*')
@@ -108,13 +168,7 @@ export function useAuth() {
           console.warn('[ATC Auth] Could not fetch profile on sign in:', fetchErr?.message);
         }
 
-        const activeProfile = profileRow || {
-          id: cred.user.uid,
-          email: cred.user.email,
-          full_name: cred.user.displayName || email.split('@')[0],
-          role: 'member',
-          is_verified: true
-        };
+        const activeProfile = await resolveRoleAndProfile(client, cred.user, profileRow);
 
         useAuthStore.getState().setUser({
           firebaseUser: cred.user,
@@ -172,37 +226,20 @@ export function useAuth() {
         }
 
         let profileRow = null;
+        let client = null;
         try {
-          const client = getSupabaseClient(idToken);
+          client = getSupabaseClient(idToken);
           const { data } = await client
             .from('profiles')
             .select('*')
             .eq('id', cred.user.uid)
             .maybeSingle();
           profileRow = data;
-
-          if (!profileRow) {
-            const defaultRecord = {
-              id: cred.user.uid,
-              email: cred.user.email,
-              full_name: fullName || email.split('@')[0],
-              department: 'Computer Science & Engineering',
-              role: 'member',
-              is_verified: false,
-              verification_status: 'pending'
-            };
-            const { data: upserted } = await client
-              .from('profiles')
-              .upsert(defaultRecord, { onConflict: 'id' })
-              .select('*')
-              .maybeSingle();
-            profileRow = upserted;
-          }
         } catch (dbErr) {
           console.warn('[ATC Auth] Supabase profile sync warning:', dbErr?.message);
         }
 
-        const newProfile = profileRow || {
+        const newProfile = await resolveRoleAndProfile(client, cred.user, profileRow || {
           id: cred.user.uid,
           email: cred.user.email,
           full_name: fullName || email.split('@')[0],
@@ -210,7 +247,7 @@ export function useAuth() {
           role: 'member',
           is_verified: false,
           verification_status: 'pending'
-        };
+        });
 
         useAuthStore.getState().setUser({
           firebaseUser: cred.user,
@@ -274,47 +311,20 @@ export function useAuth() {
         }
 
         let profileRow = null;
+        let client = null;
         try {
-          const client = getSupabaseClient(idToken);
+          client = getSupabaseClient(idToken);
           const { data } = await client
             .from('profiles')
             .select('*')
             .eq('id', cred.user.uid)
             .maybeSingle();
           profileRow = data;
-
-          if (!profileRow) {
-            // Attempt direct upsert to public.profiles
-            const defaultRecord = {
-              id: cred.user.uid,
-              email: cred.user.email,
-              full_name: cred.user.displayName || cred.user.email?.split('@')[0] || 'Club Member',
-              avatar_url: cred.user.photoURL || '',
-              department: 'Computer Science & Engineering',
-              role: 'member',
-              is_verified: false,
-              verification_status: 'pending'
-            };
-            const { data: upserted } = await client
-              .from('profiles')
-              .upsert(defaultRecord, { onConflict: 'id' })
-              .select('*')
-              .maybeSingle();
-            profileRow = upserted;
-          }
         } catch (dbErr) {
           console.warn('[ATC Auth] Supabase profile sync warning:', dbErr?.message);
         }
 
-        const activeProfile = profileRow || {
-          id: cred.user.uid,
-          email: cred.user.email,
-          full_name: cred.user.displayName || cred.user.email?.split('@')[0] || 'Club Member',
-          avatar_url: cred.user.photoURL || '',
-          role: 'member',
-          is_verified: false,
-          verification_status: 'pending'
-        };
+        const activeProfile = await resolveRoleAndProfile(client, cred.user, profileRow);
 
         useAuthStore.getState().setUser({
           firebaseUser: cred.user,
@@ -322,20 +332,20 @@ export function useAuth() {
           profile: activeProfile
         });
 
-        const isNewUser = !profileRow || !profileRow.student_id;
+        const isNewUser = (!profileRow || !profileRow.student_id) && activeProfile.role !== 'super_admin';
         return { user: cred.user, profile: activeProfile, isNewUser };
       } else {
         // Fallback for offline / dev demo
         const mockGoogleUser = {
           id: 'google-user-' + Date.now(),
-          email: 'student.google@gmail.com',
-          full_name: 'Google Student',
-          role: 'member',
-          is_verified: false,
-          verification_status: 'pending'
+          email: 'admin.user@gmail.com',
+          full_name: 'Club Administrator',
+          role: 'super_admin',
+          is_verified: true,
+          verification_status: 'verified'
         };
         useAuthStore.getState().setUser(mockGoogleUser);
-        return { user: mockGoogleUser, profile: mockGoogleUser, isNewUser: true };
+        return { user: mockGoogleUser, profile: mockGoogleUser, isNewUser: false };
       }
     } catch (err) {
       useAuthStore.getState().setError(err.message);
