@@ -24,6 +24,16 @@ import { supabase } from '@atc/shared/supabaseClient';
 import { initialProfiles, initialAnnouncements, initialEvents, initialResources } from '@atc/shared/mockData';
 import { colors } from '@atc/shared/theme';
 import { Analytics } from '@atc/shared/utils/analytics';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+
+try {
+  GoogleSignin.configure({
+    webClientId: '767714143869-ctm1vp5g2h0erdf1cruivave2a9ostbt.apps.googleusercontent.com',
+    offlineAccess: true,
+  });
+} catch (cfgErr) {
+  console.warn('[ATC Mobile] GoogleSignin configure warning:', cfgErr);
+}
 
 const SESSION_FILE = `${FileSystem.documentDirectory}atc_mobile_session.json`;
 
@@ -130,6 +140,66 @@ export default function App() {
   const [pendingMembers, setPendingMembers] = useState(
     initialProfiles.filter((p) => !p.is_verified || p.verification_status === 'pending')
   );
+  const [totalMembersCount, setTotalMembersCount] = useState(142);
+
+  // Sync Live Data with Supabase Database
+  useEffect(() => {
+    let isMounted = true;
+    async function loadLivePlatformData() {
+      try {
+        const { data: dbAnnouncements } = await supabase
+          .from('announcements')
+          .select('*')
+          .order('pinned', { ascending: false })
+          .order('created_at', { ascending: false });
+
+        if (isMounted && dbAnnouncements && dbAnnouncements.length > 0) {
+          setAnnouncements(dbAnnouncements);
+        }
+
+        const { data: dbEvents } = await supabase
+          .from('events')
+          .select('*')
+          .order('date', { ascending: true });
+
+        if (isMounted && dbEvents && dbEvents.length > 0) {
+          setEvents(dbEvents);
+        }
+
+        const { data: dbResources } = await supabase
+          .from('resources')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (isMounted && dbResources && dbResources.length > 0) {
+          setResources(dbResources);
+        }
+
+        const { data: dbPending } = await supabase
+          .from('profiles')
+          .select('*')
+          .or('is_verified.is.null,is_verified.eq.false,verification_status.eq.pending');
+
+        if (isMounted && dbPending) {
+          setPendingMembers(dbPending);
+        }
+
+        const { count } = await supabase
+          .from('profiles')
+          .select('id', { count: 'exact' });
+
+        if (isMounted && count) {
+          setTotalMembersCount(count);
+        }
+      } catch (err) {
+        // Fallback to initial mock data if offline
+      }
+    }
+    loadLivePlatformData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // User Interactivity
   const [registeredEventIds, setRegisteredEventIds] = useState(['evt-1']);
@@ -336,8 +406,32 @@ export default function App() {
     }
   };
 
-  const handleGoogleAuth = () => {
-    setIsGoogleModalOpen(true);
+  const handleGoogleAuth = async () => {
+    try {
+      setGoogleSubmitting(true);
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const userInfo = await GoogleSignin.signIn();
+      if (userInfo && userInfo.user) {
+        await handleSelectGoogleAccount(
+          userInfo.user.email,
+          userInfo.user.name || userInfo.user.email.split('@')[0],
+          userInfo.user.photo || ''
+        );
+        return;
+      }
+    } catch (err) {
+      if (err.code === statusCodes?.SIGN_IN_CANCELLED) {
+        return;
+      }
+      if (err.code === statusCodes?.IN_PROGRESS) {
+        return;
+      }
+      console.warn('[ATC Mobile] Native Google Sign-In notice, opening account selector modal:', err);
+      // Fallback: Opens in-app account modal so user is never blocked
+      setIsGoogleModalOpen(true);
+    } finally {
+      setGoogleSubmitting(false);
+    }
   };
 
   const handleSelectGoogleAccount = async (accountEmail, accountName, accountAvatar = '') => {
@@ -1453,6 +1547,55 @@ export default function App() {
         {/* ========================================================= */}
         {currentTab === 'home' && (
           <View style={{ gap: 14 }}>
+            {/* Campus Innovation Spotlight Hero Card */}
+            <View
+              style={{
+                backgroundColor: colors.neutral[900],
+                borderRadius: 20,
+                padding: 18,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.15,
+                shadowRadius: 8,
+                elevation: 3
+              }}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success[400] }} />
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[300], textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    ATC Engineering Hub
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 10, color: colors.neutral[400] }}>Spring 2026</Text>
+              </View>
+
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#ffffff', marginBottom: 6 }}>
+                Advanced Tech Club
+              </Text>
+              <Text style={{ fontSize: 12, color: colors.neutral[300], lineHeight: 18, marginBottom: 14 }}>
+                {currentUser
+                  ? `Welcome back, ${currentUser.full_name?.split(' ')[0]}! Explore campus workshops, technical guides in the vault, and project collaborations.`
+                  : 'The official student engineering society. Build production-grade systems with AI, Cloud, and Full-Stack Engineering.'}
+              </Text>
+
+              {/* Live Metric Strip */}
+              <View style={{ flexDirection: 'row', gap: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)' }}>
+                <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 10, paddingVertical: 8, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#ffffff' }}>{totalMembersCount}</Text>
+                  <Text style={{ fontSize: 10, color: colors.neutral[400], marginTop: 2 }}>Engineers</Text>
+                </View>
+                <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 10, paddingVertical: 8, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#ffffff' }}>{events.length}</Text>
+                  <Text style={{ fontSize: 10, color: colors.neutral[400], marginTop: 2 }}>Workshops</Text>
+                </View>
+                <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 10, paddingVertical: 8, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#ffffff' }}>{resources.length}</Text>
+                  <Text style={{ fontSize: 10, color: colors.neutral[400], marginTop: 2 }}>Vault Docs</Text>
+                </View>
+              </View>
+            </View>
+
             {/* Quick Action Tray */}
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
               <TouchableOpacity
@@ -1828,6 +1971,83 @@ export default function App() {
                     >
                       <Text style={{ color: colors.primary[700], fontWeight: 'bold', fontSize: 12 }}>📝 Edit Application</Text>
                     </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Academic & Engineering Domain Card */}
+                <View
+                  style={{
+                    backgroundColor: '#ffffff',
+                    borderWidth: 1,
+                    borderColor: colors.neutral[200],
+                    borderRadius: 16,
+                    padding: 16
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 10 }}>
+                    Academic & Engineering Profile
+                  </Text>
+
+                  <View style={{ gap: 8 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ fontSize: 11, color: colors.neutral[500] }}>Student ID</Text>
+                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[800] }}>
+                        {currentUser.student_id || (isAdmin ? 'ADMIN-001' : 'Pending Enrollment')}
+                      </Text>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ fontSize: 11, color: colors.neutral[500] }}>Department</Text>
+                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[800] }}>
+                        {currentUser.department || 'Computer Science & Engineering'}
+                      </Text>
+                    </View>
+
+                    <View style={{ marginTop: 4 }}>
+                      <Text style={{ fontSize: 11, color: colors.neutral[500], marginBottom: 6 }}>Technical Interests & Tracks</Text>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                        {(currentUser.interests || ['AI & Machine Learning', 'Cloud & DevOps', 'Full-Stack Web']).map((tag) => (
+                          <View
+                            key={tag}
+                            style={{
+                              backgroundColor: colors.primary[50],
+                              borderWidth: 1,
+                              borderColor: colors.primary[100],
+                              paddingHorizontal: 8,
+                              paddingVertical: 3,
+                              borderRadius: 6
+                            }}
+                          >
+                            <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary[700] }}>{tag}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Member Activity & Engagement Strip */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    gap: 8
+                  }}
+                >
+                  <View style={{ flex: 1, backgroundColor: '#ffffff', borderWidth: 1, borderColor: colors.neutral[200], borderRadius: 14, padding: 12, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.primary[700] }}>{registeredEventIds.length}</Text>
+                    <Text style={{ fontSize: 10, color: colors.neutral[500], marginTop: 2 }}>Workshops</Text>
+                  </View>
+                  <View style={{ flex: 1, backgroundColor: '#ffffff', borderWidth: 1, borderColor: colors.neutral[200], borderRadius: 14, padding: 12, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.warning[700] }}>{bookmarkedIds.length}</Text>
+                    <Text style={{ fontSize: 10, color: colors.neutral[500], marginTop: 2 }}>Bookmarks</Text>
+                  </View>
+                  <View style={{ flex: 1, backgroundColor: '#ffffff', borderWidth: 1, borderColor: colors.neutral[200], borderRadius: 14, padding: 12, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: currentUser.is_verified ? colors.success[700] : colors.warning[700] }}>
+                      {currentUser.is_verified ? '✓' : '⏳'}
+                    </Text>
+                    <Text style={{ fontSize: 10, color: colors.neutral[500], marginTop: 2 }}>
+                      {currentUser.is_verified ? 'Verified' : 'Pending'}
+                    </Text>
                   </View>
                 </View>
 

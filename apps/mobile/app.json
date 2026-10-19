@@ -23,7 +23,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0597ff"
       },
-      "package": "com.atc.mobile",
+      "package": "advancedtechclub.vercel.app",
       "permissions": [
         "NOTIFICATIONS",
         "READ_EXTERNAL_STORAGE",
