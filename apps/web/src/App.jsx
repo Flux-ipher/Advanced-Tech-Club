@@ -1,5 +1,5 @@
-import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { PortalLayout } from './components/PortalLayout';
 import { Footer } from './components/Footer';
@@ -21,6 +21,42 @@ import { MembersAdminPage } from './pages/MembersAdminPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { useAuthListener } from '@atc/shared/hooks/useAuth';
 import { isPortalSubdomain } from '@atc/shared/utils/domains';
+
+// Component to automatically redirect /portal routes to portal.advclub.online in production
+function PortalRoute({ component: Component, cleanSubpath = '/' }) {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname.toLowerCase();
+      // If accessed on advclub.online or www.advclub.online, redirect immediately to portal.advclub.online
+      if (hostname.includes('advclub.online') && !isPortalSubdomain()) {
+        const cleanPath = location.pathname.replace(/^\/portal/, '') || cleanSubpath || '/';
+        const targetUrl = `https://portal.advclub.online${cleanPath}${location.search}`;
+        window.location.replace(targetUrl);
+      }
+    }
+  }, [location, cleanSubpath]);
+
+  const isProd = typeof window !== 'undefined' && window.location.hostname.includes('advclub.online');
+  if (isProd) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-neutral-900 text-white font-voodoo">
+        <div className="text-center space-y-3">
+          <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-neutral-400">Navigating to Member Portal (portal.advclub.online)...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // In local development, permit rendering the portal locally
+  return (
+    <PortalLayout>
+      <Component />
+    </PortalLayout>
+  );
+}
 
 // Clean Public Layout for Main Domain Pages
 function PublicLayout({ children }) {
@@ -204,73 +240,41 @@ export function App() {
 
       {/* ========================================================= */}
       {/* 2. PROTECTED CLUB SUBDOMAIN PORTAL ROUTES (/portal/*)    */}
-      {/* Wrapped in Collapsible Sidebar Portal Layout & Gate       */}
+      {/* Automatically redirects to portal.advclub.online in prod */}
       {/* ========================================================= */}
       <Route
         path="/portal"
-        element={
-          <PortalLayout>
-            <HomePage />
-          </PortalLayout>
-        }
+        element={<PortalRoute component={HomePage} cleanSubpath="/" />}
       />
       <Route
         path="/portal/events"
-        element={
-          <PortalLayout>
-            <EventsPage />
-          </PortalLayout>
-        }
+        element={<PortalRoute component={EventsPage} cleanSubpath="/events" />}
       />
       <Route
         path="/portal/events/:id"
-        element={
-          <PortalLayout>
-            <EventDetailPage />
-          </PortalLayout>
-        }
+        element={<PortalRoute component={EventDetailPage} cleanSubpath="/events" />}
       />
       <Route
         path="/portal/resources"
-        element={
-          <PortalLayout>
-            <ResourcesPage />
-          </PortalLayout>
-        }
+        element={<PortalRoute component={ResourcesPage} cleanSubpath="/resources" />}
       />
       <Route
         path="/portal/profile"
-        element={
-          <PortalLayout>
-            <ProfilePage />
-          </PortalLayout>
-        }
+        element={<PortalRoute component={ProfilePage} cleanSubpath="/profile" />}
       />
 
       {/* Admin Management Routes */}
       <Route
         path="/admin"
-        element={
-          <PortalLayout>
-            <AdminPage />
-          </PortalLayout>
-        }
+        element={<PortalRoute component={AdminPage} cleanSubpath="/admin" />}
       />
       <Route
         path="/admin/members"
-        element={
-          <PortalLayout>
-            <MembersAdminPage />
-          </PortalLayout>
-        }
+        element={<PortalRoute component={MembersAdminPage} cleanSubpath="/admin/members" />}
       />
       <Route
         path="/analytics"
-        element={
-          <PortalLayout>
-            <AnalyticsPage />
-          </PortalLayout>
-        }
+        element={<PortalRoute component={AnalyticsPage} cleanSubpath="/analytics" />}
       />
 
       {/* Fallback to Public Landing */}

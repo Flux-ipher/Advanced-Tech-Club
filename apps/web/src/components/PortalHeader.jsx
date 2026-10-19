@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@atc/shared/hooks/useAuth';
 import { NotificationDropdown } from './NotificationDropdown';
+import { getPublicSiteUrl, isPortalSubdomain } from '@atc/shared/utils/domains';
 import {
   Menu,
   PanelLeft,
@@ -103,7 +104,7 @@ export function PortalHeader({ collapsed, onToggleCollapse, onOpenMobile }) {
         {/* Authenticated User Info */}
         {user ? (
           <Link
-            to="/portal/profile"
+            to={isPortalSubdomain() ? '/profile' : '/portal/profile'}
             className="hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 transition-colors"
             title="View Profile"
           >
@@ -117,12 +118,12 @@ export function PortalHeader({ collapsed, onToggleCollapse, onOpenMobile }) {
             <span className="text-xs font-semibold text-neutral-800 max-w-[120px] truncate">
               {user.name || user.email?.split('@')[0]}
             </span>
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded capitalize ${
-              user.role === 'admin'
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${
+              user.role === 'admin' || user.role === 'super_admin'
                 ? 'bg-purple-100 text-purple-700 border border-purple-200'
                 : 'bg-primary-50 text-primary-700 border border-primary-200'
             }`}>
-              {user.role === 'admin' ? 'Admin' : (user.role || 'Member')}
+              {user.role === 'admin' || user.role === 'super_admin' ? 'Admin' : 'Member'}
             </span>
           </Link>
         ) : null}
@@ -131,13 +132,14 @@ export function PortalHeader({ collapsed, onToggleCollapse, onOpenMobile }) {
         <NotificationDropdown />
 
         {/* Exit back to main domain link */}
-        <Link
-          to="/"
+        <a
+          href={getPublicSiteUrl('/')}
           className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 text-xs font-semibold text-neutral-700 hover:bg-neutral-100 transition-colors"
+          title="Return to Public Site (advclub.online)"
         >
           <Globe className="w-3.5 h-3.5 text-neutral-400" />
           Public Site
-        </Link>
+        </a>
 
         {/* Log Out Button */}
         <button

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '@atc/shared/hooks/useAuth';
+import { getPortalSiteUrl, getPublicSiteUrl, isPortalSubdomain } from '@atc/shared/utils/domains';
 import { Lock, Mail, User, Sparkles, Shield, ArrowRight } from 'lucide-react';
 
 export function AuthPage() {
@@ -26,6 +27,26 @@ export function AuthPage() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  const routeAfterAuth = (destination = 'portal') => {
+    if (destination === 'apply') {
+      const applyUrl = isPortalSubdomain() ? '/apply' : getPublicSiteUrl('/apply');
+      if (applyUrl.startsWith('http') && typeof window !== 'undefined') {
+        window.location.replace(applyUrl);
+      } else {
+        navigate('/apply');
+      }
+      return;
+    }
+
+    // Portal destination (portal.advclub.online)
+    const portalUrl = getPortalSiteUrl('/');
+    if (portalUrl.startsWith('http') && typeof window !== 'undefined' && !isPortalSubdomain()) {
+      window.location.replace(portalUrl);
+    } else {
+      navigate(isPortalSubdomain() ? '/' : '/portal');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
@@ -34,14 +55,14 @@ export function AuthPage() {
     try {
       if (mode === 'login') {
         await signInWithEmail(email, password);
-        navigate('/portal');
+        routeAfterAuth('portal');
       } else {
         const res = await signUpWithEmail(email, password, fullName);
         if (res?.profile?.role === 'super_admin' || res?.profile?.role === 'admin') {
-          navigate('/portal');
+          routeAfterAuth('portal');
         } else {
           // Take new member signups directly to the Apply page to fill up their data
-          navigate('/apply');
+          routeAfterAuth('apply');
         }
       }
     } catch (err) {
@@ -58,12 +79,12 @@ export function AuthPage() {
       const res = await signInWithGoogle();
       // If user is super_admin or admin, route straight to portal
       if (res?.profile?.role === 'super_admin' || res?.profile?.role === 'admin') {
-        navigate('/portal');
+        routeAfterAuth('portal');
       } else if (res?.isNewUser || !res?.profile?.student_id) {
         // If user has not completed their application details, route to apply page
-        navigate('/apply');
+        routeAfterAuth('apply');
       } else {
-        navigate('/portal');
+        routeAfterAuth('portal');
       }
     } catch (err) {
       if (err.code !== 'auth/popup-closed-by-user') {

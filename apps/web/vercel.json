@@ -1,4 +1,116 @@
 {
+  "redirects": [
+    {
+      "source": "/portal",
+      "has": [
+        {
+          "type": "host",
+          "value": "advclub.online"
+        }
+      ],
+      "destination": "https://portal.advclub.online/",
+      "permanent": false
+    },
+    {
+      "source": "/portal/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "advclub.online"
+        }
+      ],
+      "destination": "https://portal.advclub.online/$1",
+      "permanent": false
+    },
+    {
+      "source": "/portal",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.advclub.online"
+        }
+      ],
+      "destination": "https://portal.advclub.online/",
+      "permanent": false
+    },
+    {
+      "source": "/portal/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.advclub.online"
+        }
+      ],
+      "destination": "https://portal.advclub.online/$1",
+      "permanent": false
+    },
+    {
+      "source": "/admin",
+      "has": [
+        {
+          "type": "host",
+          "value": "advclub.online"
+        }
+      ],
+      "destination": "https://portal.advclub.online/admin",
+      "permanent": false
+    },
+    {
+      "source": "/admin/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "advclub.online"
+        }
+      ],
+      "destination": "https://portal.advclub.online/admin/$1",
+      "permanent": false
+    },
+    {
+      "source": "/analytics",
+      "has": [
+        {
+          "type": "host",
+          "value": "advclub.online"
+        }
+      ],
+      "destination": "https://portal.advclub.online/analytics",
+      "permanent": false
+    },
+    {
+      "source": "/admin",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.advclub.online"
+        }
+      ],
+      "destination": "https://portal.advclub.online/admin",
+      "permanent": false
+    },
+    {
+      "source": "/admin/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.advclub.online"
+        }
+      ],
+      "destination": "https://portal.advclub.online/admin/$1",
+      "permanent": false
+    },
+    {
+      "source": "/analytics",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.advclub.online"
+        }
+      ],
+      "destination": "https://portal.advclub.online/analytics",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",

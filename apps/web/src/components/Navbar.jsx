@@ -30,6 +30,11 @@ export function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const portalUrl = getPortalSiteUrl('/');
+  const loginUrl = getPortalSiteUrl('/login');
+  const registerUrl = getPortalSiteUrl('/login?mode=register');
+  const isExternalPortal = portalUrl.startsWith('http');
+
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
@@ -39,9 +44,17 @@ export function Navbar() {
     try {
       const res = await signInWithGoogle();
       if (res?.isNewUser || !res?.profile?.student_id) {
-        navigate('/apply');
+        if (isExternalPortal) {
+          window.location.replace(getPublicSiteUrl('/apply'));
+        } else {
+          navigate('/apply');
+        }
       } else {
-        navigate('/portal');
+        if (isExternalPortal) {
+          window.location.replace(portalUrl);
+        } else {
+          navigate('/portal');
+        }
       }
     } catch (err) {
       if (err.code !== 'auth/popup-closed-by-user') {
@@ -222,20 +235,40 @@ export function Navbar() {
             ) : (
               /* Logged Out: ONLY Log In and Sign Up buttons */
               <div className="flex items-center gap-2">
-                <Link
-                  to="/login"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-neutral-200 text-xs font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 transition-colors"
-                >
-                  <LogIn className="w-3.5 h-3.5 text-neutral-500" />
-                  <span>Log In</span>
-                </Link>
-                <Link
-                  to="/login?mode=register"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold shadow-xs transition-colors"
-                >
-                  <UserPlus className="w-3.5 h-3.5" />
-                  <span>Sign Up</span>
-                </Link>
+                {isExternalPortal ? (
+                  <a
+                    href={loginUrl}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-neutral-200 text-xs font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 transition-colors"
+                  >
+                    <LogIn className="w-3.5 h-3.5 text-neutral-500" />
+                    <span>Log In</span>
+                  </a>
+                ) : (
+                  <Link
+                    to="/login"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-neutral-200 text-xs font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 transition-colors"
+                  >
+                    <LogIn className="w-3.5 h-3.5 text-neutral-500" />
+                    <span>Log In</span>
+                  </Link>
+                )}
+                {isExternalPortal ? (
+                  <a
+                    href={registerUrl}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold shadow-xs transition-colors"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>Sign Up</span>
+                  </a>
+                ) : (
+                  <Link
+                    to="/login?mode=register"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold shadow-xs transition-colors"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>Sign Up</span>
+                  </Link>
+                )}
               </div>
             )}
 
@@ -359,20 +392,38 @@ export function Navbar() {
               </div>
             ) : (
               <div className="flex gap-2">
-                <Link
-                  to="/login"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex-1 py-2 text-center rounded-lg border border-neutral-300 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
-                >
-                  Log In
-                </Link>
-                <Link
-                  to="/login?mode=register"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex-1 py-2 text-center rounded-lg bg-primary-500 hover:bg-primary-600 text-xs font-bold text-white shadow-xs"
-                >
-                  Sign Up
-                </Link>
+                {isExternalPortal ? (
+                  <a
+                    href={loginUrl}
+                    className="flex-1 py-2 text-center rounded-lg border border-neutral-300 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+                  >
+                    Log In
+                  </a>
+                ) : (
+                  <Link
+                    to="/login"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex-1 py-2 text-center rounded-lg border border-neutral-300 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+                  >
+                    Log In
+                  </Link>
+                )}
+                {isExternalPortal ? (
+                  <a
+                    href={registerUrl}
+                    className="flex-1 py-2 text-center rounded-lg bg-primary-500 hover:bg-primary-600 text-xs font-bold text-white shadow-xs"
+                  >
+                    Sign Up
+                  </a>
+                ) : (
+                  <Link
+                    to="/login?mode=register"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex-1 py-2 text-center rounded-lg bg-primary-500 hover:bg-primary-600 text-xs font-bold text-white shadow-xs"
+                  >
+                    Sign Up
+                  </Link>
+                )}
               </div>
             )}
           </div>

@@ -77,12 +77,12 @@ export function LandingPage() {
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>
 
-            {user && isExternalPortal ? (
+            {isExternalPortal ? (
               <a
-                href={portalUrl}
+                href={user ? portalUrl : getPortalSiteUrl('/login?mode=register')}
                 className="w-full sm:w-auto btn-outline px-7 py-3.5 text-sm font-bold flex items-center justify-center gap-2 shadow-sm hover:border-neutral-300"
               >
-                Open Club Portal
+                {user ? 'Open Club Portal' : 'Sign Up for Portal'}
                 <ArrowUpRight className="w-4 h-4 text-neutral-400" />
               </a>
             ) : (
@@ -444,12 +444,12 @@ export function LandingPage() {
               >
                 Start Application
               </Link>
-              {user && isExternalPortal ? (
+              {isExternalPortal ? (
                 <a
-                  href={portalUrl}
+                  href={user ? portalUrl : getPortalSiteUrl('/login?mode=register')}
                   className="px-8 py-3.5 rounded-xl bg-primary-800/80 text-white font-bold text-sm hover:bg-primary-900 transition-all border border-primary-400/60 active:scale-95"
                 >
-                  Open Member Portal
+                  {user ? 'Open Member Portal' : 'Member Portal Sign Up'}
                 </a>
               ) : (
                 <Link
