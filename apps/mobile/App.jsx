@@ -1,3 +1,8 @@
+// apps/mobile/App.jsx
+// Advanced Tech Club (ATC) - Official Cross-Platform Mobile Application
+// Includes: Full Authentication (Login & Signup), Member Portal, Application Hub,
+// Status Checker, Admin Management Console, Offline Vault & Digital QR Pass
+
 import React, { useState } from 'react';
 import {
   SafeAreaView,
@@ -18,25 +23,39 @@ import { colors } from '@atc/shared/theme';
 import { Analytics } from '@atc/shared/utils/analytics';
 
 export default function App() {
-  // Navigation State
-  const [currentTab, setCurrentTab] = useState('home'); // 'home' | 'events' | 'resources' | 'profile'
+  // Navigation Tab: 'home' | 'events' | 'resources' | 'profile'
+  const [currentTab, setCurrentTab] = useState('home');
 
   const handleSwitchTab = (tab) => {
     setCurrentTab(tab);
     Analytics.screenView(tab);
   };
 
-  // Active User Profile
-  const [currentUser, setCurrentUser] = useState(initialProfiles[0]); // Default: Ritesh Mishra
-  const isAdmin = currentUser.role === 'admin' || currentUser.role === 'super_admin';
+  // =========================================================================
+  // 1. AUTHENTICATION & SESSION STATE
+  // =========================================================================
+  // Starts unauthenticated so user can log in or sign up, with Guest mode option
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isGuest, setIsGuest] = useState(false);
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
 
-  // Rule 4 Helper: Format role strictly as 'Admin' or 'Member'
+  // Auth Form Fields
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authFullName, setAuthFullName] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
+
+  // Rule 4: Admin Role Privacy - format strictly as 'Admin' or 'Member'
   const getDisplayRole = (role) => {
     if (role === 'admin' || role === 'super_admin') return 'Admin';
     return 'Member';
   };
 
-  // Feed, Events & Resources Data State
+  // =========================================================================
+  // 2. CONTENT & PLATFORM DATA
+  // =========================================================================
   const [announcements, setAnnouncements] = useState(initialAnnouncements);
   const [events, setEvents] = useState(initialEvents);
   const [resources, setResources] = useState(initialResources);
@@ -44,7 +63,7 @@ export default function App() {
     initialProfiles.filter((p) => !p.is_verified || p.verification_status === 'pending')
   );
 
-  // User Interactive State
+  // User Interactivity
   const [registeredEventIds, setRegisteredEventIds] = useState(['evt-1']);
   const [bookmarkedIds, setBookmarkedIds] = useState(['ann-1']);
   const [reactions, setReactions] = useState({
@@ -53,6 +72,32 @@ export default function App() {
     'ann-3': { fire: 12, rocket: 14, heart: 9 }
   });
 
+  // Notifications State
+  const [notifications, setNotifications] = useState([
+    {
+      id: 'notif-1',
+      title: '🎉 Welcome to Advanced Tech Club',
+      message: 'Your campus developer hub is ready. Explore workshops, announcements, and the vault.',
+      time: 'Just now',
+      read: false
+    },
+    {
+      id: 'notif-2',
+      title: '📅 Cloud Architecture Workshop Confirmed',
+      message: 'Check your digital QR pass for campus laboratory check-in details.',
+      time: '2h ago',
+      read: false
+    },
+    {
+      id: 'notif-3',
+      title: '⚡ New Vault Resource Available',
+      message: 'Full-Stack Distributed Systems Engineering Handbook has been published.',
+      time: 'Yesterday',
+      read: true
+    }
+  ]);
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
   // Filter & Search States
   const [searchQuery, setSearchQuery] = useState('');
   const [feedCategory, setFeedCategory] = useState('all');
@@ -60,14 +105,16 @@ export default function App() {
   const [resourceCategory, setResourceCategory] = useState('all');
   const [showSavedOnly, setShowSavedOnly] = useState(false);
 
-  // In-App Toast State
+  // Toast Notification
   const [toastText, setToastText] = useState(null);
   const triggerToast = (msg) => {
     setToastText(msg);
     setTimeout(() => setToastText(null), 2500);
   };
 
-  // Modals State
+  // =========================================================================
+  // 3. MODALS STATE
+  // =========================================================================
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [selectedResource, setSelectedResource] = useState(null);
   const [isQrPassOpen, setIsQrPassOpen] = useState(false);
@@ -75,8 +122,24 @@ export default function App() {
   const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
   const [isCreateEventModalOpen, setIsCreateEventModalOpen] = useState(false);
   const [isVerificationsModalOpen, setIsVerificationsModalOpen] = useState(false);
+  const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(null);
 
-  // Form States for Admin Creators
+  // Status Search State
+  const [statusSearchId, setStatusSearchId] = useState('');
+  const [statusSearchResult, setStatusSearchResult] = useState(null);
+
+  // Student Membership Application Form State
+  const [applyStudentId, setApplyStudentId] = useState('');
+  const [applyDept, setApplyDept] = useState('Computer Science & Engineering');
+  const [applyYear, setApplyYear] = useState('2nd Year');
+  const [applyInterests, setApplyInterests] = useState(['AI & Machine Learning', 'Cloud & DevOps']);
+  const [applyGithub, setApplyGithub] = useState('');
+
+  // Admin Publishers Form States
   const [newAnnTitle, setNewAnnTitle] = useState('');
   const [newAnnBody, setNewAnnBody] = useState('');
   const [newAnnCategory, setNewAnnCategory] = useState('hackathon');
@@ -88,11 +151,168 @@ export default function App() {
   const [newEventCategory, setNewEventCategory] = useState('workshop');
   const [newEventCapacity, setNewEventCapacity] = useState('80');
 
-  // Push Telemetry State
-  const [pushStatus, setPushStatus] = useState('Active · ExponentPushToken synced');
+  // Available Technical Interests for Application
+  const availableInterests = [
+    '🤖 AI & Machine Learning',
+    '☁️ Cloud & DevOps',
+    '📱 Mobile Development',
+    '🌐 Full-Stack Web',
+    '🛡️ Cybersecurity',
+    '⛓️ Web3 & Blockchain',
+    '🎨 UI/UX Design',
+    '⚡ Distributed Systems',
+    '🦾 Robotics & IoT',
+    '🐧 Open Source'
+  ];
 
-  // Quick 1-tap event registration
+  // =========================================================================
+  // 4. AUTHENTICATION HANDLERS
+  // =========================================================================
+  const handleLogin = () => {
+    if (!authEmail.trim() || !authPassword.trim()) {
+      Alert.alert('Required', 'Please enter your email and password.');
+      return;
+    }
+
+    setAuthLoading(true);
+    setTimeout(() => {
+      setAuthLoading(false);
+
+      // Check if existing profile matches email
+      const matched = initialProfiles.find(
+        (p) => p.email?.toLowerCase() === authEmail.trim().toLowerCase()
+      );
+
+      // Auto-SuperAdmin logic: if no admin exists, first logged in user becomes super_admin
+      const hasExistingAdmin = initialProfiles.some(
+        (p) => p.role === 'admin' || p.role === 'super_admin'
+      );
+
+      const loggedIn = matched || {
+        id: `usr-${Date.now()}`,
+        email: authEmail.trim(),
+        full_name: authEmail.split('@')[0].replace('.', ' '),
+        role: hasExistingAdmin ? 'member' : 'super_admin',
+        is_verified: !hasExistingAdmin,
+        verification_status: !hasExistingAdmin ? 'verified' : 'pending',
+        department: 'Computer Science & Engineering',
+        student_id: 'CS2026-001',
+        avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
+      };
+
+      setCurrentUser(loggedIn);
+      setIsGuest(false);
+      triggerToast(`Welcome back, ${loggedIn.full_name}! 👋`);
+    }, 600);
+  };
+
+  const handleSignUp = () => {
+    if (!authFullName.trim() || !authEmail.trim() || !authPassword.trim()) {
+      Alert.alert('Required', 'Please fill in your name, email, and password.');
+      return;
+    }
+
+    setAuthLoading(true);
+    setTimeout(() => {
+      setAuthLoading(false);
+
+      // Auto-SuperAdmin logic: if this is the first registered user, make them super_admin
+      const hasExistingAdmin = initialProfiles.some(
+        (p) => p.role === 'admin' || p.role === 'super_admin'
+      );
+
+      const newUser = {
+        id: `usr-${Date.now()}`,
+        email: authEmail.trim(),
+        full_name: authFullName.trim(),
+        role: hasExistingAdmin ? 'member' : 'super_admin',
+        is_verified: !hasExistingAdmin,
+        verification_status: !hasExistingAdmin ? 'verified' : 'pending',
+        department: 'Computer Science & Engineering',
+        student_id: '',
+        interests: ['AI & Machine Learning'],
+        avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'
+      };
+
+      setCurrentUser(newUser);
+      setIsGuest(false);
+      triggerToast('Account Created! 🚀 Welcome to ATC.');
+
+      // If regular member, open application form to complete student ID
+      if (hasExistingAdmin) {
+        setIsApplyModalOpen(true);
+      }
+    }, 600);
+  };
+
+  const handleGoogleAuth = () => {
+    setAuthLoading(true);
+    setTimeout(() => {
+      setAuthLoading(false);
+      const googleUser = {
+        id: `google-${Date.now()}`,
+        email: authEmail.trim() || 'student.google@gmail.com',
+        full_name: authFullName.trim() || 'Campus Engineer',
+        role: 'member',
+        is_verified: false,
+        verification_status: 'pending',
+        department: 'Computer Science & Engineering',
+        student_id: '',
+        avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80'
+      };
+      setCurrentUser(googleUser);
+      setIsGuest(false);
+      triggerToast('Google Account Synchronized! ✓');
+      setIsApplyModalOpen(true);
+    }, 500);
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Log Out',
+      'Are you sure you want to sign out of the Advanced Tech Club mobile app?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log Out',
+          style: 'destructive',
+          onPress: () => {
+            setCurrentUser(null);
+            setIsGuest(false);
+            setAuthEmail('');
+            setAuthPassword('');
+            triggerToast('Signed out of ATC Mobile');
+          }
+        }
+      ]
+    );
+  };
+
+  // Guest action gate
+  const requireAuth = (actionName = 'access this feature') => {
+    if (!currentUser) {
+      Alert.alert(
+        'Member Sign-In Required',
+        `Please log in or sign up to ${actionName}.`,
+        [
+          { text: 'Continue as Guest', style: 'cancel' },
+          {
+            text: 'Sign In / Register',
+            onPress: () => setIsGuest(false)
+          }
+        ]
+      );
+      return false;
+    }
+    return true;
+  };
+
+  // =========================================================================
+  // 5. INTERACTIVE FEATURE HANDLERS
+  // =========================================================================
   const handleToggleEventRSVP = (eventId) => {
+    if (!requireAuth('RSVP for workshops')) return;
+
     if (registeredEventIds.includes(eventId)) {
       setRegisteredEventIds((prev) => prev.filter((id) => id !== eventId));
       setEvents((prev) =>
@@ -118,7 +338,6 @@ export default function App() {
     }
   };
 
-  // Bookmark toggle
   const handleToggleBookmark = (id) => {
     if (bookmarkedIds.includes(id)) {
       setBookmarkedIds((prev) => prev.filter((i) => i !== id));
@@ -129,7 +348,6 @@ export default function App() {
     }
   };
 
-  // Reactions toggle
   const handleReact = (annId, type) => {
     setReactions((prev) => {
       const current = prev[annId] || { fire: 0, rocket: 0, heart: 0 };
@@ -144,7 +362,84 @@ export default function App() {
     triggerToast(`Reacted with ${type === 'fire' ? '🔥' : type === 'rocket' ? '🚀' : '❤️'}`);
   };
 
-  // Admin Quick Announcement Post
+  const handleDownloadResource = (resource) => {
+    if (!requireAuth('download vault resources')) return;
+
+    setDownloadProgress(20);
+    const t1 = setTimeout(() => setDownloadProgress(65), 300);
+    const t2 = setTimeout(() => setDownloadProgress(100), 700);
+    const t3 = setTimeout(() => {
+      setDownloadProgress(null);
+      triggerToast(`Downloaded ${resource.title} (${resource.file_size || '12MB'}) ✓`);
+    }, 1000);
+  };
+
+  // Submit Student Application
+  const handleSubmitApplication = () => {
+    if (!applyStudentId.trim()) {
+      Alert.alert('Required', 'Please enter your Student ID (e.g. CS2026-088).');
+      return;
+    }
+
+    const updatedUser = {
+      ...currentUser,
+      student_id: applyStudentId.trim().toUpperCase(),
+      department: applyDept,
+      interests: applyInterests,
+      verification_status: 'pending',
+      is_verified: false
+    };
+
+    setCurrentUser(updatedUser);
+    setPendingMembers((prev) => [updatedUser, ...prev]);
+    setIsApplyModalOpen(false);
+    triggerToast('Application Submitted! Reviewing by Club Admin (Ritesh Mishra) ⏳');
+  };
+
+  // Application Status Checker
+  const handleSearchStatus = () => {
+    if (!statusSearchId.trim()) {
+      Alert.alert('Search', 'Please enter a Student ID or Email.');
+      return;
+    }
+
+    const q = statusSearchId.trim().toLowerCase();
+    const found =
+      initialProfiles.find(
+        (p) => p.student_id?.toLowerCase() === q || p.email?.toLowerCase() === q
+      ) || (currentUser?.student_id?.toLowerCase() === q || currentUser?.email?.toLowerCase() === q ? currentUser : null);
+
+    if (found) {
+      setStatusSearchResult(found);
+    } else {
+      setStatusSearchResult({
+        full_name: 'Applicant Record',
+        student_id: statusSearchId.toUpperCase(),
+        department: 'Engineering',
+        verification_status: 'pending',
+        is_verified: false
+      });
+    }
+  };
+
+  // Mark all notifications read
+  const handleMarkNotificationsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    triggerToast('All notifications marked as read ✓');
+  };
+
+  // Share Content
+  const handleShare = async (title, body) => {
+    try {
+      await Share.share({
+        message: `${title}\n\n${body}\n\nShared via Advanced Tech Club (ATC) Mobile App\nhttps://advclub.online`
+      });
+    } catch (e) {
+      triggerToast('Share completed');
+    }
+  };
+
+  // Admin Quick Post Announcement
   const handleAdminPostAnnouncement = () => {
     if (!newAnnTitle.trim() || !newAnnBody.trim()) {
       Alert.alert('Required', 'Please enter a title and message.');
@@ -156,9 +451,9 @@ export default function App() {
       body: newAnnBody.trim(),
       category: newAnnCategory,
       pinned: newAnnPinned,
-      author_name: currentUser.full_name,
+      author_name: currentUser?.full_name || 'Club Admin',
       author_role: 'Admin',
-      author_avatar: currentUser.avatar_url,
+      author_avatar: currentUser?.avatar_url,
       created_at: new Date().toISOString()
     };
     setAnnouncements((prev) => [created, ...prev]);
@@ -186,7 +481,7 @@ export default function App() {
       registrations_count: 1,
       start_at: new Date(Date.now() + 86400000 * 5).toISOString(),
       banner_url: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=1200&q=80',
-      author_name: currentUser.full_name,
+      author_name: currentUser?.full_name || 'Club Admin',
       author_role: 'Admin'
     };
     setEvents((prev) => [created, ...prev]);
@@ -202,27 +497,6 @@ export default function App() {
     setPendingMembers((prev) => prev.filter((m) => m.student_id !== studentId));
     triggerToast('Student Approved & Verified ✓');
   };
-
-  // Share Content Helper
-  const handleShare = async (title, body) => {
-    try {
-      await Share.share({
-        message: `${title}\n\n${body}\n\nShared via Advanced Tech Club Mobile App`
-      });
-    } catch (e) {
-      triggerToast('Share completed');
-    }
-  };
-
-  // Avatar Presets
-  const avatarPresets = [
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
-    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80',
-    'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=300&q=80',
-    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80',
-    'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'
-  ];
 
   // Filtering Logic
   const filteredAnnouncements = announcements.filter((a) => {
@@ -252,6 +526,273 @@ export default function App() {
     return matchesCat && matchesSearch && matchesSaved;
   });
 
+  // =========================================================================
+  // 6. VIEW: AUTH SCREEN (LOGIN & SIGNUP)
+  // Displayed when user has not yet authenticated and has not chosen Guest Mode
+  // =========================================================================
+  if (!currentUser && !isGuest) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.neutral[900] }}>
+        <StatusBar barStyle="light-content" backgroundColor={colors.neutral[900]} />
+
+        {toastText && (
+          <View
+            style={{
+              position: 'absolute',
+              top: Platform.OS === 'ios' ? 50 : 20,
+              left: 20,
+              right: 20,
+              zIndex: 999,
+              backgroundColor: colors.primary[500],
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              borderRadius: 12,
+              alignItems: 'center',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 6,
+              elevation: 8
+            }}
+          >
+            <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>{toastText}</Text>
+          </View>
+        )}
+
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 40, justifyContent: 'center' }}>
+          {/* Brand Header */}
+          <View style={{ alignItems: 'center', marginBottom: 32 }}>
+            <View
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: 20,
+                backgroundColor: colors.primary[500],
+                justifyContent: 'center',
+                alignItems: 'center',
+                shadowColor: colors.primary[500],
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.5,
+                shadowRadius: 12,
+                elevation: 6,
+                marginBottom: 16
+              }}
+            >
+              <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 24, letterSpacing: -1 }}>ATC</Text>
+            </View>
+            <Text style={{ color: '#ffffff', fontSize: 24, fontWeight: 'bold', letterSpacing: -0.5 }}>
+              Advanced Tech Club
+            </Text>
+            <Text style={{ color: colors.neutral[400], fontSize: 12, marginTop: 4 }}>
+              Official University Engineering Hub · Mobile App
+            </Text>
+          </View>
+
+          {/* Mode Switcher Tabs */}
+          <View
+            style={{
+              flexDirection: 'row',
+              backgroundColor: colors.neutral[800],
+              borderRadius: 12,
+              padding: 4,
+              marginBottom: 24,
+              borderWidth: 1,
+              borderColor: colors.neutral[700]
+            }}
+          >
+            <TouchableOpacity
+              onPress={() => setAuthMode('login')}
+              style={{
+                flex: 1,
+                paddingVertical: 10,
+                borderRadius: 9,
+                backgroundColor: authMode === 'login' ? colors.primary[500] : 'transparent',
+                alignItems: 'center'
+              }}
+            >
+              <Text
+                style={{
+                  color: authMode === 'login' ? '#ffffff' : colors.neutral[400],
+                  fontWeight: 'bold',
+                  fontSize: 13
+                }}
+              >
+                Log In
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setAuthMode('signup')}
+              style={{
+                flex: 1,
+                paddingVertical: 10,
+                borderRadius: 9,
+                backgroundColor: authMode === 'signup' ? colors.primary[500] : 'transparent',
+                alignItems: 'center'
+              }}
+            >
+              <Text
+                style={{
+                  color: authMode === 'signup' ? '#ffffff' : colors.neutral[400],
+                  fontWeight: 'bold',
+                  fontSize: 13
+                }}
+              >
+                Sign Up
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Form Container */}
+          <View
+            style={{
+              backgroundColor: colors.neutral[800],
+              borderRadius: 20,
+              padding: 20,
+              borderWidth: 1,
+              borderColor: colors.neutral[700],
+              gap: 16
+            }}
+          >
+            {authMode === 'signup' && (
+              <View>
+                <Text style={{ color: colors.neutral[300], fontSize: 12, fontWeight: 'bold', marginBottom: 6 }}>
+                  Full Name
+                </Text>
+                <TextInput
+                  placeholder="e.g. Alex Rivera"
+                  placeholderTextColor={colors.neutral[500]}
+                  value={authFullName}
+                  onChangeText={setAuthFullName}
+                  style={{
+                    backgroundColor: colors.neutral[900],
+                    borderWidth: 1,
+                    borderColor: colors.neutral[700],
+                    borderRadius: 12,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    color: '#ffffff',
+                    fontSize: 14
+                  }}
+                />
+              </View>
+            )}
+
+            <View>
+              <Text style={{ color: colors.neutral[300], fontSize: 12, fontWeight: 'bold', marginBottom: 6 }}>
+                Email Address
+              </Text>
+              <TextInput
+                placeholder="name@university.edu or gmail"
+                placeholderTextColor={colors.neutral[500]}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                value={authEmail}
+                onChangeText={setAuthEmail}
+                style={{
+                  backgroundColor: colors.neutral[900],
+                  borderWidth: 1,
+                  borderColor: colors.neutral[700],
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  color: '#ffffff',
+                  fontSize: 14
+                }}
+              />
+            </View>
+
+            <View>
+              <Text style={{ color: colors.neutral[300], fontSize: 12, fontWeight: 'bold', marginBottom: 6 }}>
+                Password
+              </Text>
+              <TextInput
+                placeholder="••••••••••••"
+                placeholderTextColor={colors.neutral[500]}
+                secureTextEntry
+                value={authPassword}
+                onChangeText={setAuthPassword}
+                style={{
+                  backgroundColor: colors.neutral[900],
+                  borderWidth: 1,
+                  borderColor: colors.neutral[700],
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  color: '#ffffff',
+                  fontSize: 14
+                }}
+              />
+            </View>
+
+            {/* Primary Submit Button */}
+            <TouchableOpacity
+              onPress={authMode === 'login' ? handleLogin : handleSignUp}
+              disabled={authLoading}
+              style={{
+                backgroundColor: colors.primary[500],
+                paddingVertical: 14,
+                borderRadius: 12,
+                alignItems: 'center',
+                marginTop: 6,
+                shadowColor: colors.primary[500],
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.4,
+                shadowRadius: 8,
+                elevation: 4
+              }}
+            >
+              <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 14 }}>
+                {authLoading ? 'Verifying...' : authMode === 'login' ? 'Log In to Club Portal' : 'Create Club Account'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Divider */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 4 }}>
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.neutral[700] }} />
+              <Text style={{ color: colors.neutral[500], fontSize: 11, marginHorizontal: 10 }}>OR</Text>
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.neutral[700] }} />
+            </View>
+
+            {/* Google Sign In Button */}
+            <TouchableOpacity
+              onPress={handleGoogleAuth}
+              style={{
+                backgroundColor: '#ffffff',
+                paddingVertical: 12,
+                borderRadius: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 10
+              }}
+            >
+              <Text style={{ fontSize: 15 }}>🌐</Text>
+              <Text style={{ color: colors.neutral[900], fontWeight: 'bold', fontSize: 13 }}>
+                Continue with Google
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Guest Mode Trigger */}
+          <View style={{ alignItems: 'center', marginTop: 28 }}>
+            <TouchableOpacity onPress={() => setIsGuest(true)}>
+              <Text style={{ color: colors.primary[400], fontSize: 13, fontWeight: 'bold' }}>
+                Browse as Guest (View-Only Mode) →
+              </Text>
+            </TouchableOpacity>
+            <Text style={{ color: colors.neutral[500], fontSize: 11, textAlign: 'center', marginTop: 12 }}>
+              First registered email automatically receives Super Admin privileges.
+            </Text>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // =========================================================================
+  // 7. VIEW: MAIN APP INTERFACE (TABS: FEED, WORKSHOPS, VAULT, PROFILE)
+  // =========================================================================
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.neutral[50] }}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
@@ -329,46 +870,89 @@ export default function App() {
               />
             </View>
             <Text style={{ fontSize: 10, color: colors.neutral[500] }}>
-              Student Mobile Hub · Spring 2026
+              {currentUser ? `Welcome, ${currentUser.full_name?.split(' ')[0]}` : 'Campus Hub · Guest Mode'}
             </Text>
           </View>
         </View>
 
-        {/* Right Header Actions */}
+        {/* Header Right Actions */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          {/* QR Pass Fast Trigger */}
+          {/* Notifications Center Bell */}
           <TouchableOpacity
-            onPress={() => setIsQrPassOpen(true)}
+            onPress={() => setIsNotificationsOpen(true)}
             style={{
               backgroundColor: colors.neutral[100],
-              paddingHorizontal: 8,
-              paddingVertical: 5,
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: colors.neutral[200]
+              padding: 8,
+              borderRadius: 9,
+              position: 'relative'
             }}
-            title="Digital Member Pass"
           >
-            <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[800] }}>
-              🎟️ Pass
-            </Text>
+            <Text style={{ fontSize: 13 }}>🔔</Text>
+            {unreadCount > 0 && (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 4,
+                  right: 4,
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: colors.danger[500]
+                }}
+              />
+            )}
           </TouchableOpacity>
 
-          {/* Role Pill (Rule 4 compliant: displays 'Admin' or 'Member') */}
-          <View
-            style={{
-              backgroundColor: currentUser.role === 'admin' || currentUser.role === 'super_admin' ? colors.secondary?.[50] || '#f5f3ff' : colors.primary[50],
-              paddingHorizontal: 9,
-              paddingVertical: 5,
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: currentUser.role === 'admin' || currentUser.role === 'super_admin' ? '#ddd6fe' : colors.primary[200]
-            }}
-          >
-            <Text style={{ fontSize: 11, fontWeight: 'bold', color: currentUser.role === 'admin' || currentUser.role === 'super_admin' ? '#6d28d9' : colors.primary[700] }}>
-              {getDisplayRole(currentUser.role)}
-            </Text>
-          </View>
+          {currentUser ? (
+            <>
+              {/* QR Pass Fast Trigger */}
+              <TouchableOpacity
+                onPress={() => setIsQrPassOpen(true)}
+                style={{
+                  backgroundColor: colors.neutral[100],
+                  paddingHorizontal: 8,
+                  paddingVertical: 5,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: colors.neutral[200]
+                }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[800] }}>
+                  🎟️ Pass
+                </Text>
+              </TouchableOpacity>
+
+              {/* Role Pill (strictly Admin or Member per Rule 4) */}
+              <View
+                style={{
+                  backgroundColor: isAdmin ? '#f5f3ff' : colors.primary[50],
+                  paddingHorizontal: 9,
+                  paddingVertical: 5,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: isAdmin ? '#ddd6fe' : colors.primary[200]
+                }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: isAdmin ? '#6d28d9' : colors.primary[700] }}>
+                  {getDisplayRole(currentUser.role)}
+                </Text>
+              </View>
+            </>
+          ) : (
+            <TouchableOpacity
+              onPress={() => setIsGuest(false)}
+              style={{
+                backgroundColor: colors.primary[500],
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 8
+              }}
+            >
+              <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 11 }}>
+                Log In
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -399,7 +983,7 @@ export default function App() {
           )}
         </View>
 
-        {/* Saved Filter Pill Toggle */}
+        {/* Category Filter Chips */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
             {currentTab === 'home' &&
@@ -453,7 +1037,7 @@ export default function App() {
               ))}
 
             {currentTab === 'resources' &&
-              ['all', 'Slides', 'Cheat Sheets', 'Code Samples', 'Roadmaps'].map((cat) => (
+              ['all', 'guide', 'starter', 'cheatsheet', 'tool'].map((cat) => (
                 <TouchableOpacity
                   key={cat}
                   onPress={() => setResourceCategory(cat)}
@@ -468,7 +1052,8 @@ export default function App() {
                     style={{
                       fontSize: 11,
                       fontWeight: 'bold',
-                      color: resourceCategory === cat ? '#ffffff' : colors.neutral[600]
+                      color: resourceCategory === cat ? '#ffffff' : colors.neutral[600],
+                      textTransform: 'capitalize'
                     }}
                   >
                     {cat}
@@ -477,148 +1062,133 @@ export default function App() {
               ))}
           </ScrollView>
 
+          {/* Saved Filter Pill Toggle */}
           <TouchableOpacity
             onPress={() => setShowSavedOnly(!showSavedOnly)}
             style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 4,
-              paddingHorizontal: 8,
+              paddingHorizontal: 9,
               paddingVertical: 4,
               borderRadius: 8,
-              backgroundColor: showSavedOnly ? colors.warning[50] : 'transparent',
+              backgroundColor: showSavedOnly ? colors.warning[100] : colors.neutral[100],
               borderWidth: 1,
-              borderColor: showSavedOnly ? colors.warning[200] : 'transparent',
-              marginLeft: 8
+              borderColor: showSavedOnly ? colors.warning[300] : 'transparent'
             }}
           >
-            <Text style={{ fontSize: 11 }}>⭐</Text>
-            <Text style={{ fontSize: 11, fontWeight: 'bold', color: showSavedOnly ? colors.warning[700] : colors.neutral[500] }}>
-              Saved
+            <Text style={{ fontSize: 11, fontWeight: 'bold', color: showSavedOnly ? colors.warning[800] : colors.neutral[600] }}>
+              {showSavedOnly ? '⭐ Saved' : 'All'}
             </Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* 2. TAB 1: HOME (Announcements Feed) */}
-      {currentTab === 'home' && (
-        <ScrollView style={{ flex: 1, padding: 16 }}>
-          {/* Welcome Card with Deep VooDoo Gradient */}
-          <View
-            style={{
-              backgroundColor: colors.neutral[900],
-              padding: 18,
-              borderRadius: 16,
-              marginBottom: 16,
-              borderWidth: 1,
-              borderColor: colors.neutral[800]
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <View
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: 3,
-                  backgroundColor: colors.primary[400]
-                }}
-              />
-              <Text style={{ color: colors.primary[400], fontSize: 11, fontWeight: 'bold', letterSpacing: 0.5 }}>
-                REALTIME WEBSOCKET ACTIVE
-              </Text>
-            </View>
-            <Text style={{ color: '#ffffff', fontSize: 20, fontWeight: 'bold', marginTop: 6 }}>
-              Hi, {currentUser.full_name.split(' ')[0]} 👋
+      {/* QUICK STATUS BAR BANNER */}
+      {currentUser && !currentUser.is_verified && (
+        <TouchableOpacity
+          onPress={() => setIsStatusModalOpen(true)}
+          style={{
+            backgroundColor: colors.warning[50],
+            paddingHorizontal: 16,
+            paddingVertical: 8,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.warning[200],
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={{ fontSize: 12 }}>⏳</Text>
+            <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.warning[800] }}>
+              Application Under Review by Club Admin
             </Text>
-            <Text style={{ color: colors.neutral[300], fontSize: 13, marginTop: 4, lineHeight: 18 }}>
-              Stay updated with campus hackathons, engineering workshops, and slide decks.
-            </Text>
-
-            {/* Quick Actions in Banner */}
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
-              <TouchableOpacity
-                onPress={() => setIsQrPassOpen(true)}
-                style={{
-                  backgroundColor: colors.primary[500],
-                  paddingHorizontal: 12,
-                  paddingVertical: 7,
-                  borderRadius: 8,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 4
-                }}
-              >
-                <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>Check-in Pass</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setCurrentTab('events')}
-                style={{
-                  backgroundColor: colors.neutral[800],
-                  paddingHorizontal: 12,
-                  paddingVertical: 7,
-                  borderRadius: 8
-                }}
-              >
-                <Text style={{ color: colors.neutral[200], fontWeight: 'bold', fontSize: 12 }}>View Workshops →</Text>
-              </TouchableOpacity>
-            </View>
           </View>
+          <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.warning[900] }}>Check Status →</Text>
+        </TouchableOpacity>
+      )}
 
-          {/* Quick Metrics Bar */}
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
-            <View style={{ flex: 1, backgroundColor: '#ffffff', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.neutral[200] }}>
-              <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.neutral[400], textTransform: 'uppercase' }}>Members</Text>
-              <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.neutral[900], marginTop: 2 }}>380+ Students</Text>
-            </View>
-            <View style={{ flex: 1, backgroundColor: '#ffffff', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.neutral[200] }}>
-              <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.neutral[400], textTransform: 'uppercase' }}>Hackathon</Text>
-              <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.primary[600], marginTop: 2 }}>$5,000 Prizes</Text>
-            </View>
-          </View>
-
-          {/* Announcements Feed Section */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <Text style={{ fontSize: 15, fontWeight: 'bold', color: colors.neutral[900] }}>
-              Recent Broadcasts ({filteredAnnouncements.length})
-            </Text>
-            {isAdmin && (
+      {/* 2. MAIN SCROLLABLE CONTENT */}
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+        {/* ========================================================= */}
+        {/* TAB 1: ANNOUNCEMENTS FEED (HOME)                           */}
+        {/* ========================================================= */}
+        {currentTab === 'home' && (
+          <View style={{ gap: 14 }}>
+            {/* Quick Action Tray */}
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
               <TouchableOpacity
-                onPress={() => setIsBroadcastModalOpen(true)}
+                onPress={() => setIsStatusModalOpen(true)}
                 style={{
-                  backgroundColor: colors.primary[50],
-                  paddingHorizontal: 8,
-                  paddingVertical: 4,
-                  borderRadius: 6,
+                  flex: 1,
+                  backgroundColor: '#ffffff',
+                  padding: 10,
+                  borderRadius: 12,
                   borderWidth: 1,
-                  borderColor: colors.primary[200]
+                  borderColor: colors.neutral[200],
+                  alignItems: 'center',
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  gap: 6
                 }}
               >
-                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[700] }}>+ Broadcast</Text>
+                <Text style={{ fontSize: 12 }}>🔍</Text>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[800] }}>Check Status</Text>
               </TouchableOpacity>
-            )}
-          </View>
 
-          {filteredAnnouncements.length === 0 ? (
-            <View style={{ backgroundColor: '#ffffff', padding: 32, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: colors.neutral[200] }}>
-              <Text style={{ fontSize: 28, marginBottom: 8 }}>🔍</Text>
-              <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.neutral[800] }}>No announcements found</Text>
-              <Text style={{ fontSize: 12, color: colors.neutral[500], marginTop: 2 }}>Try clearing your search query or saved filter.</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  if (requireAuth('apply for membership')) {
+                    setIsApplyModalOpen(true);
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  backgroundColor: colors.primary[50],
+                  padding: 10,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: colors.primary[200],
+                  alignItems: 'center',
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  gap: 6
+                }}
+              >
+                <Text style={{ fontSize: 12 }}>📝</Text>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[700] }}>Student Application</Text>
+              </TouchableOpacity>
+
+              {isAdmin && (
+                <TouchableOpacity
+                  onPress={() => setIsBroadcastModalOpen(true)}
+                  style={{
+                    backgroundColor: colors.neutral[900],
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#ffffff' }}>+ Post</Text>
+                </TouchableOpacity>
+              )}
             </View>
-          ) : (
-            filteredAnnouncements.map((item) => {
-              const rx = reactions[item.id] || { fire: 12, rocket: 8, heart: 4 };
-              const isSaved = bookmarkedIds.includes(item.id);
 
-              return (
+            {filteredAnnouncements.length === 0 ? (
+              <View style={{ padding: 32, alignItems: 'center' }}>
+                <Text style={{ fontSize: 24, marginBottom: 8 }}>📭</Text>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.neutral[700] }}>No announcements found</Text>
+              </View>
+            ) : (
+              filteredAnnouncements.map((ann) => (
                 <View
-                  key={item.id}
+                  key={ann.id}
                   style={{
                     backgroundColor: '#ffffff',
                     borderWidth: 1,
-                    borderColor: item.pinned ? colors.primary[300] : colors.neutral[200],
+                    borderColor: ann.pinned ? colors.warning[300] : colors.neutral[200],
                     borderRadius: 16,
                     padding: 16,
-                    marginBottom: 14,
                     shadowColor: '#000',
                     shadowOffset: { width: 0, height: 1 },
                     shadowOpacity: 0.05,
@@ -626,975 +1196,460 @@ export default function App() {
                     elevation: 1
                   }}
                 >
-                  {/* Pinned Pill Header */}
-                  {item.pinned && (
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        backgroundColor: colors.primary[50],
-                        paddingHorizontal: 8,
-                        paddingVertical: 3,
-                        borderRadius: 6,
-                        alignSelf: 'flex-start',
-                        marginBottom: 10
-                      }}
-                    >
-                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary[700] }}>
-                        📌 PINNED ANNOUNCEMENT
+                  {/* Category & Pin Indicator */}
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 'bold',
+                          color: colors.primary[600],
+                          textTransform: 'uppercase',
+                          backgroundColor: colors.primary[50],
+                          paddingHorizontal: 7,
+                          paddingVertical: 2,
+                          borderRadius: 4
+                        }}
+                      >
+                        {ann.category}
                       </Text>
-                    </View>
-                  )}
-
-                  {/* Author Info & Save Action */}
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                      <Image
-                        source={{ uri: item.author_avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80' }}
-                        style={{ width: 34, height: 34, borderRadius: 17 }}
-                      />
-                      <View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                          <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900] }}>
-                            {item.author_name}
-                          </Text>
-                          <View style={{ backgroundColor: colors.primary[50], paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
-                            <Text style={{ fontSize: 9, fontWeight: 'bold', color: colors.primary[600] }}>
-                              {getDisplayRole(item.author_role)}
-                            </Text>
-                          </View>
-                        </View>
-                        <Text style={{ fontSize: 10, color: colors.neutral[400] }}>
-                          Campus Engineering Lead
+                      {ann.pinned && (
+                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.warning[800], backgroundColor: colors.warning[100], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                          📌 PINNED
                         </Text>
-                      </View>
+                      )}
                     </View>
 
-                    <TouchableOpacity
-                      onPress={() => handleToggleBookmark(item.id)}
-                      style={{ padding: 6 }}
-                    >
-                      <Text style={{ fontSize: 16 }}>{isSaved ? '★' : '☆'}</Text>
+                    <TouchableOpacity onPress={() => handleToggleBookmark(ann.id)}>
+                      <Text style={{ fontSize: 14 }}>{bookmarkedIds.includes(ann.id) ? '⭐' : '☆'}</Text>
                     </TouchableOpacity>
                   </View>
 
-                  {/* Title & Body */}
-                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 6 }}>
-                    {item.title}
+                  <Text style={{ fontSize: 15, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 6 }}>
+                    {ann.title}
+                  </Text>
+                  <Text style={{ fontSize: 13, color: colors.neutral[700], lineHeight: 19 }}>
+                    {ann.body}
                   </Text>
 
-                  <Text style={{ fontSize: 13, color: colors.neutral[600], lineHeight: 19, marginBottom: 10 }}>
-                    {item.body}
-                  </Text>
-
-                  {/* Optional Media Image */}
-                  {item.media_url && (
-                    <Image
-                      source={{ uri: item.media_url }}
-                      style={{ width: '100%', height: 160, borderRadius: 10, marginBottom: 12 }}
-                      resizeMode="cover"
-                    />
-                  )}
-
-                  {/* Reaction Chips & Footer Actions */}
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      borderTopWidth: 1,
-                      borderTopColor: colors.neutral[100],
-                      paddingTop: 10
-                    }}
-                  >
+                  {/* Footer & Reactions */}
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.neutral[100] }}>
                     <View style={{ flexDirection: 'row', gap: 6 }}>
                       <TouchableOpacity
-                        onPress={() => handleReact(item.id, 'fire')}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 3,
-                          backgroundColor: colors.neutral[100],
-                          paddingHorizontal: 8,
-                          paddingVertical: 4,
-                          borderRadius: 8
-                        }}
+                        onPress={() => handleReact(ann.id, 'fire')}
+                        style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.neutral[100], paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, gap: 4 }}
                       >
-                        <Text style={{ fontSize: 12 }}>🔥</Text>
-                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700] }}>{rx.fire}</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        onPress={() => handleReact(item.id, 'rocket')}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 3,
-                          backgroundColor: colors.neutral[100],
-                          paddingHorizontal: 8,
-                          paddingVertical: 4,
-                          borderRadius: 8
-                        }}
-                      >
-                        <Text style={{ fontSize: 12 }}>🚀</Text>
-                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700] }}>{rx.rocket}</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        onPress={() => handleReact(item.id, 'heart')}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 3,
-                          backgroundColor: colors.neutral[100],
-                          paddingHorizontal: 8,
-                          paddingVertical: 4,
-                          borderRadius: 8
-                        }}
-                      >
-                        <Text style={{ fontSize: 12 }}>❤️</Text>
-                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700] }}>{rx.heart}</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <TouchableOpacity
-                        onPress={() => handleShare(item.title, item.body)}
-                        style={{ padding: 4 }}
-                      >
-                        <Text style={{ fontSize: 12 }}>📤</Text>
-                      </TouchableOpacity>
-
-                      <View
-                        style={{
-                          backgroundColor: colors.primary[50],
-                          paddingHorizontal: 8,
-                          paddingVertical: 3,
-                          borderRadius: 6
-                        }}
-                      >
-                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary[700], textTransform: 'uppercase' }}>
-                          {item.category}
+                        <Text style={{ fontSize: 11 }}>🔥</Text>
+                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700] }}>
+                          {reactions[ann.id]?.fire || 0}
                         </Text>
-                      </View>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        onPress={() => handleReact(ann.id, 'rocket')}
+                        style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.neutral[100], paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, gap: 4 }}
+                      >
+                        <Text style={{ fontSize: 11 }}>🚀</Text>
+                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700] }}>
+                          {reactions[ann.id]?.rocket || 0}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        onPress={() => handleReact(ann.id, 'heart')}
+                        style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.neutral[100], paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, gap: 4 }}
+                      >
+                        <Text style={{ fontSize: 11 }}>❤️</Text>
+                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700] }}>
+                          {reactions[ann.id]?.heart || 0}
+                        </Text>
+                      </TouchableOpacity>
                     </View>
+
+                    <TouchableOpacity onPress={() => handleShare(ann.title, ann.body)}>
+                      <Text style={{ fontSize: 12, color: colors.neutral[500], fontWeight: 'bold' }}>Share ↗</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
-              );
-            })
-          )}
-          <View style={{ height: 100 }} />
-        </ScrollView>
-      )}
+              ))
+            )}
+          </View>
+        )}
 
-      {/* 3. TAB 2: EVENTS (Events List + 1-Tap Quick RSVP + Details) */}
-      {currentTab === 'events' && (
-        <ScrollView style={{ flex: 1, padding: 16 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.neutral[900] }}>
-              Workshops & Sprints
-            </Text>
+        {/* ========================================================= */}
+        {/* TAB 2: WORKSHOPS & SPRINTS (EVENTS)                        */}
+        {/* ========================================================= */}
+        {currentTab === 'events' && (
+          <View style={{ gap: 14 }}>
             {isAdmin && (
               <TouchableOpacity
                 onPress={() => setIsCreateEventModalOpen(true)}
                 style={{
-                  backgroundColor: colors.primary[50],
-                  paddingHorizontal: 8,
-                  paddingVertical: 4,
-                  borderRadius: 6,
-                  borderWidth: 1,
-                  borderColor: colors.primary[200]
+                  backgroundColor: colors.primary[500],
+                  padding: 12,
+                  borderRadius: 12,
+                  alignItems: 'center',
+                  marginBottom: 4
                 }}
               >
-                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[700] }}>+ Workshop</Text>
+                <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>+ Publish Workshop</Text>
               </TouchableOpacity>
             )}
-          </View>
-          <Text style={{ fontSize: 12, color: colors.neutral[500], marginBottom: 16 }}>
-            Tap any card to view agenda, venue logistics, or RSVP with 1-tap.
-          </Text>
 
-          {filteredEvents.map((evt) => {
-            const isReg = registeredEventIds.includes(evt.id);
-            const spotsLeft = Math.max(0, evt.capacity - (evt.registrations_count || 0));
-            const fillRatio = Math.min(1, (evt.registrations_count || 0) / evt.capacity);
+            {filteredEvents.map((evt) => {
+              const isRSVPed = registeredEventIds.includes(evt.id);
+              const spotsLeft = (evt.capacity || 100) - (evt.registrations_count || 0);
 
-            return (
-              <TouchableOpacity
-                key={evt.id}
-                activeOpacity={0.9}
-                onPress={() => setSelectedEvent(evt)}
-                style={{
-                  backgroundColor: '#ffffff',
-                  borderWidth: 1,
-                  borderColor: isReg ? colors.primary[300] : colors.neutral[200],
-                  borderRadius: 16,
-                  overflow: 'hidden',
-                  marginBottom: 16,
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 3,
-                  elevation: 1
-                }}
-              >
-                <Image
-                  source={{ uri: evt.banner_url }}
-                  style={{ width: '100%', height: 140 }}
-                  resizeMode="cover"
-                />
+              return (
+                <TouchableOpacity
+                  key={evt.id}
+                  onPress={() => setSelectedEvent(evt)}
+                  activeOpacity={0.9}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    borderWidth: 1,
+                    borderColor: isRSVPed ? colors.primary[300] : colors.neutral[200],
+                    borderRadius: 16,
+                    overflow: 'hidden',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.05,
+                    shadowRadius: 3,
+                    elevation: 1
+                  }}
+                >
+                  <Image
+                    source={{ uri: evt.banner_url || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=1200&q=80' }}
+                    style={{ width: '100%', height: 120 }}
+                  />
 
-                <View style={{ padding: 16 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                    <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary[600], textTransform: 'uppercase' }}>
-                      {evt.category}
-                    </Text>
-                    {isReg ? (
-                      <View style={{ backgroundColor: colors.success[50], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.success[700] }}>✓ RSVP Confirmed</Text>
-                      </View>
-                    ) : (
-                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[500] }}>
-                        {spotsLeft} spots left
+                  <View style={{ padding: 14 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary[600], textTransform: 'uppercase', backgroundColor: colors.primary[50], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                        {evt.category}
                       </Text>
-                    )}
-                  </View>
+                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: spotsLeft > 10 ? colors.success[700] : colors.danger[700] }}>
+                        {spotsLeft > 0 ? `${spotsLeft} spots open` : 'Sold out'}
+                      </Text>
+                    </View>
 
-                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 6 }}>
-                    {evt.title}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: colors.neutral[600], marginBottom: 10, lineHeight: 17 }} numberOfLines={2}>
-                    {evt.description}
-                  </Text>
+                    <Text style={{ fontSize: 15, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 4 }}>
+                      {evt.title}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: colors.neutral[500], marginBottom: 10 }} numberOfLines={2}>
+                      {evt.description}
+                    </Text>
 
-                  <Text style={{ fontSize: 11, color: colors.neutral[500], marginBottom: 3 }}>
-                    📍 {evt.location}
-                  </Text>
-
-                  {/* Spots Fill Meter */}
-                  <View style={{ height: 4, backgroundColor: colors.neutral[100], borderRadius: 2, marginVertical: 8, overflow: 'hidden' }}>
-                    <View style={{ width: `${fillRatio * 100}%`, height: '100%', backgroundColor: colors.primary[500] }} />
-                  </View>
-
-                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
-                    <TouchableOpacity
-                      onPress={() => handleToggleEventRSVP(evt.id)}
-                      style={{
-                        flex: 1,
-                        backgroundColor: isReg ? colors.danger[50] : colors.primary[500],
-                        borderWidth: isReg ? 1 : 0,
-                        borderColor: colors.danger[200],
-                        paddingVertical: 10,
-                        borderRadius: 10,
-                        alignItems: 'center'
-                      }}
-                    >
-                      <Text
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                      <Text style={{ fontSize: 11, color: colors.neutral[600] }}>
+                        📍 {evt.location}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => handleToggleEventRSVP(evt.id)}
                         style={{
-                          color: isReg ? colors.danger[700] : '#ffffff',
-                          fontWeight: 'bold',
-                          fontSize: 13
+                          backgroundColor: isRSVPed ? colors.success[500] : colors.primary[500],
+                          paddingHorizontal: 12,
+                          paddingVertical: 6,
+                          borderRadius: 8
                         }}
                       >
-                        {isReg ? 'Cancel Registration' : '1-Tap Quick RSVP'}
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      onPress={() => setSelectedEvent(evt)}
-                      style={{
-                        backgroundColor: colors.neutral[100],
-                        paddingHorizontal: 14,
-                        paddingVertical: 10,
-                        borderRadius: 10,
-                        justifyContent: 'center'
-                      }}
-                    >
-                      <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.neutral[700] }}>Details →</Text>
-                    </TouchableOpacity>
+                        <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>
+                          {isRSVPed ? '✓ Reserved' : 'RSVP Now'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB 3: KNOWLEDGE VAULT (RESOURCES)                        */}
+        {/* ========================================================= */}
+        {currentTab === 'resources' && (
+          <View style={{ gap: 12 }}>
+            {downloadProgress !== null && (
+              <View style={{ backgroundColor: colors.primary[50], padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.primary[200], marginBottom: 4 }}>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[800], marginBottom: 4 }}>
+                  Downloading Vault Package ({downloadProgress}%)...
+                </Text>
+                <View style={{ height: 6, backgroundColor: colors.primary[200], borderRadius: 3, overflow: 'hidden' }}>
+                  <View style={{ width: `${downloadProgress}%`, height: '100%', backgroundColor: colors.primary[600] }} />
                 </View>
-              </TouchableOpacity>
-            );
-          })}
-          <View style={{ height: 100 }} />
-        </ScrollView>
-      )}
+              </View>
+            )}
 
-      {/* 4. TAB 3: RESOURCES (Knowledge Vault) */}
-      {currentTab === 'resources' && (
-        <ScrollView style={{ flex: 1, padding: 16 }}>
-          <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 4 }}>
-            Knowledge & Slide Decks
-          </Text>
-          <Text style={{ fontSize: 12, color: colors.neutral[500], marginBottom: 16 }}>
-            Download slides, cheat sheets, and architecture blueprints curated by club leads.
-          </Text>
-
-          {filteredResources.map((res) => {
-            const isSaved = bookmarkedIds.includes(res.id);
-            return (
-              <TouchableOpacity
+            {filteredResources.map((res) => (
+              <View
                 key={res.id}
-                activeOpacity={0.9}
-                onPress={() => setSelectedResource(res)}
                 style={{
                   backgroundColor: '#ffffff',
                   borderWidth: 1,
                   borderColor: colors.neutral[200],
                   borderRadius: 14,
-                  padding: 16,
-                  marginBottom: 12,
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 3,
-                  elevation: 1
+                  padding: 14
                 }}
               >
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary[600], textTransform: 'uppercase' }}>
-                    {res.category}
-                  </Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={{ fontSize: 11, color: colors.neutral[400], fontWeight: 'bold' }}>
-                      {res.file_size}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary[600], textTransform: 'uppercase', marginBottom: 2 }}>
+                      {res.category} · {res.file_size || '12MB'}
                     </Text>
-                    <TouchableOpacity onPress={() => handleToggleBookmark(res.id)}>
-                      <Text style={{ fontSize: 14 }}>{isSaved ? '★' : '☆'}</Text>
+                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.neutral[900] }}>
+                      {res.title}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: colors.neutral[500], marginTop: 2 }}>
+                      {res.description}
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity onPress={() => handleToggleBookmark(res.id)}>
+                    <Text style={{ fontSize: 14 }}>{bookmarkedIds.includes(res.id) ? '⭐' : '☆'}</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.neutral[100] }}>
+                  <TouchableOpacity onPress={() => setSelectedResource(res)}>
+                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[600] }}>View Outline →</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => handleDownloadResource(res)}
+                    style={{ backgroundColor: colors.neutral[900], paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
+                  >
+                    <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>Download File</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB 4: PROFILE & ACCOUNT HUB                              */}
+        {/* ========================================================= */}
+        {currentTab === 'profile' && (
+          <View style={{ gap: 14 }}>
+            {currentUser ? (
+              <>
+                {/* Profile Identity Card */}
+                <View
+                  style={{
+                    backgroundColor: '#ffffff',
+                    borderWidth: 1,
+                    borderColor: colors.neutral[200],
+                    borderRadius: 18,
+                    padding: 16
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <TouchableOpacity onPress={() => setIsAvatarModalOpen(true)}>
+                      <Image
+                        source={{ uri: currentUser.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80' }}
+                        style={{ width: 60, height: 60, borderRadius: 30, borderWidth: 2, borderColor: colors.primary[500] }}
+                      />
+                    </TouchableOpacity>
+
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 17, fontWeight: 'bold', color: colors.neutral[900] }}>
+                        {currentUser.full_name}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: colors.neutral[500] }}>
+                        {currentUser.email}
+                      </Text>
+                      <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
+                        <View style={{ backgroundColor: isAdmin ? '#f5f3ff' : colors.primary[50], paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
+                          <Text style={{ fontSize: 10, fontWeight: 'bold', color: isAdmin ? '#6d28d9' : colors.primary[700] }}>
+                            {getDisplayRole(currentUser.role)}
+                          </Text>
+                        </View>
+                        <View style={{ backgroundColor: currentUser.is_verified ? colors.success[50] : colors.warning[50], paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
+                          <Text style={{ fontSize: 10, fontWeight: 'bold', color: currentUser.is_verified ? colors.success[700] : colors.warning[700] }}>
+                            {currentUser.is_verified ? '✓ Verified' : '⏳ Pending'}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.neutral[100] }}>
+                    <TouchableOpacity
+                      onPress={() => setIsQrPassOpen(true)}
+                      style={{ flex: 1, backgroundColor: colors.neutral[900], paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
+                    >
+                      <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>🎟️ Digital QR Pass</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => setIsApplyModalOpen(true)}
+                      style={{ flex: 1, backgroundColor: colors.primary[50], paddingVertical: 10, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: colors.primary[200] }}
+                    >
+                      <Text style={{ color: colors.primary[700], fontWeight: 'bold', fontSize: 12 }}>📝 Edit Application</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
 
-                <Text style={{ fontSize: 15, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 4 }}>
-                  {res.title}
-                </Text>
-                <Text style={{ fontSize: 12, color: colors.neutral[500], marginBottom: 12 }} numberOfLines={2}>
-                  {res.description}
-                </Text>
-
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      triggerToast(`Downloaded ${res.title} (${res.file_size})`);
-                      Alert.alert('Download Complete 📥', `Saved ${res.title} to device downloads folder.`);
-                    }}
+                {/* Admin Studio Quick Links */}
+                {isAdmin && (
+                  <View
                     style={{
-                      flex: 1,
-                      backgroundColor: colors.neutral[100],
-                      paddingVertical: 9,
-                      borderRadius: 8,
-                      alignItems: 'center'
+                      backgroundColor: '#f8fafc',
+                      borderWidth: 1,
+                      borderColor: colors.neutral[200],
+                      borderRadius: 16,
+                      padding: 14,
+                      gap: 8
                     }}
                   >
-                    <Text style={{ color: colors.neutral[800], fontWeight: 'bold', fontSize: 12 }}>
-                      Download ({res.download_count} dl)
+                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.neutral[800], marginBottom: 2 }}>
+                      Admin Operations Console
                     </Text>
-                  </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <TouchableOpacity
+                        onPress={() => setIsVerificationsModalOpen(true)}
+                        style={{ flex: 1, backgroundColor: '#ffffff', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.neutral[200], alignItems: 'center' }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[800] }}>
+                          Students ({pendingMembers.length})
+                        </Text>
+                      </TouchableOpacity>
 
-                  <TouchableOpacity
-                    onPress={() => setSelectedResource(res)}
-                    style={{
-                      backgroundColor: colors.primary[50],
-                      paddingHorizontal: 12,
-                      paddingVertical: 9,
-                      borderRadius: 8,
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <Text style={{ color: colors.primary[700], fontWeight: 'bold', fontSize: 12 }}>Preview</Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-          <View style={{ height: 100 }} />
-        </ScrollView>
-      )}
+                      <TouchableOpacity
+                        onPress={() => setIsAnalyticsModalOpen(true)}
+                        style={{ flex: 1, backgroundColor: '#ffffff', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.neutral[200], alignItems: 'center' }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[800] }}>
+                          📊 Analytics
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
 
-      {/* 5. TAB 4: PROFILE & DIGITAL STUDENT PASS */}
-      {currentTab === 'profile' && (
-        <ScrollView style={{ flex: 1, padding: 16 }}>
-          {/* Profile Card */}
-          <View
-            style={{
-              backgroundColor: '#ffffff',
-              borderWidth: 1,
-              borderColor: colors.neutral[200],
-              borderRadius: 16,
-              padding: 20,
-              alignItems: 'center',
-              marginBottom: 16,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.05,
-              shadowRadius: 4,
-              elevation: 2
-            }}
-          >
-            <TouchableOpacity onPress={() => setIsAvatarModalOpen(true)} style={{ position: 'relative' }}>
-              <Image
-                source={{ uri: currentUser.avatar_url }}
-                style={{ width: 88, height: 88, borderRadius: 44, borderWidth: 3, borderColor: colors.primary[200] }}
-              />
-              <View
-                style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  right: 0,
-                  backgroundColor: colors.primary[500],
-                  width: 26,
-                  height: 26,
-                  borderRadius: 13,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderWidth: 2,
-                  borderColor: '#ffffff'
-                }}
-              >
-                <Text style={{ color: '#ffffff', fontSize: 12 }}>✎</Text>
-              </View>
-            </TouchableOpacity>
-
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.neutral[900], marginTop: 10 }}>
-              {currentUser.full_name}
-            </Text>
-            <Text style={{ fontSize: 12, color: colors.neutral[500], marginTop: 2 }}>
-              {currentUser.department} · {currentUser.student_id}
-            </Text>
-
-            <View
-              style={{
-                marginTop: 8,
-                backgroundColor: colors.primary[50],
-                paddingHorizontal: 12,
-                paddingVertical: 4,
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor: colors.primary[200]
-              }}
-            >
-              <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[700], textTransform: 'uppercase' }}>
-                {getDisplayRole(currentUser.role)}
-              </Text>
-            </View>
-
-            {/* Quick Stats Grid */}
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 18, width: '100%' }}>
-              <View style={{ flex: 1, backgroundColor: colors.neutral[50], padding: 10, borderRadius: 10, alignItems: 'center' }}>
-                <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.neutral[900] }}>{registeredEventIds.length}</Text>
-                <Text style={{ fontSize: 10, color: colors.neutral[500] }}>Active RSVPs</Text>
-              </View>
-              <View style={{ flex: 1, backgroundColor: colors.neutral[50], padding: 10, borderRadius: 10, alignItems: 'center' }}>
-                <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.neutral[900] }}>{bookmarkedIds.length}</Text>
-                <Text style={{ fontSize: 10, color: colors.neutral[500] }}>Saved Items</Text>
-              </View>
-              <View style={{ flex: 1, backgroundColor: colors.neutral[50], padding: 10, borderRadius: 10, alignItems: 'center' }}>
-                <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.success[600] }}>Verified</Text>
-                <Text style={{ fontSize: 10, color: colors.neutral[500] }}>Campus Status</Text>
-              </View>
-            </View>
-
-            {/* Launch QR Pass Trigger Button */}
-            <TouchableOpacity
-              onPress={() => setIsQrPassOpen(true)}
-              style={{
-                marginTop: 16,
-                backgroundColor: colors.neutral[900],
-                paddingVertical: 11,
-                paddingHorizontal: 16,
-                borderRadius: 10,
-                width: '100%',
-                alignItems: 'center',
-                flexDirection: 'row',
-                justifyContent: 'center',
-                gap: 6
-              }}
-            >
-              <Text style={{ fontSize: 13 }}>🎟️</Text>
-              <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
-                View Digital Event Pass
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Admin Management Hub (Strictly visible to Admin) */}
-          {isAdmin && (
-            <View
-              style={{
-                backgroundColor: '#ffffff',
-                borderWidth: 1,
-                borderColor: colors.neutral[200],
-                borderRadius: 16,
-                padding: 16,
-                marginBottom: 16
-              }}
-            >
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.neutral[900] }}>
-                  Admin Operations Console
-                </Text>
-                <View style={{ backgroundColor: colors.warning[100], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                  <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.warning[800] }}>ADMIN ONLY</Text>
-                </View>
-              </View>
-
-              <View style={{ gap: 8 }}>
-                <TouchableOpacity
-                  onPress={() => setIsVerificationsModalOpen(true)}
+                {/* Registered Workshops List */}
+                <View
                   style={{
-                    backgroundColor: colors.neutral[50],
-                    padding: 12,
-                    borderRadius: 10,
+                    backgroundColor: '#ffffff',
                     borderWidth: 1,
                     borderColor: colors.neutral[200],
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
+                    borderRadius: 16,
+                    padding: 16
                   }}
                 >
-                  <View>
-                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900] }}>
-                      Student Membership Verifications
-                    </Text>
-                    <Text style={{ fontSize: 11, color: colors.neutral[500] }}>
-                      Review applicants requesting portal access
-                    </Text>
-                  </View>
-                  {pendingMembers.length > 0 && (
-                    <View style={{ backgroundColor: colors.warning[500], paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
-                      <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>{pendingMembers.length}</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
+                  <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 8 }}>
+                    My Registered Workshops ({registeredEventIds.length})
+                  </Text>
+                  {registeredEventIds.map((id) => {
+                    const matched = events.find((e) => e.id === id);
+                    if (!matched) return null;
+                    return (
+                      <View
+                        key={id}
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          paddingVertical: 8,
+                          borderBottomWidth: 1,
+                          borderBottomColor: colors.neutral[100]
+                        }}
+                      >
+                        <View style={{ flex: 1, marginRight: 8 }}>
+                          <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.neutral[800] }}>{matched.title}</Text>
+                          <Text style={{ fontSize: 10, color: colors.neutral[500] }}>📍 {matched.location}</Text>
+                        </View>
+                        <TouchableOpacity
+                          onPress={() => handleToggleEventRSVP(id)}
+                          style={{ backgroundColor: colors.danger[50], paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}
+                        >
+                          <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.danger[700] }}>Cancel</Text>
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </View>
 
+                {/* Account & Logout Container */}
                 <TouchableOpacity
-                  onPress={() => setIsCreateEventModalOpen(true)}
+                  onPress={handleLogout}
                   style={{
-                    backgroundColor: colors.neutral[50],
-                    padding: 12,
-                    borderRadius: 10,
+                    backgroundColor: colors.danger[50],
                     borderWidth: 1,
-                    borderColor: colors.neutral[200]
-                  }}
-                >
-                  <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900] }}>
-                    + Publish New Campus Workshop
-                  </Text>
-                  <Text style={{ fontSize: 11, color: colors.neutral[500] }}>
-                    Schedule sprints, set venue & capacity
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {/* Device Telemetry Card */}
-          <View
-            style={{
-              backgroundColor: '#ffffff',
-              borderWidth: 1,
-              borderColor: colors.neutral[200],
-              borderRadius: 16,
-              padding: 16,
-              marginBottom: 16
-            }}
-          >
-            <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[800], marginBottom: 6 }}>
-              Push Notification Telemetry
-            </Text>
-            <Text style={{ fontSize: 11, color: colors.success[700], marginBottom: 10 }}>
-              ✓ {pushStatus}
-            </Text>
-            <TouchableOpacity
-              onPress={() => {
-                triggerToast('Push Broadcast Emitted');
-                Alert.alert('Simulated Notification Received 🔔', 'ATC Emergency Notice: "Registration open for the 2026 AI Hackathon!"');
-              }}
-              style={{
-                backgroundColor: colors.primary[50],
-                paddingVertical: 10,
-                borderRadius: 10,
-                alignItems: 'center',
-                borderWidth: 1,
-                borderColor: colors.primary[200]
-              }}
-            >
-              <Text style={{ color: colors.primary[700], fontWeight: 'bold', fontSize: 12 }}>
-                Simulate Push Notification Test
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Active Event RSVPs */}
-          <View
-            style={{
-              backgroundColor: '#ffffff',
-              borderWidth: 1,
-              borderColor: colors.neutral[200],
-              borderRadius: 16,
-              padding: 16
-            }}
-          >
-            <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[800], marginBottom: 10 }}>
-              My Active Event RSVPs ({registeredEventIds.length})
-            </Text>
-            {registeredEventIds.map((id) => {
-              const matched = events.find((e) => e.id === id);
-              if (!matched) return null;
-              return (
-                <View
-                  key={id}
-                  style={{
-                    paddingVertical: 10,
-                    borderBottomWidth: 1,
-                    borderBottomColor: colors.neutral[100],
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
+                    borderColor: colors.danger[200],
+                    borderRadius: 12,
+                    paddingVertical: 12,
                     alignItems: 'center'
                   }}
                 >
-                  <View style={{ flex: 1, marginRight: 8 }}>
-                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900] }}>{matched.title}</Text>
-                    <Text style={{ fontSize: 11, color: colors.neutral[500], marginTop: 2 }}>📍 {matched.location}</Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => handleToggleEventRSVP(id)}
-                    style={{ backgroundColor: colors.danger[50], paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}
-                  >
-                    <Text style={{ color: colors.danger[700], fontSize: 11, fontWeight: 'bold' }}>Cancel</Text>
-                  </TouchableOpacity>
-                </View>
-              );
-            })}
-          </View>
-
-          {/* Account & Authentication Hub */}
-          <View
-            style={{
-              backgroundColor: '#ffffff',
-              borderWidth: 1,
-              borderColor: colors.neutral[200],
-              borderRadius: 16,
-              padding: 16,
-              marginTop: 16
-            }}
-          >
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[800] }}>
-                Account & Authentication Hub
-              </Text>
-              <View style={{ backgroundColor: colors.primary[50], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary[700] }}>FIREBASE AUTH</Text>
+                  <Text style={{ color: colors.danger[700], fontWeight: 'bold', fontSize: 13 }}>
+                    Log Out of ATC Mobile
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <View style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: colors.neutral[200] }}>
+                <Text style={{ fontSize: 32, marginBottom: 8 }}>👤</Text>
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.neutral[900] }}>Guest Session Active</Text>
+                <Text style={{ fontSize: 12, color: colors.neutral[500], textAlign: 'center', marginTop: 4, marginBottom: 16 }}>
+                  Sign in or create an account to unlock your digital campus pass, RSVP for workshops, and download vault materials.
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setIsGuest(false)}
+                  style={{ backgroundColor: colors.primary[500], paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 }}
+                >
+                  <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>Log In / Sign Up</Text>
+                </TouchableOpacity>
               </View>
-            </View>
-            <Text style={{ fontSize: 11, color: colors.neutral[500], marginBottom: 12 }}>
-              Signed in as {currentUser.full_name} ({currentUser.email || currentUser.student_id})
-            </Text>
-
-            <View style={{ gap: 8 }}>
-              {/* Google Sign-In Link */}
-              <TouchableOpacity
-                onPress={() => {
-                  triggerToast('Google Account Synchronized');
-                  Alert.alert(
-                    'Google Sign-In Active',
-                    `Authenticated with Firebase project at-club-001.\n\nAccount: ${currentUser.full_name} (${currentUser.email || currentUser.student_id})\nStudent ID: ${currentUser.student_id}\nProvider: Google Firebase Auth`
-                  );
-                }}
-                style={{
-                  backgroundColor: colors.neutral[50],
-                  paddingVertical: 10,
-                  paddingHorizontal: 12,
-                  borderRadius: 10,
-                  borderWidth: 1,
-                  borderColor: colors.neutral[200],
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8
-                }}
-              >
-                <Text style={{ fontSize: 13 }}>🌐</Text>
-                <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.neutral[800] }}>
-                  Google Account Synced · at-club-001
-                </Text>
-              </TouchableOpacity>
-
-              {/* Account Status */}
-              <View
-                style={{
-                  backgroundColor: '#f8fafc',
-                  paddingVertical: 10,
-                  paddingHorizontal: 12,
-                  borderRadius: 10,
-                  borderWidth: 1,
-                  borderColor: colors.neutral[200],
-                  alignItems: 'center'
-                }}
-              >
-                <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.neutral[700] }}>
-                  Member Account Active · Verified Session
-                </Text>
-              </View>
-
-              {/* Log Out Button */}
-              <TouchableOpacity
-                onPress={() => {
-                  Alert.alert(
-                    'Log Out',
-                    'Are you sure you want to sign out of the Advanced Tech Club campus app?',
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      {
-                        text: 'Log Out',
-                        style: 'destructive',
-                        onPress: () => {
-                          triggerToast('Signed out of ATC Mobile');
-                        }
-                      }
-                    ]
-                  );
-                }}
-                style={{
-                  backgroundColor: colors.danger[50],
-                  paddingVertical: 10,
-                  paddingHorizontal: 12,
-                  borderRadius: 10,
-                  borderWidth: 1,
-                  borderColor: colors.danger[200],
-                  alignItems: 'center'
-                }}
-              >
-                <Text style={{ color: colors.danger[700], fontWeight: 'bold', fontSize: 12 }}>
-                  Log Out
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View style={{ height: 100 }} />
-        </ScrollView>
-      )}
-
-      {/* FLOATING ADMIN FAB (Visible strictly to Admin) */}
-      {isAdmin && (
-        <TouchableOpacity
-          onPress={() => setIsBroadcastModalOpen(true)}
-          style={{
-            position: 'absolute',
-            bottom: 78,
-            right: 20,
-            width: 56,
-            height: 56,
-            borderRadius: 28,
-            backgroundColor: colors.primary[500],
-            justifyContent: 'center',
-            alignItems: 'center',
-            elevation: 6,
-            shadowColor: colors.primary[500],
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.4,
-            shadowRadius: 6
-          }}
-        >
-          <Text style={{ color: '#ffffff', fontSize: 26, fontWeight: 'bold', lineHeight: 28 }}>+</Text>
-        </TouchableOpacity>
-      )}
-
-      {/* 6. MODAL: EVENT DETAILS & ATTENDEE ROSTER */}
-      <Modal visible={!!selectedEvent} animationType="slide" transparent>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '85%' }}>
-            {selectedEvent && (
-              <ScrollView>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[600], textTransform: 'uppercase' }}>
-                    {selectedEvent.category} · CAMPUS WORKSHOP
-                  </Text>
-                  <TouchableOpacity onPress={() => setSelectedEvent(null)}>
-                    <Text style={{ fontSize: 16, color: colors.neutral[400], fontWeight: 'bold' }}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <Image
-                  source={{ uri: selectedEvent.banner_url }}
-                  style={{ width: '100%', height: 150, borderRadius: 12, marginBottom: 12 }}
-                  resizeMode="cover"
-                />
-
-                <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 8 }}>
-                  {selectedEvent.title}
-                </Text>
-
-                <Text style={{ fontSize: 13, color: colors.neutral[600], lineHeight: 19, marginBottom: 16 }}>
-                  {selectedEvent.description}
-                </Text>
-
-                {/* Logistics Bar */}
-                <View style={{ backgroundColor: colors.neutral[50], padding: 12, borderRadius: 12, gap: 6, marginBottom: 16 }}>
-                  <Text style={{ fontSize: 12, color: colors.neutral[700] }}>
-                    📍 <strong>Venue:</strong> {selectedEvent.location}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: colors.neutral[700] }}>
-                    👥 <strong>Attendance:</strong> {selectedEvent.registrations_count || 0} / {selectedEvent.capacity} students confirmed
-                  </Text>
-                  <Text style={{ fontSize: 12, color: colors.neutral[700] }}>
-                    🎓 <strong>Coordinated by:</strong> Ritesh Mishra (Admin)
-                  </Text>
-                </View>
-
-                {/* Schedule Agenda */}
-                <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[800], marginBottom: 6 }}>
-                  Workshop Agenda
-                </Text>
-                <View style={{ gap: 6, marginBottom: 16 }}>
-                  <Text style={{ fontSize: 12, color: colors.neutral[600] }}>• 05:30 PM — Check-in & Badge Issuance</Text>
-                  <Text style={{ fontSize: 12, color: colors.neutral[600] }}>• 06:00 PM — Hands-on Code Walkthrough</Text>
-                  <Text style={{ fontSize: 12, color: colors.neutral[600] }}>• 07:15 PM — Q&A, Networking & Swag distribution</Text>
-                </View>
-
-                {/* Action Buttons */}
-                <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      handleToggleEventRSVP(selectedEvent.id);
-                      setSelectedEvent(null);
-                    }}
-                    style={{
-                      flex: 1,
-                      backgroundColor: registeredEventIds.includes(selectedEvent.id)
-                        ? colors.danger[50]
-                        : colors.primary[500],
-                      paddingVertical: 13,
-                      borderRadius: 10,
-                      alignItems: 'center'
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: registeredEventIds.includes(selectedEvent.id)
-                          ? colors.danger[700]
-                          : '#ffffff',
-                        fontWeight: 'bold',
-                        fontSize: 14
-                      }}
-                    >
-                      {registeredEventIds.includes(selectedEvent.id)
-                        ? 'Cancel Registration'
-                        : '1-Tap Quick RSVP'}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => {
-                      setIsQrPassOpen(true);
-                      setSelectedEvent(null);
-                    }}
-                    style={{
-                      backgroundColor: colors.neutral[900],
-                      paddingHorizontal: 16,
-                      borderRadius: 10,
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>Pass 🎟️</Text>
-                  </TouchableOpacity>
-                </View>
-              </ScrollView>
             )}
           </View>
-        </View>
-      </Modal>
+        )}
+      </ScrollView>
 
-      {/* 7. MODAL: DIGITAL EVENT CHECK-IN & CAMPUS MEMBER PASS */}
+      {/* ========================================================= */}
+      {/* 3. MODALS: PASS, APPLICATION, STATUS, ADMIN, NOTIFICATIONS */}
+      {/* ========================================================= */}
+
+      {/* DIGITAL QR PASS MODAL */}
       <Modal visible={isQrPassOpen} animationType="slide" transparent>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 }}>
-          <View
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: 24,
-              padding: 24,
-              alignItems: 'center',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 6 },
-              shadowOpacity: 0.3,
-              shadowRadius: 10,
-              elevation: 10
-            }}
-          >
-            <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success[500] }} />
-                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.success[700], letterSpacing: 0.5 }}>
-                  VERIFIED CAMPUS PASS
-                </Text>
-              </View>
-              <TouchableOpacity onPress={() => setIsQrPassOpen(false)}>
-                <Text style={{ fontSize: 16, color: colors.neutral[400], fontWeight: 'bold' }}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            <Image
-              source={{ uri: currentUser.avatar_url }}
-              style={{ width: 72, height: 72, borderRadius: 36, marginBottom: 8, borderWidth: 2, borderColor: colors.primary[300] }}
-            />
-
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.neutral[900] }}>
-              {currentUser.full_name}
+          <View style={{ backgroundColor: '#ffffff', borderRadius: 20, padding: 24, alignItems: 'center' }}>
+            <Text style={{ fontSize: 17, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 4 }}>
+              Digital Campus Member Pass
             </Text>
-            <Text style={{ fontSize: 12, color: colors.neutral[500], marginTop: 1 }}>
-              {currentUser.student_id} · {currentUser.department}
+            <Text style={{ fontSize: 11, color: colors.neutral[500], marginBottom: 16 }}>
+              Flash this QR pass at campus workshops and hackathons
             </Text>
 
-            {/* QR Simulation Card */}
+            {/* QR Matrix Simulator */}
             <View
               style={{
+                width: 180,
+                height: 180,
                 backgroundColor: colors.neutral[900],
-                borderRadius: 16,
-                padding: 16,
-                marginVertical: 18,
+                borderRadius: 14,
+                justifyContent: 'center',
                 alignItems: 'center',
-                width: 200,
-                height: 200,
-                justifyContent: 'center'
+                padding: 10
               }}
             >
-              <View style={{ width: 140, height: 140, backgroundColor: '#ffffff', borderRadius: 8, padding: 8, justifyContent: 'space-between' }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <View style={{ width: 36, height: 36, backgroundColor: colors.neutral[900], borderRadius: 4 }} />
-                  <View style={{ width: 36, height: 36, backgroundColor: colors.neutral[900], borderRadius: 4 }} />
-                </View>
-                <View style={{ alignItems: 'center' }}>
-                  <Text style={{ fontWeight: 'bold', fontSize: 12, color: colors.primary[600] }}>ATC PASS</Text>
-                </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <View style={{ width: 36, height: 36, backgroundColor: colors.neutral[900], borderRadius: 4 }} />
-                  <View style={{ width: 36, height: 36, backgroundColor: colors.primary[500], borderRadius: 4 }} />
-                </View>
-              </View>
-              <Text style={{ color: colors.neutral[400], fontSize: 10, marginTop: 8, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
-                AUTH-PASS-2026-ATC
+              <Text style={{ color: '#ffffff', fontSize: 48 }}>▦</Text>
+              <Text style={{ color: colors.primary[400], fontSize: 10, fontWeight: 'bold', marginTop: 6 }}>
+                ATC-{currentUser?.student_id || 'MEMBER-2026'}
               </Text>
             </View>
 
-            <Text style={{ fontSize: 11, color: colors.neutral[500], textAlign: 'center', lineHeight: 16, paddingHorizontal: 10 }}>
-              Present this code at Innovation Lab Room 302 or Turing Auditorium gate scanners for instant workshop attendance check-in.
+            <Text style={{ fontSize: 15, fontWeight: 'bold', color: colors.neutral[900], marginTop: 14 }}>
+              {currentUser?.full_name || 'ATC Member'}
+            </Text>
+            <Text style={{ fontSize: 12, color: colors.neutral[500] }}>
+              Student ID: {currentUser?.student_id || 'Pending Application'}
             </Text>
 
             <TouchableOpacity
-              onPress={() => {
-                triggerToast('Pass verified by gate simulator ✓');
-                setIsQrPassOpen(false);
-              }}
-              style={{
-                marginTop: 18,
-                backgroundColor: colors.primary[500],
-                paddingVertical: 11,
-                width: '100%',
-                borderRadius: 12,
-                alignItems: 'center'
-              }}
+              onPress={() => setIsQrPassOpen(false)}
+              style={{ backgroundColor: colors.neutral[900], width: '100%', paddingVertical: 12, borderRadius: 10, alignItems: 'center', marginTop: 20 }}
             >
               <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>Done</Text>
             </TouchableOpacity>
@@ -1602,258 +1657,556 @@ export default function App() {
         </View>
       </Modal>
 
-      {/* 8. MODAL: AVATAR CUSTOMIZER */}
-      <Modal visible={isAvatarModalOpen} animationType="slide" transparent>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.neutral[900] }}>
-                Choose Profile Avatar
+      {/* STUDENT MEMBERSHIP APPLICATION MODAL */}
+      <Modal visible={isApplyModalOpen} animationType="slide" transparent>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: '#ffffff', borderRadius: 20, padding: 20, maxHeight: '85%' }}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={{ fontSize: 17, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 4 }}>
+                Student Membership Application
               </Text>
-              <TouchableOpacity onPress={() => setIsAvatarModalOpen(false)}>
-                <Text style={{ fontSize: 14, color: colors.neutral[500] }}>✕</Text>
-              </TouchableOpacity>
-            </View>
+              <Text style={{ fontSize: 11, color: colors.neutral[500], marginBottom: 16 }}>
+                Fill in your student credentials. Applications are verified by Club Admin (Ritesh Mishra).
+              </Text>
 
-            <Text style={{ fontSize: 12, color: colors.neutral[500], marginBottom: 14 }}>
-              Select a campus developer avatar preset:
-            </Text>
+              <View style={{ gap: 12 }}>
+                <View>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>Student ID *</Text>
+                  <TextInput
+                    placeholder="e.g. CS2026-088"
+                    value={applyStudentId}
+                    onChangeText={setApplyStudentId}
+                    autoCapitalize="characters"
+                    style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 8, padding: 10, fontSize: 13 }}
+                  />
+                </View>
 
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center', marginBottom: 16 }}>
-              {avatarPresets.map((uri, idx) => (
+                <View>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>Department</Text>
+                  <TextInput
+                    value={applyDept}
+                    editable={false}
+                    style={{ backgroundColor: colors.neutral[100], borderWidth: 1, borderColor: colors.neutral[200], borderRadius: 8, padding: 10, fontSize: 13, color: colors.neutral[600] }}
+                  />
+                </View>
+
+                <View>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>Year of Study</Text>
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    {['1st Year', '2nd Year', '3rd Year', '4th Year'].map((y) => (
+                      <TouchableOpacity
+                        key={y}
+                        onPress={() => setApplyYear(y)}
+                        style={{
+                          flex: 1,
+                          paddingVertical: 8,
+                          borderRadius: 8,
+                          backgroundColor: applyYear === y ? colors.primary[500] : colors.neutral[100],
+                          alignItems: 'center'
+                        }}
+                      >
+                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: applyYear === y ? '#ffffff' : colors.neutral[700] }}>
+                          {y.split(' ')[0]}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                <View>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>Technical Interests (Select All That Apply)</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                    {availableInterests.map((item) => {
+                      const selected = applyInterests.includes(item);
+                      return (
+                        <TouchableOpacity
+                          key={item}
+                          onPress={() => {
+                            if (selected) {
+                              setApplyInterests((prev) => prev.filter((i) => i !== item));
+                            } else {
+                              setApplyInterests((prev) => [...prev, item]);
+                            }
+                          }}
+                          style={{
+                            paddingHorizontal: 8,
+                            paddingVertical: 5,
+                            borderRadius: 6,
+                            backgroundColor: selected ? colors.primary[500] : colors.neutral[100]
+                          }}
+                        >
+                          <Text style={{ fontSize: 10, fontWeight: 'bold', color: selected ? '#ffffff' : colors.neutral[700] }}>
+                            {item}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                <View>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>GitHub / Portfolio Profile</Text>
+                  <TextInput
+                    placeholder="https://github.com/username"
+                    value={applyGithub}
+                    onChangeText={setApplyGithub}
+                    autoCapitalize="none"
+                    style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 8, padding: 10, fontSize: 13 }}
+                  />
+                </View>
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 20 }}>
                 <TouchableOpacity
-                  key={idx}
-                  onPress={() => {
-                    setCurrentUser((prev) => ({ ...prev, avatar_url: uri }));
-                    setIsAvatarModalOpen(false);
-                    triggerToast('Avatar updated!');
-                  }}
-                  style={{
-                    borderWidth: currentUser.avatar_url === uri ? 3 : 1,
-                    borderColor: currentUser.avatar_url === uri ? colors.primary[500] : colors.neutral[200],
-                    borderRadius: 35,
-                    padding: 2
-                  }}
+                  onPress={() => setIsApplyModalOpen(false)}
+                  style={{ flex: 1, backgroundColor: colors.neutral[100], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
                 >
-                  <Image source={{ uri }} style={{ width: 60, height: 60, borderRadius: 30 }} />
+                  <Text style={{ color: colors.neutral[700], fontWeight: 'bold', fontSize: 13 }}>Cancel</Text>
                 </TouchableOpacity>
-              ))}
-            </View>
+
+                <TouchableOpacity
+                  onPress={handleSubmitApplication}
+                  style={{ flex: 1, backgroundColor: colors.primary[500], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+                >
+                  <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>Submit Application</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
 
-      {/* 9. MODAL: ADMIN STUDENT VERIFICATIONS REVIEW SHEET */}
-      <Modal visible={isVerificationsModalOpen} animationType="slide" transparent>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '80%' }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.neutral[900] }}>
-                Pending Student Applications ({pendingMembers.length})
-              </Text>
-              <TouchableOpacity onPress={() => setIsVerificationsModalOpen(false)}>
-                <Text style={{ fontSize: 14, color: colors.neutral[500] }}>✕</Text>
+      {/* APPLICATION STATUS CHECKER MODAL */}
+      <Modal visible={isStatusModalOpen} animationType="slide" transparent>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: '#ffffff', borderRadius: 20, padding: 20 }}>
+            <Text style={{ fontSize: 17, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 4 }}>
+              Check Application Status
+            </Text>
+            <Text style={{ fontSize: 11, color: colors.neutral[500], marginBottom: 14 }}>
+              Enter your student ID or email to view verification records.
+            </Text>
+
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+              <TextInput
+                placeholder="Student ID or Email"
+                value={statusSearchId}
+                onChangeText={setStatusSearchId}
+                style={{ flex: 1, backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 8, paddingHorizontal: 12, fontSize: 13 }}
+              />
+              <TouchableOpacity
+                onPress={handleSearchStatus}
+                style={{ backgroundColor: colors.primary[500], paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8, justifyContent: 'center' }}
+              >
+                <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>Check</Text>
               </TouchableOpacity>
             </View>
 
-            {pendingMembers.length === 0 ? (
-              <View style={{ padding: 24, alignItems: 'center' }}>
-                <Text style={{ fontSize: 24, marginBottom: 6 }}>✓</Text>
-                <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.neutral[800] }}>All caught up!</Text>
-                <Text style={{ fontSize: 12, color: colors.neutral[500] }}>No pending student verification requests.</Text>
+            {statusSearchResult && (
+              <View style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[200], borderRadius: 12, padding: 12, marginBottom: 14 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900] }}>
+                    {statusSearchResult.full_name}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 'bold',
+                      color: statusSearchResult.is_verified ? colors.success[700] : colors.warning[700],
+                      backgroundColor: statusSearchResult.is_verified ? colors.success[100] : colors.warning[100],
+                      paddingHorizontal: 6,
+                      paddingVertical: 2,
+                      borderRadius: 4
+                    }}
+                  >
+                    {statusSearchResult.is_verified ? '✓ Verified' : '⏳ Pending Review'}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 11, color: colors.neutral[500], marginTop: 4 }}>
+                  Department: {statusSearchResult.department || 'Computer Science & Engineering'}
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.neutral[400], marginTop: 2 }}>
+                  Verified by: Club Admin (Ritesh Mishra)
+                </Text>
               </View>
-            ) : (
-              <ScrollView>
-                {pendingMembers.map((m) => (
+            )}
+
+            <TouchableOpacity
+              onPress={() => {
+                setIsStatusModalOpen(false);
+                setStatusSearchResult(null);
+              }}
+              style={{ backgroundColor: colors.neutral[900], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+            >
+              <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* NOTIFICATIONS CENTER MODAL */}
+      <Modal visible={isNotificationsOpen} animationType="slide" transparent>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: '#ffffff', borderRadius: 20, padding: 20, maxHeight: '80%' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.neutral[900] }}>
+                Campus Alerts ({unreadCount} new)
+              </Text>
+              {unreadCount > 0 && (
+                <TouchableOpacity onPress={handleMarkNotificationsRead}>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[600] }}>Mark all read</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ gap: 8 }}>
+              {notifications.map((n) => (
+                <View
+                  key={n.id}
+                  style={{
+                    backgroundColor: n.read ? '#ffffff' : colors.primary[50],
+                    borderWidth: 1,
+                    borderColor: n.read ? colors.neutral[200] : colors.primary[200],
+                    borderRadius: 12,
+                    padding: 12,
+                    marginBottom: 8
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.neutral[900] }}>{n.title}</Text>
+                    <Text style={{ fontSize: 10, color: colors.neutral[400] }}>{n.time}</Text>
+                  </View>
+                  <Text style={{ fontSize: 11, color: colors.neutral[600], marginTop: 4 }}>{n.message}</Text>
+                </View>
+              ))}
+            </ScrollView>
+
+            <TouchableOpacity
+              onPress={() => setIsNotificationsOpen(false)}
+              style={{ backgroundColor: colors.neutral[900], paddingVertical: 12, borderRadius: 10, alignItems: 'center', marginTop: 14 }}
+            >
+              <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ADMIN VERIFICATIONS MODAL */}
+      <Modal visible={isVerificationsModalOpen} animationType="slide" transparent>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: '#ffffff', borderRadius: 20, padding: 20, maxHeight: '80%' }}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 4 }}>
+              Student Applicant Verifications ({pendingMembers.length})
+            </Text>
+            <Text style={{ fontSize: 11, color: colors.neutral[500], marginBottom: 14 }}>
+              Review student enrollment to grant Club Portal and Workshop RSVP access.
+            </Text>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {pendingMembers.length === 0 ? (
+                <View style={{ padding: 24, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.neutral[600] }}>All applicants verified! ✓</Text>
+                </View>
+              ) : (
+                pendingMembers.map((m) => (
                   <View
-                    key={m.id}
+                    key={m.id || m.student_id}
                     style={{
                       borderWidth: 1,
                       borderColor: colors.neutral[200],
                       borderRadius: 12,
                       padding: 12,
-                      marginBottom: 10,
-                      backgroundColor: colors.neutral[50]
+                      marginBottom: 10
                     }}
                   >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                      <Image source={{ uri: m.avatar_url }} style={{ width: 40, height: 40, borderRadius: 20 }} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.neutral[900] }}>{m.full_name}</Text>
-                        <Text style={{ fontSize: 11, color: colors.neutral[500] }}>{m.department} · {m.student_id}</Text>
-                      </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900] }}>{m.full_name}</Text>
+                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary[700] }}>{m.student_id || 'Pending ID'}</Text>
                     </View>
-                    <Text style={{ fontSize: 11, color: colors.neutral[600], marginBottom: 8 }}>{m.bio}</Text>
-                    <TouchableOpacity
-                      onPress={() => handleApproveMember(m.student_id)}
-                      style={{
-                        backgroundColor: colors.success[500],
-                        paddingVertical: 8,
-                        borderRadius: 8,
-                        alignItems: 'center'
-                      }}
-                    >
-                      <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>Approve & Verify Student</Text>
-                    </TouchableOpacity>
+                    <Text style={{ fontSize: 11, color: colors.neutral[500], marginTop: 2 }}>{m.email}</Text>
+
+                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
+                      <TouchableOpacity
+                        onPress={() => handleApproveMember(m.student_id)}
+                        style={{ flex: 1, backgroundColor: colors.success[500], paddingVertical: 6, borderRadius: 6, alignItems: 'center' }}
+                      >
+                        <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>Approve</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setPendingMembers((prev) => prev.filter((p) => p.student_id !== m.student_id));
+                          triggerToast('Applicant removed');
+                        }}
+                        style={{ flex: 1, backgroundColor: colors.danger[50], paddingVertical: 6, borderRadius: 6, alignItems: 'center' }}
+                      >
+                        <Text style={{ color: colors.danger[700], fontSize: 11, fontWeight: 'bold' }}>Reject</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                ))}
-              </ScrollView>
+                ))
+              )}
+            </ScrollView>
+
+            <TouchableOpacity
+              onPress={() => setIsVerificationsModalOpen(false)}
+              style={{ backgroundColor: colors.neutral[900], paddingVertical: 12, borderRadius: 10, alignItems: 'center', marginTop: 12 }}
+            >
+              <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ADMIN ANALYTICS MODAL */}
+      <Modal visible={isAnalyticsModalOpen} animationType="slide" transparent>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: '#ffffff', borderRadius: 20, padding: 20 }}>
+            <Text style={{ fontSize: 17, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 4 }}>
+              Club Operations Telemetry
+            </Text>
+            <Text style={{ fontSize: 11, color: colors.neutral[500], marginBottom: 16 }}>
+              Spring 2026 Campus Developer Analytics
+            </Text>
+
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+              <View style={{ flex: 1, backgroundColor: colors.primary[50], padding: 12, borderRadius: 12, alignItems: 'center' }}>
+                <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.primary[700] }}>142</Text>
+                <Text style={{ fontSize: 10, color: colors.primary[600], marginTop: 2 }}>Active Members</Text>
+              </View>
+              <View style={{ flex: 1, backgroundColor: colors.success[50], padding: 12, borderRadius: 12, alignItems: 'center' }}>
+                <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.success[700] }}>88%</Text>
+                <Text style={{ fontSize: 10, color: colors.success[600], marginTop: 2 }}>RSVP Rate</Text>
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+              <View style={{ flex: 1, backgroundColor: '#f8fafc', padding: 12, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: colors.neutral[200] }}>
+                <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.neutral[800] }}>{events.length}</Text>
+                <Text style={{ fontSize: 10, color: colors.neutral[500], marginTop: 2 }}>Workshops</Text>
+              </View>
+              <View style={{ flex: 1, backgroundColor: '#f8fafc', padding: 12, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: colors.neutral[200] }}>
+                <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.neutral[800] }}>320+</Text>
+                <Text style={{ fontSize: 10, color: colors.neutral[500], marginTop: 2 }}>Vault Downloads</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => setIsAnalyticsModalOpen(false)}
+              style={{ backgroundColor: colors.neutral[900], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+            >
+              <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* EVENT DETAIL MODAL */}
+      <Modal visible={!!selectedEvent} animationType="slide" transparent>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: '#ffffff', borderRadius: 20, padding: 20 }}>
+            {selectedEvent && (
+              <>
+                <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary[600], textTransform: 'uppercase', marginBottom: 2 }}>
+                  {selectedEvent.category} · In-Person Campus Session
+                </Text>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 8 }}>
+                  {selectedEvent.title}
+                </Text>
+                <Text style={{ fontSize: 13, color: colors.neutral[600], lineHeight: 18, marginBottom: 12 }}>
+                  {selectedEvent.description}
+                </Text>
+                <Text style={{ fontSize: 12, color: colors.neutral[700], marginBottom: 4 }}>
+                  📍 {selectedEvent.location}
+                </Text>
+                <Text style={{ fontSize: 12, color: colors.neutral[700], marginBottom: 16 }}>
+                  👥 Capacity: {selectedEvent.capacity} engineers ({selectedEvent.registrations_count || 1} confirmed)
+                </Text>
+
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <TouchableOpacity
+                    onPress={() => setSelectedEvent(null)}
+                    style={{ flex: 1, backgroundColor: colors.neutral[100], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+                  >
+                    <Text style={{ color: colors.neutral[700], fontWeight: 'bold', fontSize: 13 }}>Close</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      handleToggleEventRSVP(selectedEvent.id);
+                      setSelectedEvent(null);
+                    }}
+                    style={{ flex: 1, backgroundColor: registeredEventIds.includes(selectedEvent.id) ? colors.danger[500] : colors.primary[500], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+                  >
+                    <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
+                      {registeredEventIds.includes(selectedEvent.id) ? 'Cancel RSVP' : 'Confirm RSVP'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
             )}
           </View>
         </View>
       </Modal>
 
-      {/* 10. MODAL: ADMIN BROADCAST POST SHEET */}
+      {/* RESOURCE PREVIEW OUTLINE MODAL */}
+      <Modal visible={!!selectedResource} animationType="slide" transparent>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: '#ffffff', borderRadius: 20, padding: 20 }}>
+            {selectedResource && (
+              <>
+                <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary[600], textTransform: 'uppercase', marginBottom: 2 }}>
+                  Vault Curriculum Preview · {selectedResource.file_size || '12MB'}
+                </Text>
+                <Text style={{ fontSize: 17, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 8 }}>
+                  {selectedResource.title}
+                </Text>
+                <Text style={{ fontSize: 13, color: colors.neutral[600], lineHeight: 18, marginBottom: 14 }}>
+                  {selectedResource.description}
+                </Text>
+
+                <View style={{ backgroundColor: colors.neutral[50], borderRadius: 10, padding: 12, marginBottom: 16 }}>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>Curriculum Outline:</Text>
+                  <Text style={{ fontSize: 11, color: colors.neutral[600] }}>• Core Architecture & Component Lifecycle</Text>
+                  <Text style={{ fontSize: 11, color: colors.neutral[600] }}>• Production CI/CD Pipeline Implementation</Text>
+                  <Text style={{ fontSize: 11, color: colors.neutral[600] }}>• Security & Rate Limiting Best Practices</Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <TouchableOpacity
+                    onPress={() => setSelectedResource(null)}
+                    style={{ flex: 1, backgroundColor: colors.neutral[100], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+                  >
+                    <Text style={{ color: colors.neutral[700], fontWeight: 'bold', fontSize: 13 }}>Close</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      handleDownloadResource(selectedResource);
+                      setSelectedResource(null);
+                    }}
+                    style={{ flex: 1, backgroundColor: colors.neutral[900], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+                  >
+                    <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>Download</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ADMIN POST BROADCAST MODAL */}
       <Modal visible={isBroadcastModalOpen} animationType="slide" transparent>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <Text style={{ fontSize: 17, fontWeight: 'bold', color: colors.neutral[900] }}>
-                Admin Quick Broadcast
-              </Text>
-              <TouchableOpacity onPress={() => setIsBroadcastModalOpen(false)}>
-                <Text style={{ fontSize: 14, color: colors.neutral[500] }}>✕ Close</Text>
-              </TouchableOpacity>
-            </View>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: '#ffffff', borderRadius: 20, padding: 20 }}>
+            <Text style={{ fontSize: 17, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 12 }}>
+              Post Campus Announcement
+            </Text>
 
             <TextInput
-              placeholder="Announcement Title..."
+              placeholder="Announcement Title"
               value={newAnnTitle}
               onChangeText={setNewAnnTitle}
-              style={{
-                borderWidth: 1,
-                borderColor: colors.neutral[300],
-                borderRadius: 10,
-                padding: 12,
-                fontSize: 13,
-                marginBottom: 10
-              }}
+              style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 8, padding: 10, fontSize: 13, marginBottom: 10 }}
             />
 
             <TextInput
-              placeholder="Announcement details & instructions..."
+              placeholder="Write broadcast message..."
               value={newAnnBody}
               onChangeText={setNewAnnBody}
               multiline
               numberOfLines={4}
-              style={{
-                borderWidth: 1,
-                borderColor: colors.neutral[300],
-                borderRadius: 10,
-                padding: 12,
-                fontSize: 13,
-                textAlignVertical: 'top',
-                marginBottom: 14
-              }}
+              style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 8, padding: 10, fontSize: 13, height: 90, textAlignVertical: 'top', marginBottom: 12 }}
             />
 
-            <TouchableOpacity
-              onPress={handleAdminPostAnnouncement}
-              style={{
-                backgroundColor: colors.primary[500],
-                paddingVertical: 13,
-                borderRadius: 10,
-                alignItems: 'center'
-              }}
-            >
-              <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 14 }}>
-                Publish & Trigger Mobile Push
-              </Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity
+                onPress={() => setIsBroadcastModalOpen(false)}
+                style={{ flex: 1, backgroundColor: colors.neutral[100], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+              >
+                <Text style={{ color: colors.neutral[700], fontWeight: 'bold', fontSize: 13 }}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleAdminPostAnnouncement}
+                style={{ flex: 1, backgroundColor: colors.primary[500], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+              >
+                <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>Publish</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
 
-      {/* 11. MODAL: ADMIN WORKSHOP CREATOR SHEET */}
+      {/* ADMIN CREATE WORKSHOP MODAL */}
       <Modal visible={isCreateEventModalOpen} animationType="slide" transparent>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <Text style={{ fontSize: 17, fontWeight: 'bold', color: colors.neutral[900] }}>
-                Schedule Campus Workshop
-              </Text>
-              <TouchableOpacity onPress={() => setIsCreateEventModalOpen(false)}>
-                <Text style={{ fontSize: 14, color: colors.neutral[500] }}>✕ Close</Text>
-              </TouchableOpacity>
-            </View>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: '#ffffff', borderRadius: 20, padding: 20 }}>
+            <Text style={{ fontSize: 17, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 12 }}>
+              Publish Campus Workshop
+            </Text>
 
             <TextInput
-              placeholder="Workshop Title (e.g. AI Agentic Systems)"
+              placeholder="Workshop Title (e.g. Distributed Systems Lab)"
               value={newEventTitle}
               onChangeText={setNewEventTitle}
-              style={{
-                borderWidth: 1,
-                borderColor: colors.neutral[300],
-                borderRadius: 10,
-                padding: 12,
-                fontSize: 13,
-                marginBottom: 10
-              }}
+              style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 8, padding: 10, fontSize: 13, marginBottom: 10 }}
             />
 
             <TextInput
-              placeholder="Campus Venue / Room (e.g. Turing Auditorium Room 302)"
+              placeholder="Location (e.g. Turing Hall / Lab 4)"
               value={newEventLocation}
               onChangeText={setNewEventLocation}
-              style={{
-                borderWidth: 1,
-                borderColor: colors.neutral[300],
-                borderRadius: 10,
-                padding: 12,
-                fontSize: 13,
-                marginBottom: 10
-              }}
+              style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 8, padding: 10, fontSize: 13, marginBottom: 10 }}
             />
 
             <TextInput
-              placeholder="Short Description & Requirements"
+              placeholder="Description & prerequisites..."
               value={newEventDesc}
               onChangeText={setNewEventDesc}
               multiline
               numberOfLines={3}
-              style={{
-                borderWidth: 1,
-                borderColor: colors.neutral[300],
-                borderRadius: 10,
-                padding: 12,
-                fontSize: 13,
-                textAlignVertical: 'top',
-                marginBottom: 14
-              }}
+              style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 8, padding: 10, fontSize: 13, height: 70, textAlignVertical: 'top', marginBottom: 12 }}
             />
 
-            <TouchableOpacity
-              onPress={handleAdminCreateEvent}
-              style={{
-                backgroundColor: colors.primary[500],
-                paddingVertical: 13,
-                borderRadius: 10,
-                alignItems: 'center'
-              }}
-            >
-              <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 14 }}>
-                Publish Event & Open RSVPs
-              </Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity
+                onPress={() => setIsCreateEventModalOpen(false)}
+                style={{ flex: 1, backgroundColor: colors.neutral[100], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+              >
+                <Text style={{ color: colors.neutral[700], fontWeight: 'bold', fontSize: 13 }}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleAdminCreateEvent}
+                style={{ flex: 1, backgroundColor: colors.primary[500], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+              >
+                <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>Publish</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
 
-      {/* 12. BOTTOM TAB NAVIGATOR WITH POLISHED PILLS */}
+      {/* 4. BOTTOM TAB BAR NAVIGATION */}
       <View
         style={{
           position: 'absolute',
           bottom: 0,
           left: 0,
           right: 0,
-          height: 64,
           backgroundColor: '#ffffff',
           borderTopWidth: 1,
           borderTopColor: colors.neutral[200],
           flexDirection: 'row',
           justifyContent: 'space-around',
-          alignItems: 'center',
-          paddingBottom: Platform.OS === 'ios' ? 10 : 0
+          paddingVertical: 8,
+          paddingBottom: Platform.OS === 'ios' ? 24 : 10,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.05,
+          shadowRadius: 4,
+          elevation: 5
         }}
       >
         <TouchableOpacity
@@ -1867,7 +2220,7 @@ export default function App() {
           }}
         >
           <Text style={{ fontSize: 16, color: currentTab === 'home' ? colors.primary[600] : colors.neutral[400] }}>
-            ●
+            📢
           </Text>
           <Text
             style={{
@@ -1892,7 +2245,7 @@ export default function App() {
           }}
         >
           <Text style={{ fontSize: 16, color: currentTab === 'events' ? colors.primary[600] : colors.neutral[400] }}>
-            ◈
+            📅
           </Text>
           <Text
             style={{
