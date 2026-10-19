@@ -205,6 +205,82 @@ export function useAuth() {
     }
   }, []);
 
+  // Firebase Sign In with Google
+  const signInWithGoogle = useCallback(async () => {
+    useAuthStore.getState().setLoading(true);
+    useAuthStore.getState().setError(null);
+
+    try {
+      if (isFirebaseConfigured && firebaseAuth) {
+        const { GoogleAuthProvider, signInWithPopup } = await import('firebase/auth');
+        const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
+        const cred = await signInWithPopup(firebaseAuth, provider);
+        const idToken = await cred.user.getIdToken();
+
+        // Trigger Supabase on-signup Edge Function to auto-create profile if needed
+        try {
+          const meta = (new Function('return typeof import.meta !== "undefined" ? import.meta : {}'))();
+          const supabaseUrl = (typeof process !== 'undefined' && process?.env?.VITE_SUPABASE_URL) || meta?.env?.VITE_SUPABASE_URL || '';
+          if (supabaseUrl) {
+            await fetch(`${supabaseUrl}/functions/v1/on-signup`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                idToken,
+                fullName: cred.user.displayName || cred.user.email?.split('@')[0] || 'Club Member',
+                department: 'Computer Science'
+              })
+            });
+          }
+        } catch (edgeErr) {
+          console.warn('[ATC Auth] Google on-signup Edge Function call warning:', edgeErr);
+        }
+
+        const client = getSupabaseClient(idToken);
+        const { data: profileRow } = await client
+          .from('profiles')
+          .select('*')
+          .eq('id', cred.user.uid)
+          .single();
+
+        const activeProfile = profileRow || {
+          id: cred.user.uid,
+          email: cred.user.email,
+          full_name: cred.user.displayName || cred.user.email?.split('@')[0] || 'Club Member',
+          avatar_url: cred.user.photoURL || '',
+          role: 'member',
+          is_verified: true
+        };
+
+        useAuthStore.getState().setUser({
+          firebaseUser: cred.user,
+          token: idToken,
+          profile: activeProfile
+        });
+
+        return { user: cred.user, profile: activeProfile };
+      } else {
+        // Fallback for offline / dev demo
+        const mockGoogleUser = {
+          id: 'google-user-' + Date.now(),
+          email: 'student.google@campus.edu',
+          full_name: 'Google Student',
+          role: 'member',
+          is_verified: true,
+          verification_status: 'verified'
+        };
+        useAuthStore.getState().setUser(mockGoogleUser);
+        return { user: mockGoogleUser, profile: mockGoogleUser };
+      }
+    } catch (err) {
+      useAuthStore.getState().setError(err.message);
+      throw err;
+    } finally {
+      useAuthStore.getState().setLoading(false);
+    }
+  }, []);
+
   // Sign Out
   const signOut = useCallback(async () => {
     if (isFirebaseConfigured && firebaseAuth) {
@@ -234,6 +310,7 @@ export function useAuth() {
     setUser,
     signInWithEmail,
     signUpWithEmail,
+    signInWithGoogle,
     signOut,
     switchDemoUser,
     updateUserProfile,

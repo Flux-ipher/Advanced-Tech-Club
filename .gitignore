@@ -43,6 +43,8 @@ pnpm-debug.log*
 *.mobileprovision
 *.orig.*
 *.apk
+google-services.json
+**/google-services.json
 
 # Editor directories and files
 .vscode/*
