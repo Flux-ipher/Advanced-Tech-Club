@@ -109,6 +109,11 @@
       ],
       "destination": "https://portal.advclub.online/analytics",
       "permanent": false
+    },
+    {
+      "source": "/atc-release.apk",
+      "destination": "https://github.com/Flux-ipher/Advanced-Tech-Club/releases/latest/download/atc-release.apk",
+      "permanent": false
     }
   ],
   "rewrites": [
