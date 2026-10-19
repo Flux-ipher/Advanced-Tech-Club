@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@atc/shared/hooks/useAuth';
 import { NotificationDropdown } from './NotificationDropdown';
 import { DemoRoleSwitcher } from './DemoRoleSwitcher';
@@ -11,12 +11,19 @@ import {
   ChevronRight,
   Smartphone,
   Download,
-  Radio
+  Radio,
+  LogOut
 } from 'lucide-react';
 
 export function PortalHeader({ collapsed, onToggleCollapse, onOpenMobile }) {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
+  };
 
   const getPageTitle = () => {
     const path = location.pathname;
@@ -115,6 +122,17 @@ export function PortalHeader({ collapsed, onToggleCollapse, onOpenMobile }) {
           <Globe className="w-3.5 h-3.5 text-neutral-400" />
           Public Site
         </Link>
+
+        {/* Log Out Button */}
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 text-xs font-semibold text-neutral-700 hover:text-danger-600 hover:border-danger-200 hover:bg-danger-50 transition-colors"
+          title="Sign Out / Log Out"
+        >
+          <LogOut className="w-3.5 h-3.5 text-neutral-400 hover:text-danger-500" />
+          <span className="hidden sm:inline">Log Out</span>
+        </button>
       </div>
     </header>
   );

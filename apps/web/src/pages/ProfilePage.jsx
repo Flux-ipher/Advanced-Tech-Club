@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@atc/shared/hooks/useAuth';
 import { useEvents } from '@atc/shared/hooks/useEvents';
 import { RoleBadge } from '../components/RoleBadge';
@@ -20,12 +21,14 @@ import {
   QrCode,
   Download,
   Printer,
-  Sparkles
+  Sparkles,
+  LogOut
 } from 'lucide-react';
 
 export function ProfilePage() {
-  const { user, updateUserProfile, isSuperAdmin, isAdmin } = useAuth();
+  const { user, updateUserProfile, isSuperAdmin, isAdmin, signOut } = useAuth();
   const { events, userRegistrations, unregister } = useEvents();
+  const navigate = useNavigate();
 
   const [fullName, setFullName] = useState(user?.full_name || '');
   const [department, setDepartment] = useState(user?.department || '');
@@ -92,6 +95,19 @@ export function ProfilePage() {
                 >
                   <QrCode className="w-3.5 h-3.5" />
                   Digital Member Pass
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await signOut();
+                    navigate('/');
+                  }}
+                  className="btn-outline text-xs py-1.5 px-3 flex items-center gap-1.5 text-danger-600 hover:text-danger-700 hover:bg-danger-50 hover:border-danger-200 transition-colors"
+                  title="Sign Out of ATC Platform"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  Sign Out
                 </button>
 
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-success-50 text-success-700 border border-success-200">

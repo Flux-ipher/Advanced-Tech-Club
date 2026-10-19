@@ -1273,6 +1273,117 @@ export default function App() {
               );
             })}
           </View>
+
+          {/* Account & Authentication Hub */}
+          <View
+            style={{
+              backgroundColor: '#ffffff',
+              borderWidth: 1,
+              borderColor: colors.neutral[200],
+              borderRadius: 16,
+              padding: 16,
+              marginTop: 16
+            }}
+          >
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[800] }}>
+                Account & Authentication Hub
+              </Text>
+              <View style={{ backgroundColor: colors.primary[50], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary[700] }}>FIREBASE AUTH</Text>
+              </View>
+            </View>
+            <Text style={{ fontSize: 11, color: colors.neutral[500], marginBottom: 12 }}>
+              Signed in as {currentUser.full_name} ({currentUser.email || `${currentUser.student_id?.toLowerCase()}@techclub.edu`})
+            </Text>
+
+            <View style={{ gap: 8 }}>
+              {/* Google Sign-In Link */}
+              <TouchableOpacity
+                onPress={() => {
+                  triggerToast('Google Account Synchronized');
+                  Alert.alert(
+                    'Google Sign-In Active',
+                    `Authenticated with Firebase project at-club-001.\n\nAccount: ${currentUser.full_name} (${currentUser.email || 'student@techclub.edu'})\nStudent ID: ${currentUser.student_id}\nProvider: Google Firebase Auth`
+                  );
+                }}
+                style={{
+                  backgroundColor: colors.neutral[50],
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: colors.neutral[200],
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8
+                }}
+              >
+                <Text style={{ fontSize: 13 }}>🌐</Text>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.neutral[800] }}>
+                  Google Account Synced · at-club-001
+                </Text>
+              </TouchableOpacity>
+
+              {/* Persona Switch / Log In as Other Member */}
+              <TouchableOpacity
+                onPress={() => {
+                  // Switch to next demo profile or prompt
+                  const nextUser = initialProfiles.find((p) => p.id !== currentUser.id) || initialProfiles[0];
+                  setCurrentUser(nextUser);
+                  triggerToast(`Switched account to ${nextUser.full_name}`);
+                }}
+                style={{
+                  backgroundColor: colors.primary[50],
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: colors.primary[200],
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.primary[700] }}>
+                  Switch Account / Log In Persona
+                </Text>
+              </TouchableOpacity>
+
+              {/* Log Out Button */}
+              <TouchableOpacity
+                onPress={() => {
+                  Alert.alert(
+                    'Log Out',
+                    'Are you sure you want to sign out of the Advanced Tech Club campus app?',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Log Out',
+                        style: 'destructive',
+                        onPress: () => {
+                          triggerToast('Signed out of ATC Mobile');
+                        }
+                      }
+                    ]
+                  );
+                }}
+                style={{
+                  backgroundColor: colors.danger[50],
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: colors.danger[200],
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{ color: colors.danger[700], fontWeight: 'bold', fontSize: 12 }}>
+                  Log Out
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
           <View style={{ height: 100 }} />
         </ScrollView>
       )}

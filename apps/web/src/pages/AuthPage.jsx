@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@atc/shared/hooks/useAuth';
 import { supabase } from '@atc/shared/supabaseClient';
 import { initialProfiles } from '@atc/shared/mockData';
@@ -8,9 +8,19 @@ import { Lock, Mail, User, Sparkles, Shield, ArrowRight, Check } from 'lucide-re
 
 export function AuthPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { setUser, switchDemoUser, signInWithEmail, signUpWithEmail, signInWithGoogle } = useAuth();
 
-  const [mode, setMode] = useState('login'); // 'login' | 'register'
+  const queryMode = searchParams.get('mode');
+  const initialMode = queryMode === 'register' || location.state?.mode === 'register' ? 'register' : 'login';
+  const [mode, setMode] = useState(initialMode);
+
+  useEffect(() => {
+    if (queryMode === 'register' || location.state?.mode === 'register') {
+      setMode('register');
+    }
+  }, [queryMode, location.state]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');

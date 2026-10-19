@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink, Link, useLocation } from 'react-router-dom';
+import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@atc/shared/hooks/useAuth';
 import { useMembers } from '@atc/shared/hooks/useMembers';
 import { RoleBadge } from './RoleBadge';
@@ -23,9 +23,20 @@ import {
 } from 'lucide-react';
 
 export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile }) {
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin, signOut, logout } = useAuth();
   const { pendingMembers } = useMembers();
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    if (signOut) {
+      await signOut();
+    } else if (logout) {
+      logout();
+    }
+    onCloseMobile?.();
+    navigate('/');
+  };
 
   const pendingCount = pendingMembers?.length || 0;
 
@@ -236,26 +247,49 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
             {!collapsed && <span>Exit to Public Site</span>}
           </Link>
 
-          {/* User Mini Card */}
+          {/* User Mini Card with Log Out */}
           <div
-            className={`flex items-center gap-2.5 p-2 rounded-xl bg-white border border-neutral-200 ${
+            className={`flex items-center justify-between p-2 rounded-xl bg-white border border-neutral-200 ${
               collapsed ? 'justify-center p-1.5' : ''
             }`}
           >
-            <img
-              src={user?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80'}
-              alt={user?.full_name}
-              className="w-8 h-8 rounded-full object-cover border border-neutral-200 shrink-0"
-            />
+            <div className="flex items-center gap-2.5 min-w-0">
+              <img
+                src={user?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80'}
+                alt={user?.full_name}
+                className="w-8 h-8 rounded-full object-cover border border-neutral-200 shrink-0"
+              />
+              {!collapsed && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-neutral-900 truncate">{user?.full_name}</p>
+                  <p className="text-[10px] font-semibold text-primary-600 uppercase tracking-wider">
+                    {user?.role === 'super_admin' || user?.role === 'admin' ? 'Admin' : 'Member'}
+                  </p>
+                </div>
+              )}
+            </div>
             {!collapsed && (
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-neutral-900 truncate">{user?.full_name}</p>
-                <p className="text-[10px] font-semibold text-primary-600 uppercase tracking-wider">
-                  {user?.role === 'super_admin' || user?.role === 'admin' ? 'Admin' : 'Member'}
-                </p>
-              </div>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="p-1.5 rounded-lg text-neutral-400 hover:text-danger-600 hover:bg-danger-50 transition-colors"
+                title="Log Out / Sign Out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
             )}
           </div>
+
+          {collapsed && (
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="w-full flex items-center justify-center p-2 rounded-xl text-neutral-500 hover:text-danger-600 hover:bg-danger-50 transition-colors"
+              title="Log Out / Sign Out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </aside>
     </>

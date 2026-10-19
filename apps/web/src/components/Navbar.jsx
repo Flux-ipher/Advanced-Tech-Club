@@ -18,14 +18,22 @@ import {
   Clock,
   ArrowRight,
   Globe,
-  LayoutGrid
+  LayoutGrid,
+  LogOut,
+  LogIn,
+  UserPlus
 } from 'lucide-react';
 
 export function Navbar() {
-  const { user, isAdmin, isSuperAdmin, isVerified } = useAuth();
+  const { user, isAdmin, isSuperAdmin, isVerified, signOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
+  };
 
   // Determine if user is currently inside the Subdomain Club Portal vs the Public Website
   const isPortalSection =
@@ -164,35 +172,66 @@ export function Navbar() {
             {/* Notifications Dropdown */}
             <NotificationDropdown />
 
-            {/* User Profile Avatar Link */}
-            <Link
-              to="/portal/profile"
-              className="flex items-center gap-2.5 p-1 rounded-full hover:bg-neutral-100 transition-colors"
-              title={`${user?.full_name} (${user?.is_verified ? 'Verified' : 'Pending Review'})`}
-            >
-              <div className="relative">
-                <img
-                  src={user?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80'}
-                  alt={user?.full_name}
-                  className="w-8 h-8 rounded-full object-cover border border-neutral-300 ring-2 ring-primary-50"
-                />
-                {user?.is_verified ? (
-                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-success-500 ring-2 ring-white" />
-                ) : (
-                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-warning-500 ring-2 ring-white" />
-                )}
+            {/* User Profile / Auth Action */}
+            {user ? (
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/portal/profile"
+                  className="flex items-center gap-2 p-1 rounded-full hover:bg-neutral-100 transition-colors"
+                  title={`${user?.full_name} (${user?.is_verified ? 'Verified' : 'Pending Review'})`}
+                >
+                  <div className="relative">
+                    <img
+                      src={user?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80'}
+                      alt={user?.full_name}
+                      className="w-8 h-8 rounded-full object-cover border border-neutral-300 ring-2 ring-primary-50"
+                    />
+                    {user?.is_verified ? (
+                      <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-success-500 ring-2 ring-white" />
+                    ) : (
+                      <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-warning-500 ring-2 ring-white" />
+                    )}
+                  </div>
+                  <div className="hidden xl:block text-left">
+                    <span className="text-xs font-semibold text-neutral-900 block leading-tight">
+                      {user?.full_name?.split(' ')[0]}
+                    </span>
+                    <span className={`text-[10px] font-bold uppercase ${
+                      user?.is_verified ? 'text-primary-600' : 'text-warning-700'
+                    }`}>
+                      {user?.role === 'super_admin' || user?.role === 'admin' ? 'Admin' : 'Member'}
+                    </span>
+                  </div>
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 text-neutral-600 hover:text-danger-600 hover:border-danger-200 hover:bg-danger-50 text-xs font-semibold transition-colors"
+                  title="Sign Out / Log Out"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span className="hidden xl:inline">Log Out</span>
+                </button>
               </div>
-              <div className="hidden xl:block text-left">
-                <span className="text-xs font-semibold text-neutral-900 block leading-tight">
-                  {user?.full_name?.split(' ')[0]}
-                </span>
-                <span className={`text-[10px] font-bold uppercase ${
-                  user?.is_verified ? 'text-primary-600' : 'text-warning-700'
-                }`}>
-                  {user?.is_verified ? user?.role.replace('_', ' ') : 'Pending'}
-                </span>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/login"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 text-xs font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 transition-colors"
+                >
+                  <LogIn className="w-3.5 h-3.5 text-neutral-500" />
+                  <span>Log In</span>
+                </Link>
+                <Link
+                  to="/login?mode=register"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold shadow-xs transition-colors"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>Sign Up</span>
+                </Link>
               </div>
-            </Link>
+            )}
 
             {/* Mobile menu trigger */}
             <button
@@ -285,6 +324,53 @@ export function Navbar() {
                 </>
               )}
             </div>
+          </div>
+
+          {/* Auth Actions in Mobile Drawer */}
+          <div className="pt-3 border-t border-neutral-200">
+            {user ? (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <img
+                    src={user?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80'}
+                    alt={user?.full_name}
+                    className="w-7 h-7 rounded-full object-cover border border-neutral-300"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-neutral-900 block leading-tight">{user?.full_name}</span>
+                    <span className="text-[10px] text-neutral-500">{user?.email || 'Signed in'}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    handleSignOut();
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-danger-50 text-danger-700 border border-danger-200 text-xs font-bold hover:bg-danger-100 transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  Log Out
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Link
+                  to="/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex-1 py-2 text-center rounded-lg border border-neutral-300 text-xs font-semibold text-neutral-700 hover:bg-neutral-50"
+                >
+                  Log In
+                </Link>
+                <Link
+                  to="/login?mode=register"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex-1 py-2 text-center rounded-lg bg-primary-500 hover:bg-primary-600 text-xs font-bold text-white shadow-xs"
+                >
+                  Sign Up
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       )}

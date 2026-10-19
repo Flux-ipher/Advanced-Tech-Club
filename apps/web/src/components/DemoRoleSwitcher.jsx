@@ -22,11 +22,13 @@ export function DemoRoleSwitcher() {
           <Sparkles className="w-3.5 h-3.5" />
           Persona:
         </span>
-        <span className="font-semibold text-neutral-900">{user?.full_name?.split(' ')[0]}</span>
+        <span className="font-semibold text-neutral-900">
+          {user ? user.full_name?.split(' ')[0] : 'Guest'}
+        </span>
         <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold uppercase ${
-          user?.is_verified ? 'bg-primary-100 text-primary-700' : 'bg-warning-100 text-warning-800'
+          user?.is_verified ? 'bg-primary-100 text-primary-700' : user ? 'bg-warning-100 text-warning-800' : 'bg-neutral-200 text-neutral-600'
         }`}>
-          {user?.is_verified ? (user?.role === 'super_admin' || user?.role === 'admin' ? 'Admin' : 'Member') : 'Pending'}
+          {user ? (user.is_verified ? (user.role === 'super_admin' || user.role === 'admin' ? 'Admin' : 'Member') : 'Pending') : 'Logged Out'}
         </span>
         <ChevronDown className="w-3.5 h-3.5 text-neutral-500" />
       </button>
