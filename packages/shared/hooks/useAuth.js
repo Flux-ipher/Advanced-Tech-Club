@@ -21,15 +21,17 @@ export function useAuthListener() {
       if (user) {
         try {
           const token = await user.getIdToken();
-          const client = getSupabaseClient(token);
-          const { data: profile, error } = await client
-            .from('profiles')
-            .select('*')
-            .eq('id', user.uid)
-            .single();
-
-          if (error && error.code !== 'PGRST116') {
-            console.warn('[ATC Auth] Could not fetch Supabase profile:', error.message);
+          let profile = null;
+          try {
+            const client = getSupabaseClient(token);
+            const { data } = await client
+              .from('profiles')
+              .select('*')
+              .eq('id', user.uid)
+              .maybeSingle();
+            profile = data;
+          } catch (fetchErr) {
+            console.warn('[ATC Auth] Could not fetch Supabase profile:', fetchErr?.message);
           }
 
           useAuthStore.getState().setUser({
@@ -93,13 +95,18 @@ export function useAuth() {
         const { signInWithEmailAndPassword } = await import('firebase/auth');
         const cred = await signInWithEmailAndPassword(firebaseAuth, email, password);
         const idToken = await cred.user.getIdToken();
-        const client = getSupabaseClient(idToken);
-
-        const { data: profileRow } = await client
-          .from('profiles')
-          .select('*')
-          .eq('id', cred.user.uid)
-          .single();
+        let profileRow = null;
+        try {
+          const client = getSupabaseClient(idToken);
+          const { data } = await client
+            .from('profiles')
+            .select('*')
+            .eq('id', cred.user.uid)
+            .maybeSingle();
+          profileRow = data;
+        } catch (fetchErr) {
+          console.warn('[ATC Auth] Could not fetch profile on sign in:', fetchErr?.message);
+        }
 
         const activeProfile = profileRow || {
           id: cred.user.uid,
@@ -164,12 +171,36 @@ export function useAuth() {
           console.warn('[ATC Auth] on-signup Edge Function call warning:', edgeErr);
         }
 
-        const client = getSupabaseClient(idToken);
-        const { data: profileRow } = await client
-          .from('profiles')
-          .select('*')
-          .eq('id', cred.user.uid)
-          .single();
+        let profileRow = null;
+        try {
+          const client = getSupabaseClient(idToken);
+          const { data } = await client
+            .from('profiles')
+            .select('*')
+            .eq('id', cred.user.uid)
+            .maybeSingle();
+          profileRow = data;
+
+          if (!profileRow) {
+            const defaultRecord = {
+              id: cred.user.uid,
+              email: cred.user.email,
+              full_name: fullName || email.split('@')[0],
+              department: 'Computer Science & Engineering',
+              role: 'member',
+              is_verified: false,
+              verification_status: 'pending'
+            };
+            const { data: upserted } = await client
+              .from('profiles')
+              .upsert(defaultRecord, { onConflict: 'id' })
+              .select('*')
+              .maybeSingle();
+            profileRow = upserted;
+          }
+        } catch (dbErr) {
+          console.warn('[ATC Auth] Supabase profile sync warning:', dbErr?.message);
+        }
 
         const newProfile = profileRow || {
           id: cred.user.uid,
@@ -242,12 +273,38 @@ export function useAuth() {
           console.warn('[ATC Auth] Google on-signup Edge Function call warning:', edgeErr);
         }
 
-        const client = getSupabaseClient(idToken);
-        const { data: profileRow } = await client
-          .from('profiles')
-          .select('*')
-          .eq('id', cred.user.uid)
-          .single();
+        let profileRow = null;
+        try {
+          const client = getSupabaseClient(idToken);
+          const { data } = await client
+            .from('profiles')
+            .select('*')
+            .eq('id', cred.user.uid)
+            .maybeSingle();
+          profileRow = data;
+
+          if (!profileRow) {
+            // Attempt direct upsert to public.profiles
+            const defaultRecord = {
+              id: cred.user.uid,
+              email: cred.user.email,
+              full_name: cred.user.displayName || cred.user.email?.split('@')[0] || 'Club Member',
+              avatar_url: cred.user.photoURL || '',
+              department: 'Computer Science & Engineering',
+              role: 'member',
+              is_verified: false,
+              verification_status: 'pending'
+            };
+            const { data: upserted } = await client
+              .from('profiles')
+              .upsert(defaultRecord, { onConflict: 'id' })
+              .select('*')
+              .maybeSingle();
+            profileRow = upserted;
+          }
+        } catch (dbErr) {
+          console.warn('[ATC Auth] Supabase profile sync warning:', dbErr?.message);
+        }
 
         const activeProfile = profileRow || {
           id: cred.user.uid,
