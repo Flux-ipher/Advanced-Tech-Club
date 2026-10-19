@@ -354,26 +354,21 @@ export default function App() {
             </Text>
           </TouchableOpacity>
 
-          {/* Persona Switcher Pill (Rule 4 compliant: displays 'Admin' or 'Member') */}
-          <TouchableOpacity
-            onPress={() => {
-              const nextIndex = (initialProfiles.findIndex((p) => p.id === currentUser.id) + 1) % 3;
-              setCurrentUser(initialProfiles[nextIndex]);
-              triggerToast(`Switched persona to ${getDisplayRole(initialProfiles[nextIndex].role)}`);
-            }}
+          {/* Role Pill (Rule 4 compliant: displays 'Admin' or 'Member') */}
+          <View
             style={{
-              backgroundColor: colors.primary[50],
+              backgroundColor: currentUser.role === 'admin' || currentUser.role === 'super_admin' ? colors.secondary?.[50] || '#f5f3ff' : colors.primary[50],
               paddingHorizontal: 9,
               paddingVertical: 5,
               borderRadius: 8,
               borderWidth: 1,
-              borderColor: colors.primary[200]
+              borderColor: currentUser.role === 'admin' || currentUser.role === 'super_admin' ? '#ddd6fe' : colors.primary[200]
             }}
           >
-            <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[700] }}>
-              {getDisplayRole(currentUser.role)} ⟳
+            <Text style={{ fontSize: 11, fontWeight: 'bold', color: currentUser.role === 'admin' || currentUser.role === 'super_admin' ? '#6d28d9' : colors.primary[700] }}>
+              {getDisplayRole(currentUser.role)}
             </Text>
-          </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -1326,28 +1321,22 @@ export default function App() {
                 </Text>
               </TouchableOpacity>
 
-              {/* Persona Switch / Log In as Other Member */}
-              <TouchableOpacity
-                onPress={() => {
-                  // Switch to next demo profile or prompt
-                  const nextUser = initialProfiles.find((p) => p.id !== currentUser.id) || initialProfiles[0];
-                  setCurrentUser(nextUser);
-                  triggerToast(`Switched account to ${nextUser.full_name}`);
-                }}
+              {/* Account Status */}
+              <View
                 style={{
-                  backgroundColor: colors.primary[50],
+                  backgroundColor: '#f8fafc',
                   paddingVertical: 10,
                   paddingHorizontal: 12,
                   borderRadius: 10,
                   borderWidth: 1,
-                  borderColor: colors.primary[200],
+                  borderColor: colors.neutral[200],
                   alignItems: 'center'
                 }}
               >
-                <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.primary[700] }}>
-                  Switch Account / Log In Persona
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.neutral[700] }}>
+                  Member Account Active · Verified Session
                 </Text>
-              </TouchableOpacity>
+              </View>
 
               {/* Log Out Button */}
               <TouchableOpacity

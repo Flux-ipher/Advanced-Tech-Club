@@ -132,7 +132,7 @@ export function useAuth() {
   }, []);
 
   // Firebase Sign Up with on-signup Edge Function trigger
-  const signUpWithEmail = useCallback(async (email, password, fullName, department) => {
+  const signUpWithEmail = useCallback(async (email, password, fullName) => {
     useAuthStore.getState().setLoading(true);
     useAuthStore.getState().setError(null);
 
@@ -147,7 +147,8 @@ export function useAuth() {
 
         // Trigger Supabase on-signup Edge Function to insert profile using service role
         try {
-          const supabaseUrl = process.env?.VITE_SUPABASE_URL || '';
+          const meta = (new Function('return typeof import.meta !== "undefined" ? import.meta : {}'))();
+          const supabaseUrl = (typeof process !== 'undefined' && process?.env?.VITE_SUPABASE_URL) || meta?.env?.VITE_SUPABASE_URL || '';
           if (supabaseUrl) {
             await fetch(`${supabaseUrl}/functions/v1/on-signup`, {
               method: 'POST',
@@ -155,7 +156,7 @@ export function useAuth() {
               body: JSON.stringify({
                 idToken,
                 fullName: fullName || email.split('@')[0],
-                department: department || 'Computer Science'
+                department: 'Computer Science & Engineering'
               })
             });
           }
@@ -174,9 +175,10 @@ export function useAuth() {
           id: cred.user.uid,
           email: cred.user.email,
           full_name: fullName || email.split('@')[0],
-          department: department || 'Computer Science',
+          department: 'Computer Science & Engineering',
           role: 'member',
-          is_verified: true
+          is_verified: false,
+          verification_status: 'pending'
         };
 
         useAuthStore.getState().setUser({
@@ -185,17 +187,20 @@ export function useAuth() {
           profile: newProfile
         });
 
-        return { user: cred.user, profile: newProfile };
+        return { user: cred.user, profile: newProfile, isNewUser: true };
       } else {
-        // Mock fallback
-        const { data, error: sbErr } = await supabase.auth.signUp({
+        // Fallback
+        const newUser = {
+          id: 'user-' + Date.now(),
           email,
-          password,
-          options: { data: { full_name: fullName, department } }
-        });
-        if (sbErr) throw sbErr;
-        useAuthStore.getState().setUser(data.user);
-        return { user: data.user, profile: data.user };
+          full_name: fullName || email.split('@')[0],
+          department: 'Computer Science & Engineering',
+          role: 'member',
+          is_verified: false,
+          verification_status: 'pending'
+        };
+        useAuthStore.getState().setUser(newUser);
+        return { user: newUser, profile: newUser, isNewUser: true };
       }
     } catch (err) {
       useAuthStore.getState().setError(err.message);
@@ -229,7 +234,7 @@ export function useAuth() {
               body: JSON.stringify({
                 idToken,
                 fullName: cred.user.displayName || cred.user.email?.split('@')[0] || 'Club Member',
-                department: 'Computer Science'
+                department: 'Computer Science & Engineering'
               })
             });
           }
@@ -250,7 +255,8 @@ export function useAuth() {
           full_name: cred.user.displayName || cred.user.email?.split('@')[0] || 'Club Member',
           avatar_url: cred.user.photoURL || '',
           role: 'member',
-          is_verified: true
+          is_verified: false,
+          verification_status: 'pending'
         };
 
         useAuthStore.getState().setUser({
@@ -259,19 +265,20 @@ export function useAuth() {
           profile: activeProfile
         });
 
-        return { user: cred.user, profile: activeProfile };
+        const isNewUser = !profileRow || !profileRow.student_id;
+        return { user: cred.user, profile: activeProfile, isNewUser };
       } else {
         // Fallback for offline / dev demo
         const mockGoogleUser = {
           id: 'google-user-' + Date.now(),
-          email: 'student.google@campus.edu',
+          email: 'student.google@gmail.com',
           full_name: 'Google Student',
           role: 'member',
-          is_verified: true,
-          verification_status: 'verified'
+          is_verified: false,
+          verification_status: 'pending'
         };
         useAuthStore.getState().setUser(mockGoogleUser);
-        return { user: mockGoogleUser, profile: mockGoogleUser };
+        return { user: mockGoogleUser, profile: mockGoogleUser, isNewUser: true };
       }
     } catch (err) {
       useAuthStore.getState().setError(err.message);

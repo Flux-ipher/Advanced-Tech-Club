@@ -1,16 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '@atc/shared/hooks/useAuth';
-import { supabase } from '@atc/shared/supabaseClient';
-import { initialProfiles } from '@atc/shared/mockData';
-import { RoleBadge } from '../components/RoleBadge';
-import { Lock, Mail, User, Sparkles, Shield, ArrowRight, Check } from 'lucide-react';
+import { Lock, Mail, User, Sparkles, Shield, ArrowRight } from 'lucide-react';
 
 export function AuthPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { setUser, switchDemoUser, signInWithEmail, signUpWithEmail, signInWithGoogle } = useAuth();
+  const { signInWithEmail, signUpWithEmail, signInWithGoogle } = useAuth();
 
   const queryMode = searchParams.get('mode');
   const initialMode = queryMode === 'register' || location.state?.mode === 'register' ? 'register' : 'login';
@@ -21,10 +18,10 @@ export function AuthPage() {
       setMode('register');
     }
   }, [queryMode, location.state]);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [department, setDepartment] = useState('Computer Science & Engineering');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -37,10 +34,12 @@ export function AuthPage() {
     try {
       if (mode === 'login') {
         await signInWithEmail(email, password);
+        navigate('/portal');
       } else {
-        await signUpWithEmail(email, password, fullName, department);
+        await signUpWithEmail(email, password, fullName);
+        // Take new signups directly to the Apply page to fill up their data
+        navigate('/apply');
       }
-      navigate('/portal');
     } catch (err) {
       setErrorMsg(err.message || 'Authentication failed');
     } finally {
@@ -52,21 +51,20 @@ export function AuthPage() {
     setErrorMsg('');
     setGoogleLoading(true);
     try {
-      await signInWithGoogle();
-      navigate('/portal');
+      const res = await signInWithGoogle();
+      // If user has not completed their application details, route to apply page
+      if (res?.isNewUser || !res?.profile?.student_id) {
+        navigate('/apply');
+      } else {
+        navigate('/portal');
+      }
     } catch (err) {
-      // Ignore user closing popup intentionally
       if (err.code !== 'auth/popup-closed-by-user') {
         setErrorMsg(err.message || 'Google sign-in failed');
       }
     } finally {
       setGoogleLoading(false);
     }
-  };
-
-  const handleQuickDemoLogin = (userProfile) => {
-    switchDemoUser(userProfile.id);
-    navigate('/');
   };
 
   return (
@@ -178,48 +176,34 @@ export function AuthPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'register' && (
-              <>
-                <div>
-                  <label className="block text-xs font-bold uppercase text-neutral-700 mb-1">
-                    Full Name
-                  </label>
-                  <div className="relative">
-                    <User className="w-4 h-4 text-neutral-400 absolute left-3 top-3" />
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Alex Johnson"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase text-neutral-700 mb-1">
-                    Department
-                  </label>
+              <div>
+                <label className="block text-xs font-bold uppercase text-neutral-700 mb-1">
+                  Full Name
+                </label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-neutral-400 absolute left-3 top-3" />
                   <input
                     type="text"
-                    value={department}
-                    onChange={(e) => setDepartment(e.target.value)}
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500"
+                    required
+                    placeholder="e.g. Alex Johnson"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500"
                   />
                 </div>
-              </>
+              </div>
             )}
 
             <div>
               <label className="block text-xs font-bold uppercase text-neutral-700 mb-1">
-                Student Email
+                Email Address
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-neutral-400 absolute left-3 top-3" />
                 <input
                   type="email"
                   required
-                  placeholder="student@techclub.edu"
+                  placeholder="name@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500"
@@ -249,41 +233,21 @@ export function AuthPage() {
               disabled={loading}
               className="w-full btn-primary text-sm py-2.5 mt-2"
             >
-              {loading ? 'Processing...' : mode === 'login' ? 'Sign In' : 'Complete Registration'}
+              {loading
+                ? 'Processing...'
+                : mode === 'login'
+                ? 'Sign In'
+                : 'Sign Up & Continue to Application'}
             </button>
           </form>
 
-          {/* Quick 1-Click Demo Accounts */}
-          <div className="mt-6 pt-5 border-t border-neutral-200">
-            <p className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-primary-500" />
-              1-Click Demo Personas
-            </p>
-
-            <div className="space-y-1.5">
-              {initialProfiles.slice(0, 3).map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => handleQuickDemoLogin(p)}
-                  className="w-full flex items-center justify-between p-2 rounded-lg bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 text-left text-xs transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <img
-                      src={p.avatar_url}
-                      alt={p.full_name}
-                      className="w-6 h-6 rounded-full object-cover"
-                    />
-                    <div>
-                      <span className="font-semibold text-neutral-900 block leading-tight">{p.full_name}</span>
-                      <span className="text-[10px] text-neutral-400 capitalize">
-                        {p.role === 'admin' || p.role === 'super_admin' ? 'Admin' : 'Member'}
-                      </span>
-                    </div>
-                  </div>
-                  <ArrowRight className="w-3.5 h-3.5 text-neutral-400" />
-                </button>
-              ))}
-            </div>
+          <div className="mt-4 text-center">
+            <Link
+              to="/apply"
+              className="text-xs text-primary-600 hover:text-primary-700 font-semibold"
+            >
+              Applying directly? Open student application form →
+            </Link>
           </div>
         </div>
       </div>

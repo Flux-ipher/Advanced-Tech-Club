@@ -9,9 +9,9 @@ import { mockDb } from '../supabaseClient.js';
 export const useAuthStore = create((set, get) => ({
   firebaseUser: null,
   token: null,
-  profile: initialProfiles[0], // Active profile
-  user: initialProfiles[0],    // Backwards-compatible alias for profile
-  session: { user: initialProfiles[0] },
+  profile: null, // Starts unauthenticated (no mock users)
+  user: null,    // Starts unauthenticated
+  session: null,
   loading: false,
   error: null,
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { PublicNavbar } from './components/PublicNavbar';
+import { Navbar } from './components/Navbar';
 import { PortalLayout } from './components/PortalLayout';
 import { Footer } from './components/Footer';
 
@@ -25,7 +25,7 @@ import { useAuthListener } from '@atc/shared/hooks/useAuth';
 function PublicLayout({ children }) {
   return (
     <div className="flex flex-col min-h-screen bg-neutral-50 text-neutral-900 font-voodoo">
-      <PublicNavbar />
+      <Navbar />
       <main className="flex-1">
         {children}
       </main>

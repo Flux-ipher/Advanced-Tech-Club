@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@atc/shared/hooks/useAuth';
-import { initialEvents, initialProfiles } from '@atc/shared/mockData';
+import { initialEvents } from '@atc/shared/mockData';
 import { formatDateTime } from '@atc/shared/utils/formatters';
 import {
   Sparkles,

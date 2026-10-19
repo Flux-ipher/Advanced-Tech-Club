@@ -2,17 +2,14 @@ import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@atc/shared/hooks/useAuth';
 import { NotificationDropdown } from './NotificationDropdown';
-import { DemoRoleSwitcher } from './DemoRoleSwitcher';
 import {
   Menu,
   PanelLeft,
   Globe,
-  ExternalLink,
   ChevronRight,
   Smartphone,
-  Download,
-  Radio,
-  LogOut
+  LogOut,
+  User
 } from 'lucide-react';
 
 export function PortalHeader({ collapsed, onToggleCollapse, onOpenMobile }) {
@@ -108,8 +105,32 @@ export function PortalHeader({ collapsed, onToggleCollapse, onOpenMobile }) {
           </span>
         </a>
 
-        {/* Persona Switcher */}
-        <DemoRoleSwitcher />
+        {/* Authenticated User Info */}
+        {user ? (
+          <Link
+            to="/portal/profile"
+            className="hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-neutral-200 bg-neutral-50 hover:bg-neutral-100 transition-colors"
+            title="View Profile"
+          >
+            {user.avatar ? (
+              <img src={user.avatar} alt={user.name || 'User'} className="w-5 h-5 rounded-full object-cover" />
+            ) : (
+              <div className="w-5 h-5 rounded-full bg-primary-100 text-primary-700 font-bold text-[10px] flex items-center justify-center">
+                {(user.name || user.email || 'U')[0].toUpperCase()}
+              </div>
+            )}
+            <span className="text-xs font-semibold text-neutral-800 max-w-[120px] truncate">
+              {user.name || user.email?.split('@')[0]}
+            </span>
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded capitalize ${
+              user.role === 'admin'
+                ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                : 'bg-primary-50 text-primary-700 border border-primary-200'
+            }`}>
+              {user.role === 'admin' ? 'Admin' : (user.role || 'Member')}
+            </span>
+          </Link>
+        ) : null}
 
         {/* Notification Bell */}
         <NotificationDropdown />
