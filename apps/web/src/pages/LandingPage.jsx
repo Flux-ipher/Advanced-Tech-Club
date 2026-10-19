@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@atc/shared/hooks/useAuth';
 import { initialEvents } from '@atc/shared/mockData';
 import { formatDateTime } from '@atc/shared/utils/formatters';
+import { getPortalSiteUrl } from '@atc/shared/utils/domains';
 import {
   Sparkles,
   ArrowRight,
@@ -31,6 +32,8 @@ import {
 export function LandingPage() {
   const { user, isVerified, isSuperAdmin } = useAuth();
   const publicEvents = initialEvents.slice(0, 3);
+  const portalUrl = getPortalSiteUrl('/');
+  const isExternalPortal = portalUrl.startsWith('http');
 
   return (
     <div className="space-y-24 pb-24">
@@ -74,13 +77,23 @@ export function LandingPage() {
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>
 
-            <Link
-              to={user ? '/portal' : '/login?mode=register'}
-              className="w-full sm:w-auto btn-outline px-7 py-3.5 text-sm font-bold flex items-center justify-center gap-2 shadow-sm hover:border-neutral-300"
-            >
-              {user ? 'Open Club Portal' : 'Sign Up for Portal'}
-              <ArrowUpRight className="w-4 h-4 text-neutral-400" />
-            </Link>
+            {user && isExternalPortal ? (
+              <a
+                href={portalUrl}
+                className="w-full sm:w-auto btn-outline px-7 py-3.5 text-sm font-bold flex items-center justify-center gap-2 shadow-sm hover:border-neutral-300"
+              >
+                Open Club Portal
+                <ArrowUpRight className="w-4 h-4 text-neutral-400" />
+              </a>
+            ) : (
+              <Link
+                to={user ? '/portal' : '/login?mode=register'}
+                className="w-full sm:w-auto btn-outline px-7 py-3.5 text-sm font-bold flex items-center justify-center gap-2 shadow-sm hover:border-neutral-300"
+              >
+                {user ? 'Open Club Portal' : 'Sign Up for Portal'}
+                <ArrowUpRight className="w-4 h-4 text-neutral-400" />
+              </Link>
+            )}
           </div>
 
           {/* Security & Access Guard Note */}
@@ -431,12 +444,21 @@ export function LandingPage() {
               >
                 Start Application
               </Link>
-              <Link
-                to={user ? '/portal' : '/login?mode=register'}
-                className="px-8 py-3.5 rounded-xl bg-primary-800/80 text-white font-bold text-sm hover:bg-primary-900 transition-all border border-primary-400/60 active:scale-95"
-              >
-                {user ? 'Open Member Portal' : 'Member Portal Sign Up'}
-              </Link>
+              {user && isExternalPortal ? (
+                <a
+                  href={portalUrl}
+                  className="px-8 py-3.5 rounded-xl bg-primary-800/80 text-white font-bold text-sm hover:bg-primary-900 transition-all border border-primary-400/60 active:scale-95"
+                >
+                  Open Member Portal
+                </a>
+              ) : (
+                <Link
+                  to={user ? '/portal' : '/login?mode=register'}
+                  className="px-8 py-3.5 rounded-xl bg-primary-800/80 text-white font-bold text-sm hover:bg-primary-900 transition-all border border-primary-400/60 active:scale-95"
+                >
+                  {user ? 'Open Member Portal' : 'Member Portal Sign Up'}
+                </Link>
+              )}
             </div>
           </div>
         </div>

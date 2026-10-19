@@ -3,6 +3,7 @@ import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@atc/shared/hooks/useAuth';
 import { NotificationDropdown } from './NotificationDropdown';
 import { RoleBadge } from './RoleBadge';
+import { isPortalSubdomain, getPortalSiteUrl, getPublicSiteUrl } from '@atc/shared/utils/domains';
 import {
   Sparkles,
   Calendar,
@@ -155,19 +156,28 @@ export function Navbar() {
             {user ? (
               <div className="flex items-center gap-2">
                 {!isPortalSection ? (
-                  <Link
-                    to="/portal"
-                    className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary-500 text-white text-xs font-bold hover:bg-primary-600 transition-colors shadow-sm"
-                  >
-                    Club Portal <ArrowRight className="w-3.5 h-3.5" />
-                  </Link>
+                  isPortalSubdomain() ? (
+                    <Link
+                      to="/"
+                      className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary-500 text-white text-xs font-bold hover:bg-primary-600 transition-colors shadow-sm"
+                    >
+                      Club Portal <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  ) : (
+                    <a
+                      href={getPortalSiteUrl('/')}
+                      className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary-500 text-white text-xs font-bold hover:bg-primary-600 transition-colors shadow-sm"
+                    >
+                      Club Portal <ArrowRight className="w-3.5 h-3.5" />
+                    </a>
+                  )
                 ) : (
-                  <Link
-                    to="/"
+                  <a
+                    href={getPublicSiteUrl('/')}
                     className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-100 border border-neutral-200 text-neutral-700 text-xs font-semibold hover:bg-neutral-200 transition-colors"
                   >
                     ← Public Site
-                  </Link>
+                  </a>
                 )}
 
                 <Link
@@ -307,13 +317,13 @@ export function Navbar() {
                   )}
 
                   <div className="pt-2">
-                    <Link
-                      to="/"
+                    <a
+                      href={getPublicSiteUrl('/')}
                       onClick={() => setMobileMenuOpen(false)}
                       className="w-full btn-secondary text-xs py-2 flex items-center justify-center gap-1.5"
                     >
                       ← Back to Public Website
-                    </Link>
+                    </a>
                   </div>
                 </>
               )}

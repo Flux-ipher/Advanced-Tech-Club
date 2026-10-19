@@ -20,6 +20,7 @@ import { AdminPage } from './pages/AdminPage';
 import { MembersAdminPage } from './pages/MembersAdminPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { useAuthListener } from '@atc/shared/hooks/useAuth';
+import { isPortalSubdomain } from '@atc/shared/utils/domains';
 
 // Clean Public Layout for Main Domain Pages
 function PublicLayout({ children }) {
@@ -36,6 +37,116 @@ function PublicLayout({ children }) {
 
 export function App() {
   useAuthListener();
+  const isPortal = isPortalSubdomain();
+
+  // If accessed on the portal subdomain (e.g. portal.advclub.online)
+  // The member portal is mounted directly at root '/'
+  if (isPortal) {
+    return (
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <PortalLayout>
+              <HomePage />
+            </PortalLayout>
+          }
+        />
+        <Route
+          path="/events"
+          element={
+            <PortalLayout>
+              <EventsPage />
+            </PortalLayout>
+          }
+        />
+        <Route
+          path="/events/:id"
+          element={
+            <PortalLayout>
+              <EventDetailPage />
+            </PortalLayout>
+          }
+        />
+        <Route
+          path="/resources"
+          element={
+            <PortalLayout>
+              <ResourcesPage />
+            </PortalLayout>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <PortalLayout>
+              <ProfilePage />
+            </PortalLayout>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <PortalLayout>
+              <AdminPage />
+            </PortalLayout>
+          }
+        />
+        <Route
+          path="/admin/members"
+          element={
+            <PortalLayout>
+              <MembersAdminPage />
+            </PortalLayout>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <PortalLayout>
+              <AnalyticsPage />
+            </PortalLayout>
+          }
+        />
+
+        {/* Public auth pages accessible on portal domain */}
+        <Route
+          path="/login"
+          element={
+            <PublicLayout>
+              <AuthPage />
+            </PublicLayout>
+          }
+        />
+        <Route
+          path="/apply"
+          element={
+            <PublicLayout>
+              <ApplyPage />
+            </PublicLayout>
+          }
+        />
+        <Route
+          path="/verification-status"
+          element={
+            <PublicLayout>
+              <VerificationStatusPage />
+            </PublicLayout>
+          }
+        />
+
+        {/* Backward-compatibility for /portal/* paths on portal domain */}
+        <Route path="/portal" element={<Navigate to="/" replace />} />
+        <Route path="/portal/events" element={<Navigate to="/events" replace />} />
+        <Route path="/portal/events/:id" element={<Navigate to="/events/:id" replace />} />
+        <Route path="/portal/resources" element={<Navigate to="/resources" replace />} />
+        <Route path="/portal/profile" element={<Navigate to="/profile" replace />} />
+
+        {/* Fallback to Portal Home */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    );
+  }
 
   return (
     <Routes>

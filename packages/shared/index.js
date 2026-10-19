@@ -28,4 +28,5 @@ export * from './store/notificationStore.js';
 export * from './utils/formatters.js';
 export * from './utils/validators.js';
 export * from './utils/analytics.js';
+export * from './utils/domains.js';
 export * from './firebaseClient.js';

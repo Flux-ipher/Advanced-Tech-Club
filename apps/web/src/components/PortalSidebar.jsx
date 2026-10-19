@@ -3,6 +3,7 @@ import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@atc/shared/hooks/useAuth';
 import { useMembers } from '@atc/shared/hooks/useMembers';
 import { RoleBadge } from './RoleBadge';
+import { isPortalSubdomain, getPublicSiteUrl } from '@atc/shared/utils/domains';
 import {
   Bell,
   Calendar,
@@ -39,6 +40,8 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
   };
 
   const pendingCount = pendingMembers?.length || 0;
+  const isPortal = isPortalSubdomain();
+  const portalPrefix = isPortal ? '' : '/portal';
 
   const navItemClass = ({ isActive }) =>
     `flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-primary-400 ${
@@ -68,7 +71,7 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
         {/* Brand Header */}
         <div className="h-16 px-4 border-b border-neutral-200 flex items-center justify-between shrink-0">
           <Link
-            to="/portal"
+            to={portalPrefix || '/'}
             className={`flex items-center gap-3 overflow-hidden ${
               collapsed ? 'justify-center w-full' : ''
             }`}
@@ -124,7 +127,7 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
             )}
             <div className="space-y-1">
               <NavLink
-                to="/portal"
+                to={portalPrefix || '/'}
                 end
                 onClick={onCloseMobile}
                 className={navItemClass}
@@ -135,7 +138,7 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
               </NavLink>
 
               <NavLink
-                to="/portal/events"
+                to={`${portalPrefix}/events`}
                 onClick={onCloseMobile}
                 className={navItemClass}
                 title="Workshops & Events"
@@ -155,7 +158,7 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
             )}
             <div className="space-y-1">
               <NavLink
-                to="/portal/resources"
+                to={`${portalPrefix}/resources`}
                 onClick={onCloseMobile}
                 className={navItemClass}
                 title="Vault Resources"
@@ -165,7 +168,7 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
               </NavLink>
 
               <NavLink
-                to="/portal/profile"
+                to={`${portalPrefix}/profile`}
                 onClick={onCloseMobile}
                 className={navItemClass}
                 title="My Profile"
@@ -235,17 +238,30 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
         {/* Sidebar Footer */}
         <div className="p-3 border-t border-neutral-200 bg-neutral-50/50 space-y-2 shrink-0">
           {/* Back to Public Site Link */}
-          <Link
-            to="/"
-            onClick={onCloseMobile}
-            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-colors ${
-              collapsed ? 'justify-center px-1' : ''
-            }`}
-            title="Return to Public Website"
-          >
-            <Globe className="w-4 h-4 text-neutral-500 shrink-0" />
-            {!collapsed && <span>Exit to Public Site</span>}
-          </Link>
+          {isPortal ? (
+            <a
+              href={getPublicSiteUrl('/')}
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-colors ${
+                collapsed ? 'justify-center px-1' : ''
+              }`}
+              title="Return to Public Website (advclub.online)"
+            >
+              <Globe className="w-4 h-4 text-neutral-500 shrink-0" />
+              {!collapsed && <span>Exit to Public Site</span>}
+            </a>
+          ) : (
+            <Link
+              to="/"
+              onClick={onCloseMobile}
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-colors ${
+                collapsed ? 'justify-center px-1' : ''
+              }`}
+              title="Return to Public Website"
+            >
+              <Globe className="w-4 h-4 text-neutral-500 shrink-0" />
+              {!collapsed && <span>Exit to Public Site</span>}
+            </Link>
+          )}
 
           {/* User Mini Card with Log Out */}
           <div
