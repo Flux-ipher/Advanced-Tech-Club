@@ -1,5 +1,7 @@
 import { supabase, mockDb } from '../supabaseClient.js';
 import { initialEvents } from '../mockData.js';
+import { idempotency } from '../utils/idempotency.js';
+import { checkTokenBucket } from '../utils/rateLimiter.js';
 
 export async function getEvents() {
   try {
@@ -101,56 +103,101 @@ export async function deleteEvent(id) {
 }
 
 export async function registerForEvent(eventId, userId) {
-  if (supabase.isMock) {
-    const exists = (mockDb.storage.event_registrations || []).some(
-      (r) => r.event_id === eventId && r.user_id === userId
-    );
-    if (!exists) {
-      mockDb.storage.event_registrations.push({
-        event_id: eventId,
-        user_id: userId,
-        registered_at: new Date().toISOString(),
-        status: 'confirmed'
-      });
-      // increment event count
-      const evt = (mockDb.storage.events || []).find((e) => e.id === eventId);
-      if (evt) evt.registrations_count = (evt.registrations_count || 0) + 1;
+  if (!eventId || !userId) return { success: false, reason: 'missing_params' };
+
+  // 1. Token Bucket Rate Limiting (Prevents rapid RSVP spam)
+  const bucketCheck = checkTokenBucket('RSVP', userId);
+  if (!bucketCheck.allowed) {
+    return {
+      success: false,
+      reason: 'rate_limited',
+      retryAfterSec: bucketCheck.retryAfterSec,
+      message: bucketCheck.message
+    };
+  }
+
+  // 2. Idempotency Key Execution
+  const key = idempotency.generateKey('rsvp', userId, eventId);
+  return idempotency.execute(key, async () => {
+    if (supabase.isMock) {
+      const exists = (mockDb.storage.event_registrations || []).some(
+        (r) => r.event_id === eventId && r.user_id === userId
+      );
+      if (!exists) {
+        mockDb.storage.event_registrations.push({
+          event_id: eventId,
+          user_id: userId,
+          registered_at: new Date().toISOString(),
+          status: 'confirmed'
+        });
+        const evt = (mockDb.storage.events || []).find((e) => e.id === eventId);
+        if (evt) evt.registrations_count = (evt.registrations_count || 0) + 1;
+      }
+      return { success: true, idempotent: exists };
     }
-    return { success: true };
-  }
 
-  const { data, error } = await supabase
-    .from('event_registrations')
-    .insert([{ event_id: eventId, user_id: userId, registered_at: new Date().toISOString() }]);
+    try {
+      const { data, error } = await supabase
+        .from('event_registrations')
+        .upsert(
+          [{ event_id: eventId, user_id: userId, status: 'confirmed', registered_at: new Date().toISOString() }],
+          { onConflict: 'event_id,user_id' }
+        )
+        .select()
+        .maybeSingle();
 
-  if (error) {
-    console.error('Error registering for event:', error);
-    throw error;
-  }
-  return { success: true, data };
+      if (error) {
+        console.error('Error registering for event:', error);
+        throw error;
+      }
+      return { success: true, data };
+    } catch (err) {
+      // If duplicate constraint, return idempotent success
+      if (err?.code === '23505' || String(err?.message).includes('unique')) {
+        return { success: true, idempotent: true, alreadyRegistered: true };
+      }
+      throw err;
+    }
+  });
 }
 
 export async function unregisterForEvent(eventId, userId) {
-  if (supabase.isMock) {
-    mockDb.storage.event_registrations = (mockDb.storage.event_registrations || []).filter(
-      (r) => !(r.event_id === eventId && r.user_id === userId)
-    );
-    const evt = (mockDb.storage.events || []).find((e) => e.id === eventId);
-    if (evt && evt.registrations_count > 0) evt.registrations_count -= 1;
+  if (!eventId || !userId) return { success: false };
+
+  // Token Bucket Rate Limiting
+  const bucketCheck = checkTokenBucket('RSVP', userId);
+  if (!bucketCheck.allowed) {
+    return {
+      success: false,
+      reason: 'rate_limited',
+      retryAfterSec: bucketCheck.retryAfterSec,
+      message: bucketCheck.message
+    };
+  }
+
+  const key = idempotency.generateKey('unrsvp', userId, eventId);
+  return idempotency.execute(key, async () => {
+    if (supabase.isMock) {
+      mockDb.storage.event_registrations = (mockDb.storage.event_registrations || []).filter(
+        (r) => !(r.event_id === eventId && r.user_id === userId)
+      );
+      const evt = (mockDb.storage.events || []).find((e) => e.id === eventId);
+      if (evt && evt.registrations_count > 0) evt.registrations_count -= 1;
+      return { success: true };
+    }
+
+    const { error } = await supabase
+      .from('event_registrations')
+      .delete()
+      .eq('event_id', eventId)
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error unregistering from event:', error);
+      throw error;
+    }
     return { success: true };
-  }
-
-  const { error } = await supabase
-    .from('event_registrations')
-    .delete()
-    .eq('event_id', eventId)
-    .eq('user_id', userId);
-
-  if (error) {
-    console.error('Error unregistering from event:', error);
-    throw error;
-  }
-  return { success: true };
+  });
 }
 
 export async function getEventRegistrations(eventId) {

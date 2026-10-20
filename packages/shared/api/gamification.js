@@ -184,53 +184,104 @@ export async function getPointsLog(userId) {
 }
 
 /**
- * Award points for an action and verify badge unlocks
+ * Award points for an action and verify badge unlocks with Token Bucket & Idempotency
  */
 export async function awardPoints(userId, action, referenceId = null, customPoints = null) {
   if (!userId) return { success: false, reason: 'no_user' };
   const points = customPoints || POINT_VALUES[action] || 10;
 
-  try {
-    // 1. Get current points
-    const current = await getMemberPoints(userId);
-    const newTotal = (current.total_points || 0) + points;
-
-    // 2. Insert into points_log
-    await supabase.from('points_log').insert({
-      user_id: userId,
-      points,
-      reason: action,
-      reference_id: referenceId,
-      awarded_at: new Date().toISOString()
-    });
-
-    // 3. Upsert member_points
-    await supabase.from('member_points').upsert({
-      user_id: userId,
-      total_points: newTotal,
-      checkin_streak: current.checkin_streak || 0,
-      last_checkin_date: current.last_checkin_date || null,
-      updated_at: new Date().toISOString()
-    });
-
-    // 4. Check for badge unlock thresholds
-    const unlockedBadges = await checkAndAwardBadges(userId, newTotal, current.checkin_streak || 0);
-
+  // 1. Token Bucket Rate Limiting (Prevents rapid automated XP farming)
+  const bucketCheck = checkTokenBucket('POINTS_REWARD', userId);
+  if (!bucketCheck.allowed) {
     return {
-      success: true,
-      pointsAwarded: points,
-      newTotal,
-      unlockedBadges
-    };
-  } catch (err) {
-    console.warn('[ATC Gamification] awardPoints note:', err);
-    return {
-      success: true,
-      pointsAwarded: points,
-      newTotal: points,
-      unlockedBadges: []
+      success: false,
+      reason: 'rate_limited',
+      retryAfterSec: bucketCheck.retryAfterSec,
+      pointsAwarded: 0,
+      message: bucketCheck.message
     };
   }
+
+  // 2. Helper to execute the actual point grant
+  const executeGrant = async () => {
+    try {
+      // Get current points
+      const current = await getMemberPoints(userId);
+      const newTotal = (current.total_points || 0) + points;
+
+      // Insert into points_log
+      await supabase.from('points_log').insert({
+        user_id: userId,
+        points,
+        reason: action,
+        reference_id: referenceId ? String(referenceId) : null,
+        awarded_at: new Date().toISOString()
+      });
+
+      // Upsert member_points
+      await supabase.from('member_points').upsert({
+        user_id: userId,
+        total_points: newTotal,
+        checkin_streak: current.checkin_streak || 0,
+        last_checkin_date: current.last_checkin_date || null,
+        updated_at: new Date().toISOString()
+      });
+
+      // Check for badge unlock thresholds
+      const unlockedBadges = await checkAndAwardBadges(userId, newTotal, current.checkin_streak || 0);
+
+      return {
+        success: true,
+        idempotent: false,
+        pointsAwarded: points,
+        newTotal,
+        unlockedBadges
+      };
+    } catch (err) {
+      console.warn('[ATC Gamification] awardPoints note:', err);
+      return {
+        success: true,
+        idempotent: false,
+        pointsAwarded: points,
+        newTotal: points,
+        unlockedBadges: []
+      };
+    }
+  };
+
+  // 3. For single-occurrence actions with referenceId (e.g. resource download), apply idempotency
+  if (referenceId) {
+    const key = idempotency.generateKey(`award_${action}`, userId, referenceId);
+    return idempotency.execute(key, async () => {
+      // Check if previously logged in points_log
+      try {
+        const { data: existing } = await supabase
+          .from('points_log')
+          .select('id, points')
+          .eq('user_id', userId)
+          .eq('reason', action)
+          .eq('reference_id', String(referenceId))
+          .maybeSingle();
+
+        if (existing) {
+          const current = await getMemberPoints(userId);
+          return {
+            success: true,
+            idempotent: true,
+            alreadyAwarded: true,
+            pointsAwarded: 0,
+            newTotal: current.total_points || 0,
+            unlockedBadges: [],
+            message: 'Points already credited for this activity.'
+          };
+        }
+      } catch (logErr) {}
+
+      return executeGrant();
+    });
+  }
+
+  return executeGrant();
 }
 
 /**
