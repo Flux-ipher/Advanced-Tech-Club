@@ -59,6 +59,7 @@ export function ProfilePage() {
   const safePointsLog = Array.isArray(pointsLog) ? pointsLog : [];
   const safeEvents = Array.isArray(events) ? events : [];
   const safeRegistrations = Array.isArray(userRegistrations) ? userRegistrations : [];
+  const userTotalPoints = (typeof points === 'object' ? points?.total_points : points) || 0;
 
   // Filter events registered by current user
   const myRegisteredEvents = safeEvents.filter((e) =>
@@ -175,7 +176,7 @@ export function ProfilePage() {
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">ATC Points</p>
             <p className="text-xl font-extrabold text-neutral-900 tracking-tight">
-              {points || 0} <span className="text-xs font-semibold text-amber-600">XP</span>
+              {userTotalPoints} <span className="text-xs font-semibold text-amber-600">XP</span>
             </p>
           </div>
         </div>

@@ -229,20 +229,31 @@ export { mockDb };
 
 // Firebase Auth + Supabase JWT Bridge Client Factory
 // Passes Firebase ID Token to Supabase as Bearer token to satisfy RLS policies using auth.uid()
+const jwtClientCache = new Map();
+
 export function getSupabaseClient(firebaseIdToken) {
   if (!isRealSupabaseConfigured) {
     return supabase;
   }
-  return createClient(supabaseUrl, supabaseAnonKey, {
+  if (!firebaseIdToken) {
+    return supabase;
+  }
+  if (jwtClientCache.has(firebaseIdToken)) {
+    return jwtClientCache.get(firebaseIdToken);
+  }
+  const client = createClient(supabaseUrl, supabaseAnonKey, {
     global: {
-      headers: firebaseIdToken ? { Authorization: `Bearer ${firebaseIdToken}` } : {},
+      headers: { Authorization: `Bearer ${firebaseIdToken}` },
     },
     auth: {
       persistSession: false,
       autoRefreshToken: false,
-      detectSessionInUrl: false
+      detectSessionInUrl: false,
+      storageKey: 'sb-firebase-jwt-bridge',
     },
   });
+  jwtClientCache.set(firebaseIdToken, client);
+  return client;
 }
 
 // Executes a query with an auto-refreshed Firebase ID token

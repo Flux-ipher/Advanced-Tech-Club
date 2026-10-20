@@ -153,6 +153,7 @@ export function useMemberGamification(userId) {
 
   return {
     points: points || { total_points: 0, checkin_streak: 0, last_checkin_date: null },
+    totalPoints: points?.total_points || 0,
     streak: points?.checkin_streak || 0,
     rank: myRank || 1,
     myRank: myRank || 1,
