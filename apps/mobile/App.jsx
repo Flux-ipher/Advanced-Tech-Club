@@ -87,6 +87,7 @@ export default function App() {
   // Starts unauthenticated so user can log in or sign up, with Guest mode option
   const [currentUser, setCurrentUser] = useState(null);
   const [isGuest, setIsGuest] = useState(false);
+  const [isSessionRestoring, setIsSessionRestoring] = useState(true);
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
 
   // Auth Form Fields
@@ -118,14 +119,12 @@ export default function App() {
   const [scannerFeedback, setScannerFeedback] = useState(null);
   const [scanHistory, setScanHistory] = useState([]);
 
-  // Gamification & Badges State
-  const [memberPoints, setMemberPoints] = useState(150);
+  // Gamification & Badges State (Synchronized directly with Supabase)
+  const [memberPoints, setMemberPoints] = useState(0);
   const [memberRank, setMemberRank] = useState(1);
-  const [memberStreak, setMemberStreak] = useState(3);
-  const [allBadgesList, setAllBadgesList] = useState(initialBadges);
-  const [earnedBadgesList, setEarnedBadgesList] = useState([
-    { badge_id: 'bdg-1', name: 'First Step', icon: '🚀', description: 'Joined the Advanced Tech Club community' }
-  ]);
+  const [memberStreak, setMemberStreak] = useState(0);
+  const [allBadgesList, setAllBadgesList] = useState([]);
+  const [earnedBadgesList, setEarnedBadgesList] = useState([]);
   const [leaderboardList, setLeaderboardList] = useState([]);
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
   const [badgeUnlockCelebration, setBadgeUnlockCelebration] = useState(null);
@@ -201,16 +200,7 @@ export default function App() {
             const rawAcc = await FileSystem.readAsStringAsync(SAVED_ACCOUNTS_FILE);
             const parsedAcc = JSON.parse(rawAcc);
             if (Array.isArray(parsedAcc) && parsedAcc.length > 0 && isMounted) {
-              const cleanAcc = parsedAcc.filter(
-                (a) =>
-                  !a.email.toLowerCase().includes('alex.rivera') &&
-                  !a.name.toLowerCase().includes('alex') &&
-                  !a.email.toLowerCase().includes('techclub.edu') &&
-                  a.email.toLowerCase() !== 'ritesh.mishra@gmail.com'
-              );
-              const finalAcc = cleanAcc.length > 0 ? cleanAcc : DEFAULT_GOOGLE_ACCOUNTS;
-              setSavedGoogleAccounts(finalAcc);
-              FileSystem.writeAsStringAsync(SAVED_ACCOUNTS_FILE, JSON.stringify(finalAcc)).catch(() => {});
+              setSavedGoogleAccounts(parsedAcc);
             }
           }
         } catch (accErr) {
@@ -234,45 +224,57 @@ export default function App() {
         }
 
         // 3. Restore active session
-        const info = await FileSystem.getInfoAsync(SESSION_FILE);
-        if (info.exists) {
-          const raw = await FileSystem.readAsStringAsync(SESSION_FILE);
-          const saved = JSON.parse(raw);
-          if (saved && saved.email && isMounted) {
-            const isSavedAdmin =
-              saved.role === 'admin' ||
-              saved.role === 'super_admin' ||
-              saved.email.includes('fluxipher') ||
-              saved.email.includes('ritesh');
-            if (isSavedAdmin) {
-              setMemberPoints(1250);
-              setMemberStreak(12);
-              setMemberRank(1);
-              setEarnedBadgesList(initialBadges);
-            }
-            setCurrentUser(saved);
-            setIsGuest(false);
+        try {
+          const info = await FileSystem.getInfoAsync(SESSION_FILE);
+          if (info.exists) {
+            const raw = await FileSystem.readAsStringAsync(SESSION_FILE);
+            const saved = JSON.parse(raw);
+            if (saved && saved.email && isMounted) {
+              setCurrentUser(saved);
+              setIsGuest(false);
 
-            // Re-sync with Supabase in background
-            try {
-              const { data: dbProfile } = await supabase
+              // Background profile & gamification re-sync with live Supabase
+              supabase
                 .from('profiles')
                 .select('*')
                 .eq('email', saved.email.toLowerCase())
-                .maybeSingle();
+                .maybeSingle()
+                .then(async ({ data: dbProfile }) => {
+                  if (dbProfile && isMounted) {
+                    const merged = { ...saved, ...dbProfile };
+                    setCurrentUser(merged);
+                    FileSystem.writeAsStringAsync(SESSION_FILE, JSON.stringify(merged)).catch(() => {});
 
-              if (dbProfile && isMounted) {
-                const merged = { ...saved, ...dbProfile };
-                setCurrentUser(merged);
-                await FileSystem.writeAsStringAsync(SESSION_FILE, JSON.stringify(merged));
-              }
-            } catch (syncErr) {
-              // Silent offline fallback
+                    const targetUserId = dbProfile.id;
+                    if (targetUserId) {
+                      const mp = await getMemberPoints(targetUserId);
+                      if (mp && isMounted) {
+                        setMemberPoints(mp.total_points || 0);
+                        setMemberStreak(mp.checkin_streak || 0);
+                      }
+                      const rank = await getMyRank(targetUserId);
+                      if (rank && isMounted) {
+                        setMemberRank(rank);
+                      }
+                      const badges = await getMemberBadges(targetUserId);
+                      if (badges && badges.length > 0 && isMounted) {
+                        setEarnedBadgesList(badges);
+                      }
+                    }
+                  }
+                })
+                .catch(() => {});
             }
           }
+        } catch (sessionErr) {
+          console.warn('[ATC Mobile] Session restore notice:', sessionErr);
         }
       } catch (err) {
         console.warn('[ATC Mobile] Session restore error:', err);
+      } finally {
+        if (isMounted) {
+          setIsSessionRestoring(false);
+        }
       }
     }
     restoreMobileSession();
@@ -324,7 +326,7 @@ export default function App() {
       const { data: dbPending } = await supabase
         .from('profiles')
         .select('*')
-        .or('is_verified.is.null,is_verified.eq.false,verification_status.eq.pending');
+        .eq('verification_status', 'pending');
 
       if (dbPending) {
         setPendingMembers(dbPending);
@@ -338,31 +340,11 @@ export default function App() {
         setTotalMembersCount(count);
       }
 
-      // Load Live Leaderboard (With Admin pinned at Rank #1)
+      // Load Live Leaderboard directly from Supabase
       try {
         const lb = await getLeaderboard(20);
-        const adminLeaderEntry = {
-          rank: 1,
-          user_id: 'user-ritesh-superadmin',
-          total_points: 1250,
-          checkin_streak: 12,
-          full_name: 'Ritesh Kumar Mishra',
-          email: 'fluxipher@gmail.com',
-          avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-          role: 'admin',
-          branch: 'CSE',
-          year: 'Admin'
-        };
         if (lb && lb.length > 0) {
-          const otherMembers = lb.filter(
-            (u) =>
-              !u.email.toLowerCase().includes('fluxipher') &&
-              !u.email.toLowerCase().includes('ritesh') &&
-              !u.email.toLowerCase().includes('alex')
-          );
-          setLeaderboardList([adminLeaderEntry, ...otherMembers.map((u, i) => ({ ...u, rank: i + 2 }))]);
-        } else {
-          setLeaderboardList([adminLeaderEntry]);
+          setLeaderboardList(lb);
         }
       } catch (lbErr) {
         console.warn('[ATC Mobile] Leaderboard fetch note:', lbErr);
@@ -378,23 +360,37 @@ export default function App() {
         console.warn('[ATC Mobile] Badges fetch note:', bErr);
       }
 
-      // Restore read notifications state from disk
+      // Load Real Notifications from Supabase notifications_log
       try {
-        const readInfo = await FileSystem.getInfoAsync(READ_NOTIFS_FILE);
-        if (readInfo.exists) {
-          const rawRead = await FileSystem.readAsStringAsync(READ_NOTIFS_FILE);
-          const readIds = JSON.parse(rawRead);
-          if (Array.isArray(readIds) && readIds.length > 0) {
-            setNotifications((prev) =>
-              prev.map((n) => (readIds.includes(n.id) ? { ...n, read: true } : n))
-            );
-          }
+        const { data: dbNotifs } = await supabase
+          .from('notifications_log')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (dbNotifs && dbNotifs.length > 0) {
+          let readIds = [];
+          try {
+            const readInfo = await FileSystem.getInfoAsync(READ_NOTIFS_FILE);
+            if (readInfo.exists) {
+              const rawRead = await FileSystem.readAsStringAsync(READ_NOTIFS_FILE);
+              readIds = JSON.parse(rawRead) || [];
+            }
+          } catch {}
+
+          const formattedNotifs = dbNotifs.map((n) => ({
+            id: n.id,
+            title: n.title,
+            message: n.message || n.body || '',
+            time: formatRelativeTime(n.created_at),
+            read: n.read || readIds.includes(n.id)
+          }));
+          setNotifications(formattedNotifs);
         }
       } catch (notifDiskErr) {
-        console.warn('[ATC Mobile] Notif read sync note:', notifDiskErr);
+        console.warn('[ATC Mobile] Notif live fetch note:', notifDiskErr);
       }
 
-      // Re-sync current logged-in user profile & gamification in background
+      // Re-sync current logged-in user profile & gamification directly from Supabase
       if (currentUser?.email) {
         const { data: dbUser } = await supabase
           .from('profiles')
@@ -415,38 +411,24 @@ export default function App() {
           }
         }
 
-        // Admin has highest privileges & badges unlocked
-        const isCurAdmin =
-          currentUser?.role === 'admin' ||
-          currentUser?.role === 'super_admin' ||
-          currentUser?.email?.includes('ritesh') ||
-          currentUser?.email?.includes('fluxipher');
-
-        if (isCurAdmin) {
-          setMemberPoints(1250);
-          setMemberStreak(12);
-          setMemberRank(1);
-          setEarnedBadgesList(initialBadges);
-        } else {
-          const targetUserId = dbUser?.id || currentUser?.id;
-          if (targetUserId) {
-            try {
-              const mp = await getMemberPoints(targetUserId);
-              if (mp) {
-                setMemberPoints(mp.total_points || 0);
-                setMemberStreak(mp.checkin_streak || 0);
-              }
-              const rank = await getMyRank(targetUserId);
-              if (rank) {
-                setMemberRank(rank);
-              }
-              const userBadges = await getMemberBadges(targetUserId);
-              if (userBadges && userBadges.length > 0) {
-                setEarnedBadgesList(userBadges);
-              }
-            } catch (gamifyErr) {
-              console.warn('[ATC Mobile] Gamification sync note:', gamifyErr);
+        const targetUserId = dbUser?.id || currentUser?.id;
+        if (targetUserId) {
+          try {
+            const mp = await getMemberPoints(targetUserId);
+            if (mp) {
+              setMemberPoints(mp.total_points || 0);
+              setMemberStreak(mp.checkin_streak || 0);
             }
+            const rank = await getMyRank(targetUserId);
+            if (rank) {
+              setMemberRank(rank);
+            }
+            const userBadges = await getMemberBadges(targetUserId);
+            if (userBadges && userBadges.length > 0) {
+              setEarnedBadgesList(userBadges);
+            }
+          } catch (gamifyErr) {
+            console.warn('[ATC Mobile] Gamification sync note:', gamifyErr);
           }
         }
       }
@@ -469,6 +451,23 @@ export default function App() {
     loadLivePlatformData();
   }, []);
 
+  // Relative Time Helper
+  const formatRelativeTime = (isoString) => {
+    try {
+      if (!isoString) return 'Just now';
+      const diffMs = Date.now() - new Date(isoString).getTime();
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `${diffHours}h ago`;
+      const diffDays = Math.floor(diffHours / 24);
+      return diffDays === 1 ? 'Yesterday' : `${diffDays}d ago`;
+    } catch {
+      return 'Recent';
+    }
+  };
+
   // User Interactivity
   const [registeredEventIds, setRegisteredEventIds] = useState(['evt-1']);
   const [bookmarkedIds, setBookmarkedIds] = useState(['ann-1']);
@@ -478,30 +477,8 @@ export default function App() {
     'ann-3': { fire: 12, rocket: 14, heart: 9 }
   });
 
-  // Notifications State
-  const [notifications, setNotifications] = useState([
-    {
-      id: 'notif-1',
-      title: '🎉 Welcome to Advanced Tech Club',
-      message: 'Your campus developer hub is ready. Explore workshops, announcements, and the vault.',
-      time: 'Just now',
-      read: false
-    },
-    {
-      id: 'notif-2',
-      title: '📅 Cloud Architecture Workshop Confirmed',
-      message: 'Check your digital QR pass for campus laboratory check-in details.',
-      time: '2h ago',
-      read: false
-    },
-    {
-      id: 'notif-3',
-      title: '⚡ New Vault Resource Available',
-      message: 'Full-Stack Distributed Systems Engineering Handbook has been published.',
-      time: 'Yesterday',
-      read: true
-    }
-  ]);
+  // Notifications State (Synced from Supabase notifications_log)
+  const [notifications, setNotifications] = useState([]);
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   // Filter & Search States
@@ -539,6 +516,8 @@ export default function App() {
   const [statusSearchResult, setStatusSearchResult] = useState(null);
 
   // Student Membership Application Form State
+  const [applyFullName, setApplyFullName] = useState('');
+  const [applyEmail, setApplyEmail] = useState('');
   const [applyStudentId, setApplyStudentId] = useState('');
   const [applyDept, setApplyDept] = useState('Computer Science & Engineering');
   const [applyYear, setApplyYear] = useState('2nd Year');
@@ -627,14 +606,6 @@ export default function App() {
       interests: existingProfile?.interests || ['AI & Machine Learning', 'Mobile Development']
     };
 
-    // If user is Admin, immediately grant all privileges, 1250 XP, streak 12, rank 1, and all badges
-    if (shouldBeSuperAdmin) {
-      setMemberPoints(1250);
-      setMemberStreak(12);
-      setMemberRank(1);
-      setEarnedBadgesList(allBadgesList && allBadgesList.length > 0 ? allBadgesList : initialBadges);
-    }
-
     // If member has not completed onboarding, trigger onboarding modal
     if (resolved.onboarding_complete === false) {
       setTimeout(() => setIsOnboardingOpen(true), 400);
@@ -686,7 +657,7 @@ export default function App() {
       await persistGoogleAccount(newUser.email, newUser.full_name, newUser.avatar_url);
       triggerToast('Account Created! 🚀 Welcome to ATC.');
 
-      if (newUser.role !== 'super_admin' && !newUser.student_id) {
+      if (newUser.role !== 'super_admin' && newUser.role !== 'admin' && !newUser.student_id) {
         setIsApplyModalOpen(true);
       }
     } catch (err) {
@@ -716,8 +687,14 @@ export default function App() {
       if (err.code === statusCodes?.IN_PROGRESS) {
         return;
       }
-      console.warn('[ATC Mobile] Native Google Sign-In notice, opening account selector modal:', err);
-      // Fallback: Opens in-app account modal so user is never blocked
+      console.warn('[ATC Mobile] Native Google Sign-In notice:', err);
+      // If a saved Google account already exists on device, directly authenticate without extra modal prompts!
+      if (savedGoogleAccounts && savedGoogleAccounts.length > 0) {
+        const primaryAcc = savedGoogleAccounts[0];
+        await handleSelectGoogleAccount(primaryAcc.email, primaryAcc.name, primaryAcc.avatar);
+        return;
+      }
+      // If no saved account exists, open the selector modal
       setIsGoogleModalOpen(true);
     } finally {
       setGoogleSubmitting(false);
@@ -735,7 +712,7 @@ export default function App() {
       setIsGoogleModalOpen(false);
       triggerToast(`Signed in with Google as ${user.full_name} ✓`);
 
-      if (user.role !== 'super_admin' && !user.student_id) {
+      if (user.role !== 'super_admin' && user.role !== 'admin' && !user.student_id) {
         setIsApplyModalOpen(true);
       }
     } catch (err) {
@@ -2202,22 +2179,46 @@ export default function App() {
 
   // Submit Student Application
   const handleSubmitApplication = async () => {
-    if (!applyStudentId.trim()) {
+    const sId = applyStudentId.trim().toUpperCase();
+    if (!sId) {
       Alert.alert('Required', 'Please enter your Student ID (e.g. CS2026-088).');
       return;
     }
 
+    const targetEmail = currentUser?.email || applyEmail.trim().toLowerCase();
+    const targetName = currentUser?.full_name || applyFullName.trim();
+
+    if (!currentUser && (!targetEmail || !targetName)) {
+      Alert.alert('Required', 'Please enter your Full Name and University Email.');
+      return;
+    }
+
+    const baseUser = currentUser || {
+      id: `usr-${Date.now()}`,
+      email: targetEmail,
+      full_name: targetName,
+      role: 'member',
+      avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80',
+      branch: applyDept,
+      year: applyYear,
+      why_join: 'Campus engineering collaboration and workshops'
+    };
+
     const updatedUser = {
-      ...currentUser,
-      student_id: applyStudentId.trim().toUpperCase(),
+      ...baseUser,
+      student_id: sId,
+      roll_number: sId,
       department: applyDept,
       interests: applyInterests,
       verification_status: 'pending',
-      is_verified: false
+      is_verified: false,
+      year: applyYear
     };
 
     setCurrentUser(updatedUser);
+    setIsGuest(false);
     await saveMobileSession(updatedUser);
+    await persistGoogleAccount(updatedUser.email, updatedUser.full_name, updatedUser.avatar_url);
     try {
       await supabase.from('profiles').upsert(updatedUser, { onConflict: 'id' });
     } catch (saveErr) {
@@ -2394,6 +2395,42 @@ export default function App() {
   // 6. VIEW: AUTH SCREEN (LOGIN & SIGNUP)
   // Displayed when user has not yet authenticated and has not chosen Guest Mode
   // =========================================================================
+  // Splash Screen while restoring disk session on cold boot
+  if (isSessionRestoring) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.neutral[900], justifyContent: 'center', alignItems: 'center' }}>
+        <StatusBar barStyle="light-content" backgroundColor={colors.neutral[900]} />
+        <View style={{ alignItems: 'center' }}>
+          <View
+            style={{
+              width: 72,
+              height: 72,
+              borderRadius: 24,
+              backgroundColor: colors.primary[500],
+              justifyContent: 'center',
+              alignItems: 'center',
+              shadowColor: colors.primary[500],
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 0.5,
+              shadowRadius: 12,
+              elevation: 8,
+              marginBottom: 20
+            }}
+          >
+            <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 28, letterSpacing: -1 }}>ATC</Text>
+          </View>
+          <Text style={{ color: '#ffffff', fontSize: 22, fontWeight: 'bold', letterSpacing: -0.5 }}>
+            Advanced Tech Club
+          </Text>
+          <Text style={{ color: colors.neutral[400], fontSize: 13, marginTop: 4, marginBottom: 24 }}>
+            Official University Engineering Hub
+          </Text>
+          <ActivityIndicator size="small" color={colors.primary[400]} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   if (!currentUser && !isGuest) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.neutral[900] }}>
@@ -2495,23 +2532,23 @@ export default function App() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => setAuthMode('signup')}
+                onPress={() => setIsApplyModalOpen(true)}
                 style={{
                   flex: 1,
                   paddingVertical: 10,
                   borderRadius: 9,
-                  backgroundColor: authMode === 'signup' ? colors.primary[500] : 'transparent',
+                  backgroundColor: 'transparent',
                   alignItems: 'center'
                 }}
               >
                 <Text
                   style={{
-                    color: authMode === 'signup' ? '#ffffff' : colors.neutral[400],
+                    color: colors.neutral[400],
                     fontWeight: 'bold',
                     fontSize: 13
                   }}
                 >
-                  Sign Up
+                  Sign Up (Apply)
                 </Text>
               </TouchableOpacity>
             </View>
@@ -2765,24 +2802,24 @@ export default function App() {
         </View>
 
         {/* Header Right Actions */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           {/* Notifications Center Bell */}
           <TouchableOpacity
             onPress={() => setIsNotificationsOpen(true)}
             style={{
               backgroundColor: colors.neutral[100],
-              padding: 8,
-              borderRadius: 9,
+              padding: 9,
+              borderRadius: 10,
               position: 'relative'
             }}
           >
-            <Text style={{ fontSize: 13 }}>🔔</Text>
+            <Text style={{ fontSize: 16 }}>🔔</Text>
             {unreadCount > 0 && (
               <View
                 style={{
                   position: 'absolute',
-                  top: 4,
-                  right: 4,
+                  top: 5,
+                  right: 5,
                   width: 8,
                   height: 8,
                   borderRadius: 4,
@@ -2792,62 +2829,7 @@ export default function App() {
             )}
           </TouchableOpacity>
 
-          {currentUser ? (
-            <>
-              {/* QR Pass Fast Trigger */}
-              <TouchableOpacity
-                onPress={() => setIsQrPassOpen(true)}
-                style={{
-                  backgroundColor: colors.neutral[100],
-                  paddingHorizontal: 8,
-                  paddingVertical: 5,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: colors.neutral[200]
-                }}
-              >
-                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[800] }}>
-                  🎟️ Pass
-                </Text>
-              </TouchableOpacity>
-
-              {/* Admin Event Attendance QR Scanner Fast Trigger */}
-              {isAdmin && (
-                <TouchableOpacity
-                  onPress={() => openAdminScanner()}
-                  style={{
-                    backgroundColor: '#6d28d9',
-                    paddingHorizontal: 8,
-                    paddingVertical: 5,
-                    borderRadius: 8,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 3
-                  }}
-                >
-                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#ffffff' }}>
-                    📷 Scan
-                  </Text>
-                </TouchableOpacity>
-              )}
-
-              {/* Role Pill (strictly Admin or Member per Rule 4) */}
-              <View
-                style={{
-                  backgroundColor: isAdmin ? '#f5f3ff' : colors.primary[50],
-                  paddingHorizontal: 9,
-                  paddingVertical: 5,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: isAdmin ? '#ddd6fe' : colors.primary[200]
-                }}
-              >
-                <Text style={{ fontSize: 11, fontWeight: 'bold', color: isAdmin ? '#6d28d9' : colors.primary[700] }}>
-                  {getDisplayRole(currentUser.role)}
-                </Text>
-              </View>
-            </>
-          ) : (
+          {!currentUser && (
             <TouchableOpacity
               onPress={() => setIsGuest(false)}
               style={{
@@ -4333,6 +4315,31 @@ export default function App() {
               </Text>
 
               <View style={{ gap: 12 }}>
+                {!currentUser && (
+                  <>
+                    <View>
+                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>Full Name *</Text>
+                      <TextInput
+                        placeholder="e.g. Student Full Name"
+                        value={applyFullName}
+                        onChangeText={setApplyFullName}
+                        style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 8, padding: 10, fontSize: 13 }}
+                      />
+                    </View>
+                    <View>
+                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>University Email *</Text>
+                      <TextInput
+                        placeholder="name@university.edu"
+                        value={applyEmail}
+                        onChangeText={setApplyEmail}
+                        autoCapitalize="none"
+                        keyboardType="email-address"
+                        style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 8, padding: 10, fontSize: 13 }}
+                      />
+                    </View>
+                  </>
+                )}
+
                 <View>
                   <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>Student ID *</Text>
                   <TextInput
