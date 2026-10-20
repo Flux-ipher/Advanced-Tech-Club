@@ -206,23 +206,75 @@ export function checkPresetLimit(presetKey, identifier) {
 }
 
 /**
- * Throttle helper for async calls
+ * ============================================================================
+ * 3. RELOAD CIRCUIT BREAKER (Guards against rapid F5 / refresh loops)
+ * ============================================================================
  */
-export function throttleAsync(fn, waitMs = 1000) {
-  let lastCall = 0;
-  let inFlight = null;
+export function checkReloadCircuitBreaker(maxReloads = 10, windowMs = 10000) {
+  if (typeof window === 'undefined') return { allowed: true, isTripped: false };
 
-  return async (...args) => {
+  try {
+    const storageKey = 'atc_reload_circuit_timestamps';
     const now = Date.now();
-    if (now - lastCall < waitMs && inFlight) {
-      return inFlight;
+    const raw = window.sessionStorage ? window.sessionStorage.getItem(storageKey) : null;
+    const history = raw ? JSON.parse(raw) : [];
+
+    // Filter to reloads in the last windowMs
+    const recent = history.filter((t) => now - t < windowMs);
+
+    if (recent.length >= maxReloads) {
+      const oldest = recent[0];
+      const cooldownMs = Math.max(0, oldest + windowMs - now);
+      const cooldownSec = Math.ceil(cooldownMs / 1000);
+
+      return {
+        allowed: false,
+        isTripped: true,
+        cooldownMs,
+        cooldownSec,
+        message: `High reload frequency detected (${recent.length} reloads in ${Math.round(windowMs / 1000)}s). Serving local cached state for ${cooldownSec}s.`
+      };
     }
-    lastCall = now;
-    inFlight = Promise.resolve(fn(...args)).finally(() => {
-      inFlight = null;
-    });
-    return inFlight;
+
+    recent.push(now);
+    if (window.sessionStorage) {
+      window.sessionStorage.setItem(storageKey, JSON.stringify(recent));
+    }
+    return { allowed: true, isTripped: false, remaining: maxReloads - recent.length };
+  } catch (err) {
+    return { allowed: true, isTripped: false };
+  }
+}
+
+/**
+ * ============================================================================
+ * 4. BUTTON CLICK SPAM GUARD (Rage-click & double-tap defense)
+ * ============================================================================
+ * Drops rapid microsecond clicks within a debounce/cooldown window.
+ */
+export function createClickSpamGuard(cooldownMs = 600) {
+  let lastClickTime = 0;
+  let isExecuting = false;
+
+  return async (callback) => {
+    const now = Date.now();
+    if (now - lastClickTime < cooldownMs || isExecuting) {
+      // Discard duplicate click
+      return { executed: false, dropped: true };
+    }
+    lastClickTime = now;
+    isExecuting = true;
+    try {
+      if (typeof callback === 'function') {
+        const result = await callback();
+        return { executed: true, dropped: false, result };
+      }
+      return { executed: true, dropped: false };
+    } finally {
+      isExecuting = false;
+    }
   };
 }
 
 export default rateLimiter;
+
