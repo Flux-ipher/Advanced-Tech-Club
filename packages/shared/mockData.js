@@ -57,6 +57,8 @@ export const initialEvents = [
     feedback_link: 'https://forms.gle/nPAHQDSWGvnTUSBg9',
     author_id: 'Zp2JThOUCAbl7aF1TT4DQHUH0Dk2',
     author_name: 'Ritesh Mishra',
+    is_completed: true,
+    status: 'completed',
     registrations_count: 0,
     created_at: '2026-02-26T04:57:08.162Z'
   },
@@ -78,6 +80,8 @@ export const initialEvents = [
     feedback_link: 'https://forms.gle/fki7hA555XPDzyL28',
     author_id: 'Zp2JThOUCAbl7aF1TT4DQHUH0Dk2',
     author_name: 'Ritesh Mishra',
+    is_completed: true,
+    status: 'completed',
     registrations_count: 0,
     created_at: '2026-04-10T07:22:45.654Z'
   }

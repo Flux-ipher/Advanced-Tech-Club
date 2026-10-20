@@ -351,12 +351,20 @@ export default function App() {
         .order('start_at', { ascending: true });
 
       if (dbEvents && dbEvents.length > 0) {
-        const normalizedEvents = dbEvents.map((evt) => ({
-          ...evt,
-          date: evt.date || evt.start_at,
-          image: evt.image || evt.banner_url,
-          tags: Array.isArray(evt.tags) ? evt.tags : (typeof evt.tags === 'string' ? [evt.tags] : [])
-        }));
+        const normalizedEvents = dbEvents.map((evt) => {
+          const isPast = (evt.end_at && new Date(evt.end_at).getTime() < Date.now()) ||
+                         (!evt.end_at && evt.start_at && new Date(evt.start_at).getTime() < Date.now()) ||
+                         (!evt.end_at && !evt.start_at && evt.date && new Date(evt.date).getTime() < Date.now());
+          const isCompleted = evt.is_completed === true || (evt.is_completed !== false && isPast);
+          return {
+            ...evt,
+            date: evt.date || evt.start_at,
+            image: evt.image || evt.banner_url,
+            tags: Array.isArray(evt.tags) ? evt.tags : (typeof evt.tags === 'string' ? [evt.tags] : []),
+            is_completed: isCompleted,
+            status: isCompleted ? 'completed' : 'upcoming'
+          };
+        });
         setEvents(normalizedEvents);
       }
 
@@ -568,6 +576,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [feedCategory, setFeedCategory] = useState('all');
   const [eventCategory, setEventCategory] = useState('all');
+  const [eventStatusFilter, setEventStatusFilter] = useState('all'); // 'all' | 'upcoming' | 'completed'
   const [resourceCategory, setResourceCategory] = useState('all');
   const [showSavedOnly, setShowSavedOnly] = useState(false);
 
@@ -3699,12 +3708,24 @@ export default function App() {
   });
 
   const filteredEvents = events.filter((e) => {
+    const isPast = (e.end_at && new Date(e.end_at).getTime() < Date.now()) ||
+                   (!e.end_at && e.start_at && new Date(e.start_at).getTime() < Date.now()) ||
+                   (!e.end_at && !e.start_at && e.date && new Date(e.date).getTime() < Date.now());
+    const isDone = e.is_completed === true || (e.is_completed !== false && isPast);
+
+    const matchesStatus =
+      eventStatusFilter === 'all'
+        ? true
+        : eventStatusFilter === 'upcoming'
+        ? !isDone
+        : isDone;
+
     const matchesCat = eventCategory === 'all' || e.category === eventCategory;
     const matchesSearch =
-      e.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      e.location.toLowerCase().includes(searchQuery.toLowerCase());
+      (e.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (e.location || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesSaved = !showSavedOnly || registeredEventIds.includes(e.id);
-    return matchesCat && matchesSearch && matchesSaved;
+    return matchesStatus && matchesCat && matchesSearch && matchesSaved;
   });
 
   const filteredResources = resources.filter((r) => {
@@ -4790,6 +4811,41 @@ export default function App() {
         {/* ========================================================= */}
         {currentTab === 'events' && (
           <View style={{ gap: 14 }}>
+            {/* Status Filter: All / Upcoming / Concluded */}
+            <View style={{ flexDirection: 'row', gap: 6, marginBottom: 2 }}>
+              {[
+                { id: 'all', label: 'All Workshops' },
+                { id: 'upcoming', label: 'Upcoming' },
+                { id: 'completed', label: '🏁 Concluded' }
+              ].map((tab) => {
+                const isSelected = eventStatusFilter === tab.id;
+                return (
+                  <TouchableOpacity
+                    key={tab.id}
+                    onPress={() => setEventStatusFilter(tab.id)}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 8,
+                      backgroundColor: isSelected ? colors.neutral[900] : colors.neutral[100],
+                      borderWidth: 1,
+                      borderColor: isSelected ? colors.neutral[900] : colors.neutral[200]
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                        color: isSelected ? '#ffffff' : colors.neutral[600]
+                      }}
+                    >
+                      {tab.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
             {isAdmin && (
               <TouchableOpacity
                 onPress={() => setIsCreateEventModalOpen(true)}
@@ -4834,15 +4890,16 @@ export default function App() {
                   No Workshops Found
                 </Text>
                 <Text style={{ fontSize: 12, color: colors.neutral[500], textAlign: 'center', marginBottom: 16, lineHeight: 18 }}>
-                  {searchQuery || eventCategory !== 'all' || showSavedOnly
-                    ? `No workshops match "${searchQuery || eventCategory}". Try adjusting your category or search query.`
+                  {searchQuery || eventCategory !== 'all' || eventStatusFilter !== 'all' || showSavedOnly
+                    ? `No workshops match your current filters. Try resetting filters.`
                     : 'There are currently no active campus workshops scheduled.'}
                 </Text>
-                {(searchQuery !== '' || eventCategory !== 'all' || showSavedOnly) && (
+                {(searchQuery !== '' || eventCategory !== 'all' || eventStatusFilter !== 'all' || showSavedOnly) && (
                   <TouchableOpacity
                     onPress={() => {
                       setSearchQuery('');
                       setEventCategory('all');
+                      setEventStatusFilter('all');
                       setShowSavedOnly(false);
                     }}
                     style={{
@@ -4860,6 +4917,10 @@ export default function App() {
               filteredEvents.map((evt) => {
                 const isRSVPed = registeredEventIds.includes(evt.id);
                 const spotsLeft = (evt.capacity || 100) - (evt.registrations_count || 0);
+                const isPast = (evt.end_at && new Date(evt.end_at).getTime() < Date.now()) ||
+                               (!evt.end_at && evt.start_at && new Date(evt.start_at).getTime() < Date.now()) ||
+                               (!evt.end_at && !evt.start_at && evt.date && new Date(evt.date).getTime() < Date.now());
+                const isCompleted = evt.is_completed === true || (evt.is_completed !== false && isPast);
 
                 return (
                   <TouchableOpacity
@@ -4876,7 +4937,8 @@ export default function App() {
                       shadowOffset: { width: 0, height: 1 },
                       shadowOpacity: 0.05,
                       shadowRadius: 3,
-                      elevation: 1
+                      elevation: 1,
+                      opacity: isCompleted ? 0.92 : 1
                     }}
                   >
                     <Image
@@ -4890,14 +4952,22 @@ export default function App() {
                           <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary[600], textTransform: 'uppercase', backgroundColor: colors.primary[50], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                             {evt.category}
                           </Text>
-                          <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                            <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#92400e' }}>
-                              {getEventCountdown(evt)}
-                            </Text>
-                          </View>
+                          {isCompleted ? (
+                            <View style={{ backgroundColor: '#1e293b', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                              <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#f8fafc' }}>
+                                🏁 Concluded
+                              </Text>
+                            </View>
+                          ) : (
+                            <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                              <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#92400e' }}>
+                                {getEventCountdown(evt)}
+                              </Text>
+                            </View>
+                          )}
                         </View>
-                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: spotsLeft > 10 ? colors.success[700] : colors.danger[700] }}>
-                          {spotsLeft > 0 ? `${spotsLeft} spots open` : 'Sold out'}
+                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: isCompleted ? colors.neutral[500] : (spotsLeft > 10 ? colors.success[700] : colors.danger[700]) }}>
+                          {isCompleted ? 'Finished' : (spotsLeft > 0 ? `${spotsLeft} spots open` : 'Sold out')}
                         </Text>
                       </View>
 
@@ -4912,19 +4982,36 @@ export default function App() {
                         <Text style={{ fontSize: 11, color: colors.neutral[600] }}>
                           📍 {evt.location}
                         </Text>
-                        <TouchableOpacity
-                          onPress={() => handleToggleEventRSVP(evt.id)}
-                          style={{
-                            backgroundColor: isRSVPed ? colors.success[500] : colors.primary[500],
-                            paddingHorizontal: 12,
-                            paddingVertical: 6,
-                            borderRadius: 8
-                          }}
-                        >
-                          <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>
-                            {isRSVPed ? '✓ Reserved' : 'RSVP Now'}
-                          </Text>
-                        </TouchableOpacity>
+                        {isCompleted ? (
+                          <View
+                            style={{
+                              backgroundColor: colors.neutral[100],
+                              borderWidth: 1,
+                              borderColor: colors.neutral[200],
+                              paddingHorizontal: 12,
+                              paddingVertical: 6,
+                              borderRadius: 8
+                            }}
+                          >
+                            <Text style={{ color: colors.neutral[600], fontSize: 11, fontWeight: 'bold' }}>
+                              🏁 Concluded
+                            </Text>
+                          </View>
+                        ) : (
+                          <TouchableOpacity
+                            onPress={() => handleToggleEventRSVP(evt.id)}
+                            style={{
+                              backgroundColor: isRSVPed ? colors.success[500] : colors.primary[500],
+                              paddingHorizontal: 12,
+                              paddingVertical: 6,
+                              borderRadius: 8
+                            }}
+                          >
+                            <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>
+                              {isRSVPed ? '✓ Reserved' : 'RSVP Now'}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
                     </View>
                   </TouchableOpacity>
@@ -6286,46 +6373,121 @@ export default function App() {
       <Modal visible={!!selectedEvent} animationType="slide" transparent>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 }}>
           <View style={{ backgroundColor: '#ffffff', borderRadius: 20, padding: 20 }}>
-            {selectedEvent && (
-              <>
-                <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary[600], textTransform: 'uppercase', marginBottom: 2 }}>
-                  {selectedEvent.category} · In-Person Campus Session
-                </Text>
-                <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 8 }}>
-                  {selectedEvent.title}
-                </Text>
-                <Text style={{ fontSize: 13, color: colors.neutral[600], lineHeight: 18, marginBottom: 12 }}>
-                  {selectedEvent.description}
-                </Text>
-                <Text style={{ fontSize: 12, color: colors.neutral[700], marginBottom: 4 }}>
-                  📍 {selectedEvent.location}
-                </Text>
-                <Text style={{ fontSize: 12, color: colors.neutral[700], marginBottom: 16 }}>
-                  👥 Capacity: {selectedEvent.capacity} engineers ({selectedEvent.registrations_count || 1} confirmed)
-                </Text>
+            {selectedEvent && (() => {
+              const isPast = (selectedEvent.end_at && new Date(selectedEvent.end_at).getTime() < Date.now()) ||
+                             (!selectedEvent.end_at && selectedEvent.start_at && new Date(selectedEvent.start_at).getTime() < Date.now()) ||
+                             (!selectedEvent.end_at && !selectedEvent.start_at && selectedEvent.date && new Date(selectedEvent.date).getTime() < Date.now());
+              const isCompleted = selectedEvent.is_completed === true || (selectedEvent.is_completed !== false && isPast);
 
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <TouchableOpacity
-                    onPress={() => setSelectedEvent(null)}
-                    style={{ flex: 1, backgroundColor: colors.neutral[100], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
-                  >
-                    <Text style={{ color: colors.neutral[700], fontWeight: 'bold', fontSize: 13 }}>Close</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => {
-                      handleToggleEventRSVP(selectedEvent.id);
-                      setSelectedEvent(null);
-                    }}
-                    style={{ flex: 1, backgroundColor: registeredEventIds.includes(selectedEvent.id) ? colors.danger[500] : colors.primary[500], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
-                  >
-                    <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
-                      {registeredEventIds.includes(selectedEvent.id) ? 'Cancel RSVP' : 'Confirm RSVP'}
+              return (
+                <>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary[600], textTransform: 'uppercase' }}>
+                      {selectedEvent.category} · In-Person Campus Session
                     </Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
+                    {isCompleted && (
+                      <View style={{ backgroundColor: '#1e293b', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#f8fafc' }}>
+                          🏁 Concluded
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 8 }}>
+                    {selectedEvent.title}
+                  </Text>
+                  <Text style={{ fontSize: 13, color: colors.neutral[600], lineHeight: 18, marginBottom: 12 }}>
+                    {selectedEvent.description}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: colors.neutral[700], marginBottom: 4 }}>
+                    📍 {selectedEvent.location}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: colors.neutral[700], marginBottom: 12 }}>
+                    👥 Capacity: {selectedEvent.capacity} engineers ({selectedEvent.registrations_count || 1} confirmed)
+                  </Text>
+
+                  {isCompleted && (
+                    <View style={{ backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, padding: 10, marginBottom: 14 }}>
+                      <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#1e293b' }}>
+                        🏁 Event Concluded
+                      </Text>
+                      <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                        This workshop has already taken place. Registrations are closed.
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Admin Lifecycle Toggle in Modal */}
+                  {isAdmin && (
+                    <TouchableOpacity
+                      onPress={async () => {
+                        const targetStatus = !selectedEvent.is_completed;
+                        try {
+                          await supabase
+                            .from('events')
+                            .update({ is_completed: targetStatus })
+                            .eq('id', selectedEvent.id);
+                          setSelectedEvent(prev => ({
+                            ...prev,
+                            is_completed: targetStatus,
+                            status: targetStatus ? 'completed' : 'upcoming'
+                          }));
+                          setEvents(prev => prev.map(e => e.id === selectedEvent.id ? {
+                            ...e,
+                            is_completed: targetStatus,
+                            status: targetStatus ? 'completed' : 'upcoming'
+                          } : e));
+                          Alert.alert('Status Updated', targetStatus ? 'Event marked as concluded.' : 'Event re-opened as upcoming.');
+                        } catch (err) {
+                          Alert.alert('Update Failed', err.message);
+                        }
+                      }}
+                      style={{
+                        backgroundColor: selectedEvent.is_completed ? '#334155' : '#10b981',
+                        paddingVertical: 10,
+                        borderRadius: 10,
+                        alignItems: 'center',
+                        marginBottom: 10
+                      }}
+                    >
+                      <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>
+                        {selectedEvent.is_completed ? '↺ Admin: Re-open as Upcoming' : '✓ Admin: Mark Event Concluded'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity
+                      onPress={() => setSelectedEvent(null)}
+                      style={{ flex: 1, backgroundColor: colors.neutral[100], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+                    >
+                      <Text style={{ color: colors.neutral[700], fontWeight: 'bold', fontSize: 13 }}>Close</Text>
+                    </TouchableOpacity>
+
+                    {!isCompleted && (
+                      <TouchableOpacity
+                        onPress={() => {
+                          handleToggleEventRSVP(selectedEvent.id);
+                          setSelectedEvent(null);
+                        }}
+                        style={{
+                          flex: 1,
+                          backgroundColor: registeredEventIds.includes(selectedEvent.id) ? colors.danger[500] : colors.primary[500],
+                          paddingVertical: 12,
+                          borderRadius: 10,
+                          alignItems: 'center'
+                        }}
+                      >
+                        <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
+                          {registeredEventIds.includes(selectedEvent.id) ? 'Cancel RSVP' : 'Confirm RSVP'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </>
+              );
+            })()}
           </View>
         </View>
       </Modal>

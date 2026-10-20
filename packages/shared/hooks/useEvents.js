@@ -8,7 +8,8 @@ import {
   deleteEvent,
   registerForEvent,
   unregisterForEvent,
-  getUserRegistrations
+  getUserRegistrations,
+  toggleEventCompletion
 } from '../api/events.js';
 import { useAuthStore } from '../store/authStore.js';
 import { initialEvents } from '../mockData.js';
@@ -130,6 +131,21 @@ export function useEvents() {
     setEvents((prev) => prev.filter((e) => e.id !== id));
   };
 
+  const setEventCompletion = async (id, isCompleted) => {
+    await toggleEventCompletion(id, isCompleted);
+    setEvents((prev) =>
+      prev.map((e) =>
+        e.id === id
+          ? {
+              ...e,
+              is_completed: isCompleted,
+              status: isCompleted ? 'completed' : 'upcoming'
+            }
+          : e
+      )
+    );
+  };
+
   return {
     events,
     userRegistrations,
@@ -140,7 +156,8 @@ export function useEvents() {
     register: handleRegister,
     unregister: handleUnregister,
     addEvent,
-    removeEvent
+    removeEvent,
+    setEventCompletion
   };
 }
 

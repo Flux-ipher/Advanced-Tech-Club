@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import QRCode from 'react-qr-code';
 import { useAuth } from '@atc/shared/hooks/useAuth';
 import { useEvents } from '@atc/shared/hooks/useEvents';
-import { getEventById, getEventRegistrations } from '@atc/shared/api/events';
+import { getEventById, getEventRegistrations, toggleEventCompletion } from '@atc/shared/api/events';
 import { generateEventQRToken, getEventCheckinRoster, awardPoints } from '@atc/shared/api/gamification';
 import { formatDateTime, formatDate } from '@atc/shared/utils/formatters';
 import {
@@ -22,7 +22,8 @@ import {
   Copy,
   Sparkles,
   ExternalLink,
-  Flame
+  Flame,
+  Check
 } from 'lucide-react';
 
 export function EventDetailPage() {
@@ -36,6 +37,7 @@ export function EventDetailPage() {
   const [checkins, setCheckins] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [updatingCompletion, setUpdatingCompletion] = useState(false);
 
   // QR Modal State
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
@@ -63,6 +65,24 @@ export function EventDetailPage() {
     }
     loadData();
   }, [id]);
+
+  const handleToggleCompletion = async () => {
+    if (!event) return;
+    const targetStatus = !event.is_completed;
+    try {
+      setUpdatingCompletion(true);
+      await toggleEventCompletion(event.id, targetStatus);
+      setEvent((prev) => ({
+        ...prev,
+        is_completed: targetStatus,
+        status: targetStatus ? 'completed' : 'upcoming'
+      }));
+    } catch (err) {
+      alert('Failed to update event status: ' + err.message);
+    } finally {
+      setUpdatingCompletion(false);
+    }
+  };
 
   const handleGenerateQR = async () => {
     setGeneratingQR(true);
@@ -180,11 +200,15 @@ export function EventDetailPage() {
             <span className="px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider bg-white/95 text-neutral-900 shadow backdrop-blur-sm">
               {event.category}
             </span>
-            {registered && (
+            {event.is_completed ? (
+              <span className="px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider bg-neutral-900/90 text-neutral-200 border border-neutral-700 shadow backdrop-blur-sm flex items-center gap-1.5">
+                <span>🏁</span> Concluded
+              </span>
+            ) : registered ? (
               <span className="px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider bg-success-500 text-white shadow">
                 ✓ RSVP Confirmed
               </span>
-            )}
+            ) : null}
           </div>
 
           {/* Bottom Title on banner */}
@@ -316,28 +340,65 @@ export function EventDetailPage() {
 
             {/* Right 1 col: Key Details Box & RSVP */}
             <div className="space-y-6">
-              {/* ADMIN QR PROJECTOR ACTION (Role-gated) */}
+              {/* ADMIN CONTROLS (Role-gated) */}
               {isAdmin && (
                 <div className="p-6 rounded-2xl bg-neutral-900 border border-neutral-800 text-white space-y-4 shadow-lg">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold uppercase tracking-wider text-warning-400 flex items-center gap-1.5">
-                      <ShieldCheck className="w-4 h-4" /> Admin Operations
+                      <ShieldCheck className="w-4 h-4" /> Admin Controls
                     </span>
                     <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded font-mono text-neutral-300">
                       {checkins.length} Checked In
                     </span>
                   </div>
-                  <p className="text-xs text-neutral-400 leading-relaxed">
-                    Generate the unique verification QR code to display on the workshop projector. Attending members scan with their phone camera or ATC mobile app to earn 50 points.
-                  </p>
-                  <button
-                    onClick={handleGenerateQR}
-                    disabled={generatingQR}
-                    className="w-full py-2.5 px-4 rounded-xl bg-primary-500 hover:bg-primary-600 font-bold text-xs text-white shadow-md transition-all flex items-center justify-center gap-2"
-                  >
-                    <QrCode className="w-4 h-4" />
-                    <span>{generatingQR ? 'Generating Token...' : 'Project Event Check-in QR'}</span>
-                  </button>
+
+                  {/* Lifecycle Toggle */}
+                  <div className="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-neutral-300">Status</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                        event.is_completed
+                          ? 'bg-neutral-700 text-neutral-200'
+                          : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                      }`}>
+                        {event.is_completed ? '🏁 Concluded' : '● Upcoming'}
+                      </span>
+                    </div>
+                    <button
+                      onClick={handleToggleCompletion}
+                      disabled={updatingCompletion}
+                      className={`w-full py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                        event.is_completed
+                          ? 'bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700'
+                          : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow'
+                      }`}
+                    >
+                      {updatingCompletion ? (
+                        <span>Updating...</span>
+                      ) : event.is_completed ? (
+                        <>
+                          <span>↺ Re-open as Upcoming</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Mark Event Concluded</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* QR Projector Button */}
+                  {!event.is_completed && (
+                    <button
+                      onClick={handleGenerateQR}
+                      disabled={generatingQR}
+                      className="w-full py-2.5 px-4 rounded-xl bg-primary-500 hover:bg-primary-600 font-bold text-xs text-white shadow-md transition-all flex items-center justify-center gap-2"
+                    >
+                      <QrCode className="w-4 h-4" />
+                      <span>{generatingQR ? 'Generating Token...' : 'Project Event Check-in QR'}</span>
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -350,8 +411,10 @@ export function EventDetailPage() {
                   <div className="flex items-start gap-3">
                     <Calendar className="w-4 h-4 text-primary-500 shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-semibold text-neutral-900">Date & Time</p>
-                      <p className="text-neutral-500 mt-0.5">{formatDateTime(event.start_at)}</p>
+                      <p className="font-semibold text-neutral-900">
+                        {event.is_completed ? 'Concluded On' : 'Date & Time'}
+                      </p>
+                      <p className="text-neutral-500 mt-0.5">{formatDateTime(event.start_at || event.date)}</p>
                     </div>
                   </div>
 
@@ -367,7 +430,7 @@ export function EventDetailPage() {
                     <Users className="w-4 h-4 text-primary-500 shrink-0 mt-0.5" />
                     <div className="w-full">
                       <div className="flex justify-between items-center mb-1">
-                        <p className="font-semibold text-neutral-900">Capacity</p>
+                        <p className="font-semibold text-neutral-900">Attendance / Capacity</p>
                         <span className="text-neutral-500">{count} / {capacity}</span>
                       </div>
                       <div className="w-full bg-neutral-200 rounded-full h-2 overflow-hidden">
@@ -376,13 +439,39 @@ export function EventDetailPage() {
                           style={{ width: `${fillRate}%` }}
                         />
                       </div>
-                      <p className="text-[11px] text-neutral-400 mt-1">{spotsLeft} spots available</p>
+                      <p className="text-[11px] text-neutral-400 mt-1">
+                        {event.is_completed ? 'Event finished' : `${spotsLeft} spots available`}
+                      </p>
                     </div>
                   </div>
                 </div>
 
                 <div className="pt-4 border-t border-neutral-200">
-                  {registered ? (
+                  {event.is_completed ? (
+                    <div className="space-y-3">
+                      <div className="p-3.5 bg-neutral-100 rounded-xl border border-neutral-200 text-neutral-700 text-xs space-y-1">
+                        <div className="flex items-center gap-1.5 font-bold text-neutral-900">
+                          <span>🏁</span>
+                          <span>Event Concluded</span>
+                        </div>
+                        <p className="text-[11px] text-neutral-500">
+                          This event has concluded. Registrations are closed.
+                        </p>
+                      </div>
+
+                      {event.feedback_link && (
+                        <a
+                          href={event.feedback_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full py-2.5 px-4 rounded-xl bg-primary-500 hover:bg-primary-600 text-white font-bold text-xs text-center flex items-center justify-center gap-1.5 shadow transition-all"
+                        >
+                          <span>Give Event Feedback</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                    </div>
+                  ) : registered ? (
                     <div className="space-y-2">
                       <div className="p-3 bg-success-50 text-success-700 rounded-xl border border-success-200 text-xs font-medium flex items-center gap-2">
                         <CheckCircle2 className="w-4 h-4 text-success-600 shrink-0" />

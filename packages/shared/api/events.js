@@ -6,11 +6,19 @@ import { checkTokenBucket } from '../utils/rateLimiter.js';
 export function normalizeEvent(evt) {
   if (!evt) return evt;
   const startAt = evt.start_at || evt.date || new Date().toISOString();
+  const endAt = evt.end_at || startAt;
+  const isPast = new Date(endAt).getTime() < Date.now();
+  const isCompleted = evt.is_completed === true || (evt.is_completed !== false && isPast);
+  const status = isCompleted ? 'completed' : 'upcoming';
   const banner = evt.banner_url || evt.image || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=1200&q=80';
   return {
     ...evt,
     start_at: startAt,
     date: evt.date || startAt,
+    end_at: endAt,
+    is_completed: isCompleted,
+    status,
+    is_past: isPast,
     banner_url: banner,
     image: evt.image || banner,
     tags: Array.isArray(evt.tags) ? evt.tags : (typeof evt.tags === 'string' ? [evt.tags] : []),
@@ -107,6 +115,10 @@ export async function updateEvent(id, updates) {
     throw error;
   }
   return data;
+}
+
+export async function toggleEventCompletion(id, isCompleted) {
+  return updateEvent(id, { is_completed: Boolean(isCompleted), updated_at: new Date().toISOString() });
 }
 
 export async function deleteEvent(id) {

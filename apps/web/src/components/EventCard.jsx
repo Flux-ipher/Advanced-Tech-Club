@@ -26,6 +26,8 @@ export function EventCard({
 
   const spotsLeft = Math.max(0, capacity - registrations_count);
   const fillPercentage = Math.min(100, Math.round((registrations_count / capacity) * 100));
+  const isPast = new Date(end_at || start_at).getTime() < Date.now();
+  const isCompleted = event.is_completed === true || isPast;
 
   return (
     <div className="voodoo-card-hover flex flex-col h-full overflow-hidden group">
@@ -42,11 +44,16 @@ export function EventCard({
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
 
-        {/* Category Pill */}
-        <div className="absolute top-3 left-3">
+        {/* Category & Status Pill */}
+        <div className="absolute top-3 left-3 flex items-center gap-1.5">
           <span className="px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider bg-white/95 text-neutral-900 shadow-sm backdrop-blur-sm">
             {category}
           </span>
+          {isCompleted && (
+            <span className="px-2.5 py-1 rounded-md text-xs font-bold tracking-wide bg-neutral-900/90 text-white shadow-sm backdrop-blur-sm flex items-center gap-1 border border-white/20">
+              🏁 Concluded
+            </span>
+          )}
         </div>
 
         {/* Registered status indicator overlay */}
@@ -59,7 +66,7 @@ export function EventCard({
 
         {/* Date badge on image */}
         <div className="absolute bottom-3 left-3 text-white">
-          <p className="text-xs font-semibold text-white/80">Scheduled Date</p>
+          <p className="text-xs font-semibold text-white/80">{isCompleted ? 'Concluded On' : 'Scheduled Date'}</p>
           <p className="text-sm font-bold">{formatDateTime(start_at)}</p>
         </div>
       </div>
@@ -122,7 +129,11 @@ export function EventCard({
               </button>
             )}
 
-            {isRegistered ? (
+            {isCompleted ? (
+              <span className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-neutral-100 text-neutral-500 border border-neutral-200">
+                🏁 Concluded
+              </span>
+            ) : isRegistered ? (
               <button
                 onClick={() => onUnregister(id)}
                 className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-danger-50 text-danger-700 hover:bg-danger-100 border border-danger-200 transition-colors"

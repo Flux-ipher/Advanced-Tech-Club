@@ -52,8 +52,13 @@ export function EventsPage() {
       evt.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
       evt.description.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const isUpcoming = new Date(evt.start_at) >= new Date();
-    const matchesTime = timeFilter === 'all' ? true : isUpcoming;
+    const isCompleted = evt.is_completed === true || new Date(evt.end_at || evt.start_at).getTime() < Date.now();
+    let matchesTime = true;
+    if (timeFilter === 'upcoming') {
+      matchesTime = !isCompleted;
+    } else if (timeFilter === 'completed') {
+      matchesTime = isCompleted;
+    }
 
     return matchesCategory && matchesSearch && matchesTime;
   });
@@ -148,6 +153,14 @@ export function EventsPage() {
         <div className="flex items-center gap-3">
           <div className="flex items-center bg-neutral-100 p-1 rounded-lg border border-neutral-200 text-xs">
             <button
+              onClick={() => setTimeFilter('all')}
+              className={`px-3 py-1 rounded-md font-medium transition-colors ${
+                timeFilter === 'all' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'
+              }`}
+            >
+              All Events
+            </button>
+            <button
               onClick={() => setTimeFilter('upcoming')}
               className={`px-3 py-1 rounded-md font-medium transition-colors ${
                 timeFilter === 'upcoming' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'
@@ -156,12 +169,13 @@ export function EventsPage() {
               Upcoming
             </button>
             <button
-              onClick={() => setTimeFilter('all')}
-              className={`px-3 py-1 rounded-md font-medium transition-colors ${
-                timeFilter === 'all' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'
+              onClick={() => setTimeFilter('completed')}
+              className={`px-3 py-1 rounded-md font-medium transition-colors flex items-center gap-1 ${
+                timeFilter === 'completed' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'
               }`}
             >
-              All Events
+              <span>Completed</span>
+              <span className="text-[10px]">🏁</span>
             </button>
           </div>
 
