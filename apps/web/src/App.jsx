@@ -18,6 +18,7 @@ import { ResourcesPage } from './pages/ResourcesPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { AdminPage } from './pages/AdminPage';
 import { MembersAdminPage } from './pages/MembersAdminPage';
+import { AnalyticsPage } from './pages/AnalyticsPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
 import { CheckinPage } from './pages/CheckinPage';
 import { useAuthListener } from '@atc/shared/hooks/useAuth';
