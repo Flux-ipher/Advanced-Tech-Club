@@ -38,7 +38,7 @@ import {
 export function ProfilePage() {
   const { user, updateUserProfile, isSuperAdmin, isAdmin, signOut } = useAuth();
   const { events, userRegistrations, unregister } = useEvents();
-  const { points, streak, rank, earnedBadges, allBadges, pointsLog } = useMemberGamification(user?.id);
+  const { points, streak, rank, earnedBadges = [], allBadges = [], pointsLog = [] } = useMemberGamification(user?.id);
   const navigate = useNavigate();
   const isPortal = isPortalSubdomain();
   const portalPrefix = isPortal ? '' : '/portal';
@@ -53,9 +53,16 @@ export function ProfilePage() {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isPassModalOpen, setIsPassModalOpen] = useState(false);
 
+  // Safe array fallbacks to prevent TypeError on undefined arrays
+  const safeEarnedBadges = Array.isArray(earnedBadges) ? earnedBadges : [];
+  const safeAllBadges = Array.isArray(allBadges) ? allBadges : [];
+  const safePointsLog = Array.isArray(pointsLog) ? pointsLog : [];
+  const safeEvents = Array.isArray(events) ? events : [];
+  const safeRegistrations = Array.isArray(userRegistrations) ? userRegistrations : [];
+
   // Filter events registered by current user
-  const myRegisteredEvents = events.filter((e) =>
-    userRegistrations.some((r) => r.event_id === e.id)
+  const myRegisteredEvents = safeEvents.filter((e) =>
+    safeRegistrations.some((r) => r.event_id === e.id)
   );
 
   const handleSaveProfile = (e) => {
@@ -215,7 +222,7 @@ export function ProfilePage() {
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Badges</p>
             <p className="text-xl font-extrabold text-neutral-900 tracking-tight">
-              {earnedBadges.length} <span className="text-xs font-semibold text-neutral-400">/ {allBadges.length}</span>
+              {safeEarnedBadges.length} <span className="text-xs font-semibold text-neutral-400">/ {safeAllBadges.length}</span>
             </p>
           </div>
         </div>
@@ -345,7 +352,7 @@ export function ProfilePage() {
             <div className="flex items-center justify-between pb-3 mb-4 border-b border-neutral-100">
               <h3 className="text-base font-bold text-neutral-900 uppercase tracking-wider flex items-center gap-2">
                 <Award className="w-4 h-4 text-purple-600" />
-                Badges & Accolades ({earnedBadges.length} Unlocked)
+                Badges & Accolades ({safeEarnedBadges.length} Unlocked)
               </h3>
               <Link
                 to={`${portalPrefix}/leaderboard`}
@@ -356,8 +363,8 @@ export function ProfilePage() {
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {allBadges.map((badge) => {
-                const isEarned = earnedBadges.some(
+              {safeAllBadges.map((badge) => {
+                const isEarned = safeEarnedBadges.some(
                   (b) => b.badge_id === badge.id || b.name === badge.name
                 );
                 return (
@@ -402,18 +409,18 @@ export function ProfilePage() {
               Points Activity Ledger
             </h3>
 
-            {pointsLog.length === 0 ? (
+            {safePointsLog.length === 0 ? (
               <div className="py-6 text-center text-xs text-neutral-400">
                 No activity yet. Scan event QR codes or RSVP to workshops to earn XP!
               </div>
             ) : (
               <div className="divide-y divide-neutral-100">
-                {pointsLog.slice(0, 8).map((log) => (
+                {safePointsLog.slice(0, 8).map((log) => (
                   <div key={log.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
                     <div>
                       <p className="font-semibold text-neutral-800">{log.reason || 'Activity Reward'}</p>
                       <p className="text-[10px] text-neutral-400">
-                        {new Date(log.created_at).toLocaleString([], {
+                        {new Date(log.created_at || log.awarded_at || Date.now()).toLocaleString([], {
                           month: 'short',
                           day: 'numeric',
                           hour: '2-digit',
@@ -422,7 +429,7 @@ export function ProfilePage() {
                       </p>
                     </div>
                     <span className="px-2 py-0.5 rounded-full font-mono font-bold text-xs bg-amber-50 text-amber-800 border border-amber-200">
-                      +{log.points_earned} XP
+                      +{log.points_earned || log.points || 10} XP
                     </span>
                   </div>
                 ))}

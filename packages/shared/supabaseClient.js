@@ -237,7 +237,11 @@ export function getSupabaseClient(firebaseIdToken) {
     global: {
       headers: firebaseIdToken ? { Authorization: `Bearer ${firebaseIdToken}` } : {},
     },
-    auth: { persistSession: false }, // Firebase manages session lifecycle
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false
+    },
   });
 }
 
