@@ -20,7 +20,8 @@ import {
   Smartphone,
   LogOut,
   Layers,
-  ChevronDown
+  ChevronDown,
+  Trophy
 } from 'lucide-react';
 
 export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile }) {
@@ -145,6 +146,16 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
               >
                 <Calendar className="w-4 h-4 shrink-0" />
                 {!collapsed && <span>Workshops & Sprints</span>}
+              </NavLink>
+
+              <NavLink
+                to={`${portalPrefix}/leaderboard`}
+                onClick={onCloseMobile}
+                className={navItemClass}
+                title="Leaderboard & Badges"
+              >
+                <Trophy className="w-4 h-4 shrink-0 text-amber-500" />
+                {!collapsed && <span>Leaderboard & Badges</span>}
               </NavLink>
             </div>
           </div>

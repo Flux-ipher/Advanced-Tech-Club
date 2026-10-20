@@ -1,11 +1,7 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@atc/shared/hooks/useAuth';
-import { useEvents } from '@atc/shared/hooks/useEvents';
-import { RoleBadge } from '../components/RoleBadge';
-import { Modal } from '../components/Modal';
-import { ImageUploader } from '../components/ImageUploader';
-import { formatDateTime, formatDate } from '@atc/shared/utils/formatters';
+import QRCode from 'react-qr-code';
+import { Link } from 'react-router-dom';
+import { useMemberGamification } from '@atc/shared/hooks/useGamification';
+import { isPortalSubdomain } from '@atc/shared/utils/domains';
 import {
   User,
   Mail,
@@ -22,17 +18,29 @@ import {
   Download,
   Printer,
   Sparkles,
-  LogOut
+  LogOut,
+  Trophy,
+  Flame,
+  Award,
+  History,
+  ArrowRight,
+  BookOpen,
+  Lock
 } from 'lucide-react';
 
 export function ProfilePage() {
   const { user, updateUserProfile, isSuperAdmin, isAdmin, signOut } = useAuth();
   const { events, userRegistrations, unregister } = useEvents();
+  const { points, streak, rank, earnedBadges, allBadges, pointsLog } = useMemberGamification(user?.id);
   const navigate = useNavigate();
+  const isPortal = isPortalSubdomain();
+  const portalPrefix = isPortal ? '' : '/portal';
 
   const [fullName, setFullName] = useState(user?.full_name || '');
-  const [department, setDepartment] = useState(user?.department || '');
-  const [studentId, setStudentId] = useState(user?.student_id || '');
+  const [branch, setBranch] = useState(user?.branch || user?.department || '');
+  const [rollNumber, setRollNumber] = useState(user?.roll_number || user?.student_id || '');
+  const [year, setYear] = useState(user?.year || '2nd Year');
+  const [whyJoin, setWhyJoin] = useState(user?.why_join || '');
   const [bio, setBio] = useState(user?.bio || '');
   const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url || '');
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -47,8 +55,12 @@ export function ProfilePage() {
     e.preventDefault();
     updateUserProfile({
       full_name: fullName,
-      department,
-      student_id: studentId,
+      department: branch,
+      branch,
+      student_id: rollNumber,
+      roll_number: rollNumber,
+      year,
+      why_join: whyJoin,
       bio,
       avatar_url: avatarUrl
     });
@@ -139,9 +151,72 @@ export function ProfilePage() {
         </div>
       </div>
 
+      {/* Gamification Stats Ribbon */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {/* XP Points */}
+        <div className="voodoo-card p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border-amber-200/60 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-sm shrink-0">
+            <Trophy className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">ATC Points</p>
+            <p className="text-xl font-extrabold text-neutral-900 tracking-tight">
+              {points || 0} <span className="text-xs font-semibold text-amber-600">XP</span>
+            </p>
+          </div>
+        </div>
+
+        {/* Campus Rank */}
+        <div className="voodoo-card p-4 bg-gradient-to-br from-primary-500/10 via-primary-500/5 to-transparent border-primary-200/60 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary-600 text-white flex items-center justify-center shadow-sm shrink-0 font-extrabold text-sm">
+              #{rank || '-'}
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Club Rank</p>
+              <p className="text-xs font-bold text-neutral-800">Leaderboard</p>
+            </div>
+          </div>
+          <Link
+            to={`${portalPrefix}/leaderboard`}
+            className="text-xs font-bold text-primary-600 hover:text-primary-700 flex items-center gap-0.5"
+            title="View Full Leaderboard"
+          >
+            <span>View</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        {/* Active Streak */}
+        <div className="voodoo-card p-4 bg-gradient-to-br from-orange-500/10 via-orange-500/5 to-transparent border-orange-200/60 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center shadow-sm shrink-0">
+            <Flame className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Active Streak</p>
+            <p className="text-xl font-extrabold text-neutral-900 tracking-tight">
+              {streak || 0} <span className="text-xs font-semibold text-orange-600">Days 🔥</span>
+            </p>
+          </div>
+        </div>
+
+        {/* Badges Earned */}
+        <div className="voodoo-card p-4 bg-gradient-to-br from-purple-500/10 via-purple-500/5 to-transparent border-purple-200/60 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-sm shrink-0">
+            <Award className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Badges</p>
+            <p className="text-xl font-extrabold text-neutral-900 tracking-tight">
+              {earnedBadges.length} <span className="text-xs font-semibold text-neutral-400">/ {allBadges.length}</span>
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Grid: Edit Profile Form + Registered Events */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left 2 Cols: Edit Details */}
+        {/* Left 2 Cols: Edit Details + Badges + Points History */}
         <div className="lg:col-span-2 space-y-6">
           <div className="voodoo-card p-6">
             <h3 className="text-base font-bold text-neutral-900 uppercase tracking-wider mb-4 pb-2 border-b border-neutral-100 flex items-center gap-2">
@@ -169,30 +244,62 @@ export function ProfilePage() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-bold uppercase text-neutral-700 mb-1">
-                    Department
+                    Branch / Dept
                   </label>
                   <input
                     type="text"
-                    value={department}
-                    onChange={(e) => setDepartment(e.target.value)}
+                    value={branch}
+                    onChange={(e) => setBranch(e.target.value)}
+                    placeholder="e.g. CSE / IT"
                     className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold uppercase text-neutral-700 mb-1">
-                    Student ID
+                    Roll Number / ID
                   </label>
                   <input
                     type="text"
-                    value={studentId}
-                    onChange={(e) => setStudentId(e.target.value)}
+                    value={rollNumber}
+                    onChange={(e) => setRollNumber(e.target.value)}
+                    placeholder="e.g. 23CS041"
                     className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500"
                   />
                 </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-neutral-700 mb-1">
+                    Year of Study
+                  </label>
+                  <select
+                    value={year}
+                    onChange={(e) => setYear(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500 bg-white"
+                  >
+                    <option value="1st Year">1st Year</option>
+                    <option value="2nd Year">2nd Year</option>
+                    <option value="3rd Year">3rd Year</option>
+                    <option value="4th Year">4th Year</option>
+                    <option value="Postgraduate">Postgraduate</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-neutral-700 mb-1">
+                  Why Did You Join ATC?
+                </label>
+                <input
+                  type="text"
+                  value={whyJoin}
+                  onChange={(e) => setWhyJoin(e.target.value)}
+                  placeholder="e.g. Passionate about AI, Systems, Web3 and building real projects"
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500"
+                />
               </div>
 
               <div>
@@ -200,7 +307,7 @@ export function ProfilePage() {
                   Bio / Technical Interests
                 </label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
                   className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500"
@@ -212,7 +319,7 @@ export function ProfilePage() {
                 <ImageUploader
                   mode="avatar"
                   label="Profile Picture / Avatar"
-                  helperText="Upload your real photo or avatar (PNG, JPG, WEBP, GIF up to 5MB). Other file types are prohibited."
+                  helperText="Upload your real photo or avatar (PNG, JPG, WEBP, GIF up to 5MB)."
                   value={avatarUrl}
                   onChange={(newAvatar) => setAvatarUrl(newAvatar)}
                 />
@@ -224,6 +331,96 @@ export function ProfilePage() {
                 </button>
               </div>
             </form>
+          </div>
+
+          {/* Badges & Accolades Showcase */}
+          <div className="voodoo-card p-6">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-neutral-100">
+              <h3 className="text-base font-bold text-neutral-900 uppercase tracking-wider flex items-center gap-2">
+                <Award className="w-4 h-4 text-purple-600" />
+                Badges & Accolades ({earnedBadges.length} Unlocked)
+              </h3>
+              <Link
+                to={`${portalPrefix}/leaderboard`}
+                className="text-xs font-semibold text-primary-600 hover:text-primary-700 flex items-center gap-1"
+              >
+                Leaderboard <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {allBadges.map((badge) => {
+                const isEarned = earnedBadges.some(
+                  (b) => b.badge_id === badge.id || b.name === badge.name
+                );
+                return (
+                  <div
+                    key={badge.id}
+                    className={`p-3 rounded-xl border transition-all ${
+                      isEarned
+                        ? 'bg-purple-50/60 border-purple-200 shadow-xs'
+                        : 'bg-neutral-50/60 border-neutral-200/80 opacity-60'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-xl">{badge.icon || '🎖️'}</span>
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-bold text-neutral-900 truncate">
+                          {badge.name}
+                        </h4>
+                        <span
+                          className={`text-[9px] font-semibold px-1.5 py-0.2 rounded-full inline-block ${
+                            isEarned
+                              ? 'bg-purple-100 text-purple-800'
+                              : 'bg-neutral-200 text-neutral-600'
+                          }`}
+                        >
+                          {isEarned ? 'Unlocked' : 'Locked'}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-neutral-500 leading-snug line-clamp-2">
+                      {badge.description}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Points History Ledger */}
+          <div className="voodoo-card p-6">
+            <h3 className="text-base font-bold text-neutral-900 uppercase tracking-wider mb-4 pb-2 border-b border-neutral-100 flex items-center gap-2">
+              <History className="w-4 h-4 text-amber-500" />
+              Points Activity Ledger
+            </h3>
+
+            {pointsLog.length === 0 ? (
+              <div className="py-6 text-center text-xs text-neutral-400">
+                No activity yet. Scan event QR codes or RSVP to workshops to earn XP!
+              </div>
+            ) : (
+              <div className="divide-y divide-neutral-100">
+                {pointsLog.slice(0, 8).map((log) => (
+                  <div key={log.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
+                    <div>
+                      <p className="font-semibold text-neutral-800">{log.reason || 'Activity Reward'}</p>
+                      <p className="text-[10px] text-neutral-400">
+                        {new Date(log.created_at).toLocaleString([], {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full font-mono font-bold text-xs bg-amber-50 text-amber-800 border border-amber-200">
+                      +{log.points_earned} XP
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Registered Events Section */}
@@ -407,26 +604,22 @@ export function ProfilePage() {
                 </div>
               </div>
 
-              {/* High-density QR Matrix Simulation */}
+              {/* Real QR Matrix Component */}
               <div className="pt-4 flex flex-col items-center">
-                <div className="p-3 bg-white rounded-xl shadow-inner border border-neutral-200">
-                  <div className="w-40 h-40 grid grid-cols-10 gap-0.5 p-1 bg-white">
-                    {Array.from({ length: 100 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className={`w-full h-full rounded-[1px] ${
-                          (i % 2 === 0 && i % 3 === 0) ||
-                          (i < 30 && i % 7 === 0) ||
-                          i % 5 === 0 ||
-                          i === 42 ||
-                          i === 55 ||
-                          i === 88
-                            ? 'bg-neutral-900'
-                            : 'bg-white'
-                        }`}
-                      />
-                    ))}
-                  </div>
+                <div className="p-3 bg-white rounded-2xl shadow-inner border border-neutral-200">
+                  <QRCode
+                    value={JSON.stringify({
+                      type: 'atc_member',
+                      uid: user?.id,
+                      roll: rollNumber || user?.student_id || user?.roll_number || 'ATC-MEMBER',
+                      name: user?.full_name,
+                      email: user?.email
+                    })}
+                    size={160}
+                    bgColor="#ffffff"
+                    fgColor="#09090b"
+                    level="H"
+                  />
                 </div>
                 <p className="text-[10px] font-mono text-neutral-400 mt-2">
                   PASS-TOKEN: {user?.id || 'usr-ritesh-admin'}-2026-ATC

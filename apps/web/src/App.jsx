@@ -18,7 +18,8 @@ import { ResourcesPage } from './pages/ResourcesPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { AdminPage } from './pages/AdminPage';
 import { MembersAdminPage } from './pages/MembersAdminPage';
-import { AnalyticsPage } from './pages/AnalyticsPage';
+import { LeaderboardPage } from './pages/LeaderboardPage';
+import { CheckinPage } from './pages/CheckinPage';
 import { useAuthListener } from '@atc/shared/hooks/useAuth';
 import { isPortalSubdomain } from '@atc/shared/utils/domains';
 
@@ -144,6 +145,22 @@ export function App() {
             </PortalLayout>
           }
         />
+        <Route
+          path="/leaderboard"
+          element={
+            <PortalLayout>
+              <LeaderboardPage />
+            </PortalLayout>
+          }
+        />
+        <Route
+          path="/checkin"
+          element={
+            <PortalLayout>
+              <CheckinPage />
+            </PortalLayout>
+          }
+        />
 
         {/* Public auth pages accessible on portal domain */}
         <Route
@@ -177,6 +194,8 @@ export function App() {
         <Route path="/portal/events/:id" element={<Navigate to="/events/:id" replace />} />
         <Route path="/portal/resources" element={<Navigate to="/resources" replace />} />
         <Route path="/portal/profile" element={<Navigate to="/profile" replace />} />
+        <Route path="/portal/leaderboard" element={<Navigate to="/leaderboard" replace />} />
+        <Route path="/portal/checkin" element={<Navigate to="/checkin" replace />} />
 
         {/* Fallback to Portal Home */}
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -237,6 +256,22 @@ export function App() {
           </PublicLayout>
         }
       />
+      <Route
+        path="/leaderboard"
+        element={
+          <PublicLayout>
+            <LeaderboardPage />
+          </PublicLayout>
+        }
+      />
+      <Route
+        path="/checkin"
+        element={
+          <PublicLayout>
+            <CheckinPage />
+          </PublicLayout>
+        }
+      />
 
       {/* ========================================================= */}
       {/* 2. PROTECTED CLUB SUBDOMAIN PORTAL ROUTES (/portal/*)    */}
@@ -261,6 +296,14 @@ export function App() {
       <Route
         path="/portal/profile"
         element={<PortalRoute component={ProfilePage} cleanSubpath="/profile" />}
+      />
+      <Route
+        path="/portal/leaderboard"
+        element={<PortalRoute component={LeaderboardPage} cleanSubpath="/leaderboard" />}
+      />
+      <Route
+        path="/portal/checkin"
+        element={<PortalRoute component={CheckinPage} cleanSubpath="/checkin" />}
       />
 
       {/* Admin Management Routes */}

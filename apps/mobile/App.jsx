@@ -27,7 +27,24 @@ import {
 import * as FileSystem from 'expo-file-system';
 import { BarCodeScanner } from 'expo-barcode-scanner';
 import { supabase } from '@atc/shared/supabaseClient';
-import { initialProfiles, initialAnnouncements, initialEvents, initialResources } from '@atc/shared/mockData';
+import {
+  initialProfiles,
+  initialAnnouncements,
+  initialEvents,
+  initialResources,
+  initialBadges,
+  initialMemberPoints,
+  initialMemberBadges
+} from '@atc/shared/mockData';
+import {
+  getLeaderboard,
+  getMyRank,
+  getMemberPoints,
+  getAllBadges,
+  getMemberBadges,
+  awardPoints,
+  recordEventCheckin
+} from '@atc/shared/api/gamification';
 import { colors } from '@atc/shared/theme';
 import { Analytics } from '@atc/shared/utils/analytics';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
@@ -124,6 +141,32 @@ export default function App() {
       status: 'Attended'
     }
   ]);
+
+  // Gamification & Badges State
+  const [memberPoints, setMemberPoints] = useState(150);
+  const [memberRank, setMemberRank] = useState(1);
+  const [memberStreak, setMemberStreak] = useState(3);
+  const [allBadgesList, setAllBadgesList] = useState(initialBadges);
+  const [earnedBadgesList, setEarnedBadgesList] = useState([
+    { badge_id: 'bdg-1', name: 'First Step', icon: '🚀', description: 'Joined the Advanced Tech Club community' }
+  ]);
+  const [leaderboardList, setLeaderboardList] = useState([]);
+  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
+  const [badgeUnlockCelebration, setBadgeUnlockCelebration] = useState(null);
+
+  // First-time Onboarding Modal State
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [onboardRoll, setOnboardRoll] = useState('');
+  const [onboardBranch, setOnboardBranch] = useState('Computer Science & Engineering');
+  const [onboardYear, setOnboardYear] = useState('2nd Year');
+  const [onboardWhyJoin, setOnboardWhyJoin] = useState('');
+  const [onboardSubmitting, setOnboardSubmitting] = useState(false);
+
+  // Member QR Event Scanner State
+  const [isMemberScannerOpen, setIsMemberScannerOpen] = useState(false);
+  const [memberScanToken, setMemberScanToken] = useState('');
+  const [memberCheckinSubmitting, setMemberCheckinSubmitting] = useState(false);
+  const [memberCheckinSuccess, setMemberCheckinSuccess] = useState(null);
 
   const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
 
@@ -291,7 +334,27 @@ export default function App() {
         setTotalMembersCount(count);
       }
 
-      // Re-sync current logged-in user profile in background
+      // Load Live Leaderboard
+      try {
+        const lb = await getLeaderboard(20);
+        if (lb && lb.length > 0) {
+          setLeaderboardList(lb);
+        }
+      } catch (lbErr) {
+        console.warn('[ATC Mobile] Leaderboard fetch note:', lbErr);
+      }
+
+      // Load Badges Catalog
+      try {
+        const badges = await getAllBadges();
+        if (badges && badges.length > 0) {
+          setAllBadgesList(badges);
+        }
+      } catch (bErr) {
+        console.warn('[ATC Mobile] Badges fetch note:', bErr);
+      }
+
+      // Re-sync current logged-in user profile & gamification in background
       if (currentUser?.email) {
         const { data: dbUser } = await supabase
           .from('profiles')
@@ -305,6 +368,33 @@ export default function App() {
             FileSystem.writeAsStringAsync(SESSION_FILE, JSON.stringify(merged)).catch(() => {});
             return merged;
           });
+
+          // Check if onboarding is needed
+          if (dbUser.onboarding_complete === false && !isGuest) {
+            setIsOnboardingOpen(true);
+          }
+        }
+
+        // Fetch user points, streak, rank and badges
+        const targetUserId = dbUser?.id || currentUser?.id;
+        if (targetUserId) {
+          try {
+            const mp = await getMemberPoints(targetUserId);
+            if (mp) {
+              setMemberPoints(mp.total_points || 0);
+              setMemberStreak(mp.checkin_streak || 0);
+            }
+            const rank = await getMyRank(targetUserId);
+            if (rank) {
+              setMemberRank(rank);
+            }
+            const userBadges = await getMemberBadges(targetUserId);
+            if (userBadges && userBadges.length > 0) {
+              setEarnedBadgesList(userBadges);
+            }
+          } catch (gamifyErr) {
+            console.warn('[ATC Mobile] Gamification sync note:', gamifyErr);
+          }
         }
       }
 
@@ -471,13 +561,23 @@ export default function App() {
       role: resolvedRole,
       is_verified: isVerified,
       verification_status: verificationStatus,
-      department: existingProfile?.department || 'Computer Science & Engineering',
-      student_id: existingProfile?.student_id || (isRitesh ? 'ADMIN-001' : ''),
+      department: existingProfile?.department || existingProfile?.branch || 'Computer Science & Engineering',
+      student_id: existingProfile?.student_id || existingProfile?.roll_number || (isRitesh ? 'ADMIN-001' : ''),
+      roll_number: existingProfile?.roll_number || existingProfile?.student_id || (isRitesh ? 'ADMIN-001' : ''),
+      branch: existingProfile?.branch || existingProfile?.department || 'Computer Science & Engineering',
+      year: existingProfile?.year || '2nd Year',
+      why_join: existingProfile?.why_join || '',
+      onboarding_complete: existingProfile?.onboarding_complete ?? (isRitesh || !!existingProfile?.student_id),
       avatar_url: existingProfile?.avatar_url || avatarUrl || (isRitesh
         ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
         : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'),
       interests: existingProfile?.interests || ['AI & Machine Learning', 'Mobile Development']
     };
+
+    // If member has not completed onboarding, trigger onboarding modal
+    if (resolved.onboarding_complete === false) {
+      setTimeout(() => setIsOnboardingOpen(true), 400);
+    }
 
     // Persist profile to Supabase database
     try {
@@ -604,6 +704,168 @@ export default function App() {
         }
       ]
     );
+  };
+
+  // =========================================================================
+  // ONBOARDING & GAMIFICATION HANDLERS
+  // =========================================================================
+
+  const handleCompleteOnboarding = async () => {
+    if (!onboardRoll.trim()) {
+      Alert.alert('Required', 'Please enter your university Roll Number / Student ID.');
+      return;
+    }
+    setOnboardSubmitting(true);
+    try {
+      const updatedUser = {
+        ...currentUser,
+        roll_number: onboardRoll.trim(),
+        student_id: onboardRoll.trim(),
+        branch: onboardBranch,
+        department: onboardBranch,
+        year: onboardYear,
+        why_join: onboardWhyJoin.trim(),
+        onboarding_complete: true
+      };
+
+      try {
+        await supabase
+          .from('profiles')
+          .update({
+            roll_number: onboardRoll.trim(),
+            student_id: onboardRoll.trim(),
+            branch: onboardBranch,
+            department: onboardBranch,
+            year: onboardYear,
+            why_join: onboardWhyJoin.trim(),
+            onboarding_complete: true
+          })
+          .eq('id', currentUser.id);
+      } catch (dbErr) {
+        console.warn('[ATC Mobile] Onboarding DB update notice:', dbErr);
+      }
+
+      // Award +25 XP
+      try {
+        await awardPoints(currentUser.id, 25, 'First-time Onboarding Complete');
+      } catch {}
+      setMemberPoints((prev) => prev + 25);
+
+      // Unlock First Step badge
+      const newBadge = {
+        badge_id: 'bdg-1',
+        name: 'First Step',
+        icon: '🚀',
+        description: 'Completed member onboarding on mobile'
+      };
+      setEarnedBadgesList((prev) => {
+        if (prev.some((b) => b.name === 'First Step')) return prev;
+        return [...prev, newBadge];
+      });
+
+      setCurrentUser(updatedUser);
+      await saveMobileSession(updatedUser);
+      setIsOnboardingOpen(false);
+
+      // Trigger Badge Unlock Celebration Modal
+      setBadgeUnlockCelebration({
+        badge: newBadge,
+        pointsAwarded: 25,
+        title: 'Welcome to ATC!'
+      });
+      triggerToast('Onboarding complete! +25 XP earned 🚀');
+    } catch (err) {
+      console.warn('[ATC Mobile] Onboarding error:', err);
+      // Local fallback
+      const updatedUser = {
+        ...currentUser,
+        roll_number: onboardRoll.trim(),
+        student_id: onboardRoll.trim(),
+        branch: onboardBranch,
+        year: onboardYear,
+        why_join: onboardWhyJoin.trim(),
+        onboarding_complete: true
+      };
+      setCurrentUser(updatedUser);
+      await saveMobileSession(updatedUser);
+      setIsOnboardingOpen(false);
+    } finally {
+      setOnboardSubmitting(false);
+    }
+  };
+
+  const handleMemberScanCheckin = async (scannedData) => {
+    const raw = scannedData || memberScanToken;
+    if (!raw || memberCheckinSubmitting) return;
+    setMemberCheckinSubmitting(true);
+
+    try {
+      let token = String(raw).trim();
+      // If URL was scanned e.g. https://advclub.online/portal/checkin?token=TOKEN123
+      if (token.includes('token=')) {
+        const parts = token.split('token=');
+        token = parts[1].split('&')[0];
+      } else if (token.startsWith('{') && token.endsWith('}')) {
+        try {
+          const parsed = JSON.parse(token);
+          if (parsed.token) token = parsed.token;
+        } catch {}
+      }
+
+      const res = await recordEventCheckin(token, currentUser?.id);
+      if (res.success) {
+        setMemberPoints(res.total_points || (memberPoints + 50));
+        setMemberStreak(res.streak || (memberStreak + 1));
+        setMemberCheckinSuccess({
+          eventTitle: res.eventTitle || 'Campus Workshop',
+          pointsEarned: res.pointsAwarded || 50,
+          streak: res.streak || (memberStreak + 1)
+        });
+
+        if (res.badgeUnlocked) {
+          setBadgeUnlockCelebration({
+            badge: res.badgeUnlocked,
+            pointsAwarded: 50,
+            title: 'Badge Unlocked at Workshop!'
+          });
+        }
+        triggerToast('Check-in confirmed! +50 XP 🎉');
+      } else {
+        Alert.alert('Check-in Notice', res.error || 'Invalid or expired event QR code.');
+      }
+    } catch (err) {
+      Alert.alert('Scan Check-in', err.message || 'Could not verify event token');
+    } finally {
+      setMemberCheckinSubmitting(false);
+    }
+  };
+
+  const getEventCountdown = (event) => {
+    try {
+      const targetTime = event.start_at || event.date;
+      if (!targetTime) return 'Registration Open';
+      const eventDate = new Date(targetTime);
+      const now = new Date();
+      const diffMs = eventDate.getTime() - now.getTime();
+
+      if (diffMs <= 0) {
+        return '🏁 Concluded';
+      }
+
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+      if (diffHours < 1) {
+        return `⏳ Starts in ${diffMinutes}m`;
+      }
+      if (diffHours < 24) {
+        return `⏳ Starts in ${diffHours}h ${diffMinutes}m`;
+      }
+      const days = Math.floor(diffHours / 24);
+      return `🗓️ in ${days} ${days === 1 ? 'day' : 'days'}`;
+    } catch {
+      return 'Registration Open';
+    }
   };
 
   // Google Sign-In Sheet Bottom Modal (1-Tap Saved Account Selection)
@@ -1525,6 +1787,529 @@ export default function App() {
       </Modal>
     );
   };
+
+  // =========================================================================
+  // ONBOARDING, MEMBER SCANNER, LEADERBOARD & BADGE CELEBRATION MODALS
+  // =========================================================================
+
+  const renderOnboardingModal = () => (
+    <Modal visible={isOnboardingOpen} animationType="slide" transparent>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', padding: 20 }}
+      >
+        <View style={{ backgroundColor: '#ffffff', borderRadius: 24, padding: 22, maxHeight: '90%' }}>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <View style={{ alignItems: 'center', marginBottom: 14 }}>
+              <View
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 26,
+                  backgroundColor: colors.primary[50],
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginBottom: 8
+                }}
+              >
+                <Text style={{ fontSize: 26 }}>🚀</Text>
+              </View>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.neutral[900], textAlign: 'center' }}>
+                Complete Your ATC Member Profile
+              </Text>
+              <Text style={{ fontSize: 12, color: colors.neutral[500], textAlign: 'center', marginTop: 4 }}>
+                Join the official student developer community & earn +25 XP
+              </Text>
+            </View>
+
+            <View style={{ gap: 12 }}>
+              {/* Roll Number */}
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                  University Roll Number / Student ID *
+                </Text>
+                <TextInput
+                  placeholder="e.g. 23CS041 or CS2026-088"
+                  value={onboardRoll}
+                  onChangeText={setOnboardRoll}
+                  autoCapitalize="characters"
+                  style={{
+                    backgroundColor: colors.neutral[50],
+                    borderWidth: 1,
+                    borderColor: colors.neutral[300],
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    fontSize: 13,
+                    color: colors.neutral[900]
+                  }}
+                />
+              </View>
+
+              {/* Branch / Department Selection */}
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 6 }}>
+                  Branch / Department
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {[
+                    'Computer Science & Engineering',
+                    'Information Technology',
+                    'Electronics & Comm',
+                    'AI & Data Science',
+                    'Mechanical Eng',
+                    'Electrical Eng'
+                  ].map((b) => (
+                    <TouchableOpacity
+                      key={b}
+                      onPress={() => setOnboardBranch(b)}
+                      style={{
+                        paddingHorizontal: 9,
+                        paddingVertical: 6,
+                        borderRadius: 8,
+                        backgroundColor: onboardBranch === b ? colors.primary[500] : colors.neutral[100]
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 'bold',
+                          color: onboardBranch === b ? '#ffffff' : colors.neutral[700]
+                        }}
+                      >
+                        {b}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Year of Study */}
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 6 }}>
+                  Year of Study
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  {['1st Year', '2nd Year', '3rd Year', '4th Year', 'Postgrad'].map((y) => (
+                    <TouchableOpacity
+                      key={y}
+                      onPress={() => setOnboardYear(y)}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 8,
+                        borderRadius: 8,
+                        backgroundColor: onboardYear === y ? colors.primary[500] : colors.neutral[100],
+                        alignItems: 'center'
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 'bold',
+                          color: onboardYear === y ? '#ffffff' : colors.neutral[700]
+                        }}
+                      >
+                        {y.split(' ')[0]}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Why Did You Join ATC */}
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                  Why do you want to join ATC?
+                </Text>
+                <TextInput
+                  placeholder="e.g. Build production systems, participate in hackathons, and learn with peers..."
+                  value={onboardWhyJoin}
+                  onChangeText={setOnboardWhyJoin}
+                  multiline
+                  numberOfLines={3}
+                  style={{
+                    backgroundColor: colors.neutral[50],
+                    borderWidth: 1,
+                    borderColor: colors.neutral[300],
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    fontSize: 13,
+                    height: 70,
+                    textAlignVertical: 'top',
+                    color: colors.neutral[900]
+                  }}
+                />
+              </View>
+            </View>
+
+            <TouchableOpacity
+              onPress={handleCompleteOnboarding}
+              disabled={onboardSubmitting}
+              style={{
+                backgroundColor: colors.primary[500],
+                paddingVertical: 14,
+                borderRadius: 12,
+                alignItems: 'center',
+                marginTop: 20
+              }}
+            >
+              {onboardSubmitting ? (
+                <ActivityIndicator color="#ffffff" size="small" />
+              ) : (
+                <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 14 }}>
+                  Complete Profile & Claim 25 XP 🚀
+                </Text>
+              )}
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+
+  const renderMemberScannerModal = () => (
+    <Modal visible={isMemberScannerOpen} animationType="slide" transparent>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', padding: 20 }}>
+        <View
+          style={{
+            backgroundColor: '#0f172a',
+            borderRadius: 24,
+            padding: 22,
+            borderWidth: 1,
+            borderColor: '#1e293b',
+            maxHeight: '90%'
+          }}
+        >
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <View>
+              <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#ffffff' }}>
+                📷 Event Check-in Scanner
+              </Text>
+              <Text style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                Scan the projected event QR to earn +50 XP & streak
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => {
+                setIsMemberScannerOpen(false);
+                setMemberCheckinSuccess(null);
+                setMemberScanToken('');
+              }}
+              style={{ backgroundColor: '#1e293b', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 }}
+            >
+              <Text style={{ color: '#94a3b8', fontWeight: 'bold', fontSize: 12 }}>✕ Close</Text>
+            </TouchableOpacity>
+          </View>
+
+          {memberCheckinSuccess ? (
+            <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+              <Text style={{ fontSize: 44, marginBottom: 10 }}>🎉</Text>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#ffffff', textAlign: 'center' }}>
+                Check-in Confirmed!
+              </Text>
+              <Text style={{ fontSize: 13, color: '#a5b4fc', textAlign: 'center', marginTop: 4 }}>
+                {memberCheckinSuccess.eventTitle}
+              </Text>
+              <View
+                style={{
+                  backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                  borderColor: '#10b981',
+                  borderWidth: 1,
+                  paddingHorizontal: 16,
+                  paddingVertical: 10,
+                  borderRadius: 12,
+                  marginTop: 16,
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#34d399' }}>
+                  +{memberCheckinSuccess.pointsEarned} XP Awarded
+                </Text>
+                <Text style={{ fontSize: 11, color: '#6ee7b7', marginTop: 2 }}>
+                  Current Streak: {memberCheckinSuccess.streak} Days 🔥
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => {
+                  setIsMemberScannerOpen(false);
+                  setMemberCheckinSuccess(null);
+                }}
+                style={{
+                  backgroundColor: colors.primary[500],
+                  paddingVertical: 12,
+                  paddingHorizontal: 30,
+                  borderRadius: 12,
+                  marginTop: 20
+                }}
+              >
+                <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={{ gap: 14 }}>
+              {/* Camera Scanner Viewfinder */}
+              <View
+                style={{
+                  height: 220,
+                  backgroundColor: '#020617',
+                  borderRadius: 16,
+                  overflow: 'hidden',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 2,
+                  borderColor: colors.primary[500]
+                }}
+              >
+                {hasCameraPermission === false ? (
+                  <Text style={{ color: '#ef4444', fontSize: 12, textAlign: 'center', padding: 16 }}>
+                    Camera permission not granted. Use the manual token entry below.
+                  </Text>
+                ) : (
+                  <BarCodeScanner
+                    onBarCodeScanned={({ data }) => handleMemberScanCheckin(data)}
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                )}
+                <View
+                  style={{
+                    position: 'absolute',
+                    width: 140,
+                    height: 140,
+                    borderWidth: 2,
+                    borderColor: 'rgba(255,255,255,0.8)',
+                    borderRadius: 12
+                  }}
+                />
+              </View>
+
+              {/* Manual Token Fallback */}
+              <View style={{ backgroundColor: '#1e293b', padding: 12, borderRadius: 12 }}>
+                <Text style={{ fontSize: 11, color: '#94a3b8', marginBottom: 6 }}>
+                  Or enter check-in token manually:
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <TextInput
+                    placeholder="e.g. EVT-..."
+                    placeholderTextColor="#64748b"
+                    value={memberScanToken}
+                    onChangeText={setMemberScanToken}
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#0f172a',
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: '#334155',
+                      paddingHorizontal: 10,
+                      paddingVertical: 8,
+                      color: '#ffffff',
+                      fontSize: 12
+                    }}
+                  />
+                  <TouchableOpacity
+                    onPress={() => handleMemberScanCheckin(memberScanToken)}
+                    disabled={memberCheckinSubmitting}
+                    style={{
+                      backgroundColor: colors.primary[500],
+                      paddingHorizontal: 14,
+                      borderRadius: 8,
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {memberCheckinSubmitting ? (
+                      <ActivityIndicator color="#ffffff" size="small" />
+                    ) : (
+                      <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>Verify</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const renderLeaderboardModal = () => (
+    <Modal visible={isLeaderboardOpen} animationType="slide" transparent>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center', padding: 20 }}>
+        <View style={{ backgroundColor: '#ffffff', borderRadius: 24, padding: 20, maxHeight: '85%' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <View>
+              <Text style={{ fontSize: 17, fontWeight: 'bold', color: colors.neutral[900] }}>
+                🏆 ATC Leaderboard & XP
+              </Text>
+              <Text style={{ fontSize: 11, color: colors.neutral[500] }}>
+                Spring 2026 Campus Developer Standings
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setIsLeaderboardOpen(false)}
+              style={{ backgroundColor: colors.neutral[100], paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}
+            >
+              <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.neutral[600] }}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Top 3 Podium Cards */}
+          <View style={{ flexDirection: 'row', gap: 6, marginBottom: 14, justifyContent: 'center' }}>
+            {leaderboardList.slice(0, 3).map((item, idx) => {
+              const medals = ['🥇', '🥈', '🥉'];
+              const bgColors = ['#fef3c7', '#f1f5f9', '#ffedd5'];
+              return (
+                <View
+                  key={item.user_id || idx}
+                  style={{
+                    flex: 1,
+                    backgroundColor: bgColors[idx] || '#ffffff',
+                    borderWidth: 1,
+                    borderColor: colors.neutral[200],
+                    borderRadius: 14,
+                    padding: 8,
+                    alignItems: 'center'
+                  }}
+                >
+                  <Text style={{ fontSize: 18 }}>{medals[idx]}</Text>
+                  <Image
+                    source={{ uri: item.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80' }}
+                    style={{ width: 36, height: 36, borderRadius: 18, marginVertical: 4 }}
+                  />
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[900], textAlign: 'center' }} numberOfLines={1}>
+                    {item.full_name?.split(' ')[0]}
+                  </Text>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[700], marginTop: 2 }}>
+                    {item.total_points} XP
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+
+          {/* Full Rankings ScrollView */}
+          <ScrollView showsVerticalScrollIndicator={false} style={{ gap: 6 }}>
+            {leaderboardList.map((m, idx) => (
+              <View
+                key={m.user_id || idx}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 8,
+                  paddingHorizontal: 10,
+                  borderRadius: 10,
+                  backgroundColor: m.user_id === currentUser?.id ? colors.primary[50] : '#ffffff',
+                  borderWidth: 1,
+                  borderColor: m.user_id === currentUser?.id ? colors.primary[200] : colors.neutral[100],
+                  marginBottom: 6
+                }}
+              >
+                <Text style={{ width: 28, fontSize: 12, fontWeight: 'bold', color: colors.neutral[500] }}>
+                  #{idx + 1}
+                </Text>
+                <Image
+                  source={{ uri: m.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80' }}
+                  style={{ width: 32, height: 32, borderRadius: 16, marginRight: 10 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.neutral[900] }} numberOfLines={1}>
+                    {m.full_name}
+                  </Text>
+                  <Text style={{ fontSize: 10, color: colors.neutral[400] }}>
+                    {m.branch || 'CSE'} · {m.checkin_streak || 0}d streak 🔥
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.primary[700] }}>
+                  {m.total_points} XP
+                </Text>
+              </View>
+            ))}
+          </ScrollView>
+
+          <TouchableOpacity
+            onPress={() => setIsLeaderboardOpen(false)}
+            style={{
+              backgroundColor: colors.neutral[900],
+              paddingVertical: 12,
+              borderRadius: 12,
+              alignItems: 'center',
+              marginTop: 12
+            }}
+          >
+            <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>Done</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const renderBadgeCelebrationModal = () => (
+    <Modal visible={!!badgeUnlockCelebration} animationType="fade" transparent>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', padding: 24, alignItems: 'center' }}>
+        <View
+          style={{
+            backgroundColor: '#ffffff',
+            borderRadius: 24,
+            padding: 24,
+            width: '100%',
+            maxWidth: 320,
+            alignItems: 'center',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: 0.3,
+            shadowRadius: 20,
+            elevation: 10
+          }}
+        >
+          <Text style={{ fontSize: 50, marginBottom: 8 }}>
+            {badgeUnlockCelebration?.badge?.icon || '🏆'}
+          </Text>
+          <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[600], textTransform: 'uppercase', letterSpacing: 1 }}>
+            🎉 NEW BADGE UNLOCKED!
+          </Text>
+          <Text style={{ fontSize: 20, fontWeight: 'extrabold', color: colors.neutral[900], textAlign: 'center', marginTop: 4 }}>
+            {badgeUnlockCelebration?.badge?.name}
+          </Text>
+          <Text style={{ fontSize: 12, color: colors.neutral[600], textAlign: 'center', marginTop: 6, lineHeight: 18 }}>
+            {badgeUnlockCelebration?.badge?.description}
+          </Text>
+
+          <View
+            style={{
+              backgroundColor: '#fffbeb',
+              borderWidth: 1,
+              borderColor: '#fde68a',
+              borderRadius: 12,
+              paddingHorizontal: 14,
+              paddingVertical: 6,
+              marginTop: 14
+            }}
+          >
+            <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#b45309' }}>
+              +{badgeUnlockCelebration?.pointsAwarded || 25} XP Added
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            onPress={() => setBadgeUnlockCelebration(null)}
+            style={{
+              backgroundColor: colors.primary[500],
+              paddingVertical: 12,
+              paddingHorizontal: 30,
+              borderRadius: 12,
+              marginTop: 18,
+              width: '100%',
+              alignItems: 'center'
+            }}
+          >
+            <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
+              Awesome! 🚀
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
 
   // Guest action gate
   const requireAuth = (actionName = 'access this feature') => {
@@ -2753,9 +3538,16 @@ export default function App() {
 
                     <View style={{ padding: 14 }}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary[600], textTransform: 'uppercase', backgroundColor: colors.primary[50], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                          {evt.category}
-                        </Text>
+                        <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                          <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary[600], textTransform: 'uppercase', backgroundColor: colors.primary[50], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                            {evt.category}
+                          </Text>
+                          <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                            <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#92400e' }}>
+                              {getEventCountdown(evt)}
+                            </Text>
+                          </View>
+                        </View>
                         <Text style={{ fontSize: 11, fontWeight: 'bold', color: spotsLeft > 10 ? colors.success[700] : colors.danger[700] }}>
                           {spotsLeft > 0 ? `${spotsLeft} spots open` : 'Sold out'}
                         </Text>
@@ -2971,6 +3763,104 @@ export default function App() {
                       <Text style={{ color: colors.primary[700], fontWeight: 'bold', fontSize: 12 }}>📝 Edit Application</Text>
                     </TouchableOpacity>
                   </View>
+                </View>
+
+                {/* Gamification Stats Strip */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    gap: 8
+                  }}
+                >
+                  <View style={{ flex: 1, backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a', borderRadius: 14, padding: 12, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#b45309' }}>{memberPoints} XP</Text>
+                    <Text style={{ fontSize: 10, color: '#92400e', marginTop: 2, fontWeight: 'bold' }}>Total Points</Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => setIsLeaderboardOpen(true)}
+                    style={{ flex: 1, backgroundColor: colors.primary[50], borderWidth: 1, borderColor: colors.primary[200], borderRadius: 14, padding: 12, alignItems: 'center' }}
+                  >
+                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.primary[700] }}>#{memberRank || '-'}</Text>
+                    <Text style={{ fontSize: 10, color: colors.primary[600], marginTop: 2, fontWeight: 'bold' }}>Leaderboard ❯</Text>
+                  </TouchableOpacity>
+                  <View style={{ flex: 1, backgroundColor: '#fff7ed', borderWidth: 1, borderColor: '#fed7aa', borderRadius: 14, padding: 12, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#c2410c' }}>{memberStreak} 🔥</Text>
+                    <Text style={{ fontSize: 10, color: '#9a3412', marginTop: 2, fontWeight: 'bold' }}>Day Streak</Text>
+                  </View>
+                </View>
+
+                {/* Badges & Accolades Showcase */}
+                <View
+                  style={{
+                    backgroundColor: '#ffffff',
+                    borderWidth: 1,
+                    borderColor: colors.neutral[200],
+                    borderRadius: 16,
+                    padding: 16
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900] }}>
+                      🎖️ Badges & Accolades ({earnedBadgesList.length}/{allBadgesList.length})
+                    </Text>
+                    <TouchableOpacity onPress={() => setIsLeaderboardOpen(true)}>
+                      <Text style={{ fontSize: 11, color: colors.primary[600], fontWeight: 'bold' }}>
+                        Leaderboard ❯
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                    {allBadgesList.map((b) => {
+                      const isUnlocked = earnedBadgesList.some(
+                        (eb) => eb.badge_id === b.id || eb.name === b.name
+                      );
+                      return (
+                        <View
+                          key={b.id}
+                          style={{
+                            width: 110,
+                            backgroundColor: isUnlocked ? '#faf5ff' : '#f8fafc',
+                            borderWidth: 1,
+                            borderColor: isUnlocked ? '#e9d5ff' : '#e2e8f0',
+                            borderRadius: 12,
+                            padding: 10,
+                            alignItems: 'center'
+                          }}
+                        >
+                          <Text style={{ fontSize: 26, opacity: isUnlocked ? 1 : 0.4 }}>
+                            {b.icon || '🎖️'}
+                          </Text>
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 'bold',
+                              color: isUnlocked ? '#581c87' : colors.neutral[400],
+                              textAlign: 'center',
+                              marginTop: 4
+                            }}
+                            numberOfLines={1}
+                          >
+                            {b.name}
+                          </Text>
+                          <Text
+                            style={{
+                              fontSize: 9,
+                              color: isUnlocked ? '#7e22ce' : colors.neutral[400],
+                              backgroundColor: isUnlocked ? '#f3e8ff' : '#f1f5f9',
+                              paddingHorizontal: 6,
+                              paddingVertical: 2,
+                              borderRadius: 4,
+                              marginTop: 6,
+                              fontWeight: 'bold'
+                            }}
+                          >
+                            {isUnlocked ? 'Unlocked' : 'Locked'}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </ScrollView>
                 </View>
 
                 {/* Academic & Engineering Domain Card */}
@@ -3917,7 +4807,7 @@ export default function App() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* 4. BOTTOM TAB BAR NAVIGATION */}
+      {/* 4. BOTTOM TAB BAR NAVIGATION (5-TAB WITH RAISED CENTER ACTION FAB) */}
       <View
         style={{
           position: 'absolute',
@@ -3929,8 +4819,9 @@ export default function App() {
           borderTopColor: colors.neutral[200],
           flexDirection: 'row',
           justifyContent: 'space-around',
-          paddingVertical: 8,
-          paddingBottom: Platform.OS === 'ios' ? 24 : 10,
+          alignItems: 'center',
+          paddingVertical: 6,
+          paddingBottom: Platform.OS === 'ios' ? 22 : 8,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -2 },
           shadowOpacity: 0.05,
@@ -3938,13 +4829,14 @@ export default function App() {
           elevation: 5
         }}
       >
+        {/* Tab 1: Feed */}
         <TouchableOpacity
           onPress={() => handleSwitchTab('home')}
           style={{
             alignItems: 'center',
-            paddingHorizontal: 16,
-            paddingVertical: 6,
-            borderRadius: 12,
+            paddingHorizontal: 12,
+            paddingVertical: 4,
+            borderRadius: 10,
             backgroundColor: currentTab === 'home' ? colors.primary[50] : 'transparent'
           }}
         >
@@ -3953,7 +4845,7 @@ export default function App() {
           </Text>
           <Text
             style={{
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: currentTab === 'home' ? 'bold' : 'normal',
               color: currentTab === 'home' ? colors.primary[700] : colors.neutral[500],
               marginTop: 1
@@ -3963,13 +4855,14 @@ export default function App() {
           </Text>
         </TouchableOpacity>
 
+        {/* Tab 2: Events */}
         <TouchableOpacity
           onPress={() => handleSwitchTab('events')}
           style={{
             alignItems: 'center',
-            paddingHorizontal: 16,
-            paddingVertical: 6,
-            borderRadius: 12,
+            paddingHorizontal: 12,
+            paddingVertical: 4,
+            borderRadius: 10,
             backgroundColor: currentTab === 'events' ? colors.primary[50] : 'transparent'
           }}
         >
@@ -3978,7 +4871,7 @@ export default function App() {
           </Text>
           <Text
             style={{
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: currentTab === 'events' ? 'bold' : 'normal',
               color: currentTab === 'events' ? colors.primary[700] : colors.neutral[500],
               marginTop: 1
@@ -3988,13 +4881,61 @@ export default function App() {
           </Text>
         </TouchableOpacity>
 
+        {/* Tab 3: Raised Center Action FAB (QR Scanner) */}
+        <TouchableOpacity
+          onPress={() => {
+            if (isAdmin) {
+              openAdminScanner();
+            } else {
+              setIsMemberScannerOpen(true);
+            }
+          }}
+          activeOpacity={0.85}
+          style={{
+            top: -14,
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          <View
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: 26,
+              backgroundColor: colors.primary[600],
+              alignItems: 'center',
+              justifyContent: 'center',
+              shadowColor: colors.primary[900],
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.35,
+              shadowRadius: 6,
+              elevation: 8,
+              borderWidth: 3,
+              borderColor: '#ffffff'
+            }}
+          >
+            <Text style={{ fontSize: 22 }}>📷</Text>
+          </View>
+          <Text
+            style={{
+              fontSize: 10,
+              fontWeight: 'bold',
+              color: colors.primary[700],
+              marginTop: 2
+            }}
+          >
+            {isAdmin ? 'Scan' : 'Check-in'}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Tab 4: Vault */}
         <TouchableOpacity
           onPress={() => handleSwitchTab('resources')}
           style={{
             alignItems: 'center',
-            paddingHorizontal: 16,
-            paddingVertical: 6,
-            borderRadius: 12,
+            paddingHorizontal: 12,
+            paddingVertical: 4,
+            borderRadius: 10,
             backgroundColor: currentTab === 'resources' ? colors.primary[50] : 'transparent'
           }}
         >
@@ -4003,7 +4944,7 @@ export default function App() {
           </Text>
           <Text
             style={{
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: currentTab === 'resources' ? 'bold' : 'normal',
               color: currentTab === 'resources' ? colors.primary[700] : colors.neutral[500],
               marginTop: 1
@@ -4013,13 +4954,14 @@ export default function App() {
           </Text>
         </TouchableOpacity>
 
+        {/* Tab 5: Profile */}
         <TouchableOpacity
           onPress={() => handleSwitchTab('profile')}
           style={{
             alignItems: 'center',
-            paddingHorizontal: 16,
-            paddingVertical: 6,
-            borderRadius: 12,
+            paddingHorizontal: 12,
+            paddingVertical: 4,
+            borderRadius: 10,
             backgroundColor: currentTab === 'profile' ? colors.primary[50] : 'transparent'
           }}
         >
@@ -4028,7 +4970,7 @@ export default function App() {
           </Text>
           <Text
             style={{
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: currentTab === 'profile' ? 'bold' : 'normal',
               color: currentTab === 'profile' ? colors.primary[700] : colors.neutral[500],
               marginTop: 1
@@ -4038,11 +4980,13 @@ export default function App() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* TOAST POPUP NOTIFICATION */}
       {toastText && (
         <View
           style={{
             position: 'absolute',
-            bottom: 70,
+            bottom: 74,
             alignSelf: 'center',
             backgroundColor: colors.neutral[900],
             paddingHorizontal: 16,
@@ -4062,8 +5006,14 @@ export default function App() {
           <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: 'bold' }}>{toastText}</Text>
         </View>
       )}
+
+      {/* MODAL DIALOGS */}
       {renderGoogleModal()}
       {renderAdminScannerModal()}
+      {renderOnboardingModal()}
+      {renderMemberScannerModal()}
+      {renderLeaderboardModal()}
+      {renderBadgeCelebrationModal()}
     </SafeAreaView>
   );
 }

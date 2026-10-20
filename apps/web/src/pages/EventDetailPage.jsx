@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import QRCode from 'react-qr-code';
 import { useAuth } from '@atc/shared/hooks/useAuth';
 import { useEvents } from '@atc/shared/hooks/useEvents';
 import { getEventById, getEventRegistrations } from '@atc/shared/api/events';
+import { generateEventQRToken, getEventCheckinRoster, awardPoints } from '@atc/shared/api/gamification';
 import { formatDateTime, formatDate } from '@atc/shared/utils/formatters';
 import {
   Calendar,
@@ -15,7 +17,12 @@ import {
   Download,
   AlertCircle,
   ShieldCheck,
-  UserCheck
+  UserCheck,
+  QrCode,
+  Copy,
+  Sparkles,
+  ExternalLink,
+  Flame
 } from 'lucide-react';
 
 export function EventDetailPage() {
@@ -26,19 +33,28 @@ export function EventDetailPage() {
 
   const [event, setEvent] = useState(null);
   const [registrations, setRegistrations] = useState([]);
+  const [checkins, setCheckins] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // QR Modal State
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+  const [qrData, setQrData] = useState(null);
+  const [generatingQR, setGeneratingQR] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   useEffect(() => {
     async function loadData() {
       try {
         setLoading(true);
-        const [eventData, regsData] = await Promise.all([
+        const [eventData, regsData, checkinData] = await Promise.all([
           getEventById(id),
-          getEventRegistrations(id)
+          getEventRegistrations(id),
+          getEventCheckinRoster(id)
         ]);
         setEvent(eventData);
         setRegistrations(regsData);
+        setCheckins(checkinData);
       } catch (err) {
         setError(err.message || 'Failed to load event details');
       } finally {
@@ -47,6 +63,19 @@ export function EventDetailPage() {
     }
     loadData();
   }, [id]);
+
+  const handleGenerateQR = async () => {
+    setGeneratingQR(true);
+    try {
+      const generated = await generateEventQRToken(id, user?.id);
+      setQrData(generated);
+      setIsQRModalOpen(true);
+    } catch (err) {
+      console.warn('QR Generation error:', err);
+    } finally {
+      setGeneratingQR(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -84,6 +113,9 @@ export function EventDetailPage() {
       setRegistrations((prev) => prev.filter((r) => r.user_id !== user?.id));
     } else {
       await register(event.id);
+      if (user?.id) {
+        awardPoints(user.id, 'event_registration', event.id).catch(() => {});
+      }
       setRegistrations((prev) => [
         ...prev,
         {
@@ -116,6 +148,8 @@ export function EventDetailPage() {
     link.click();
     document.body.removeChild(link);
   };
+
+  const [attendeeTab, setAttendeeTab] = useState('registered'); // 'registered' | 'checked_in'
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -182,19 +216,39 @@ export function EventDetailPage() {
               <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200 text-xs text-neutral-600 space-y-2">
                 <p className="font-bold text-neutral-800">📌 Member Guidelines:</p>
                 <ul className="list-disc list-inside space-y-1 text-neutral-600 pl-1">
-                  <li>Please arrive 10 minutes prior to scheduled start time for badge check-in.</li>
-                  <li>Bring your laptop, charger, and have your Git/GitHub environment configured.</li>
+                  <li>Please arrive 10 minutes prior to scheduled start time for QR check-in.</li>
+                  <li>Scan the event QR code with your mobile camera or ATC App to earn 50 points!</li>
                   <li>Certificates of participation will be generated for all confirmed attendees.</li>
                 </ul>
               </div>
 
-              {/* Registered Attendees Roster (Visible for transparency) */}
+              {/* Attendees & Check-in Roster Tabs */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-bold text-neutral-900 uppercase tracking-wider flex items-center gap-1.5">
-                    <UserCheck className="w-4 h-4 text-primary-500" />
-                    Attendee Roster ({registrations.length})
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setAttendeeTab('registered')}
+                      className={`text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg transition-colors ${
+                        attendeeTab === 'registered'
+                          ? 'bg-neutral-900 text-white'
+                          : 'text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100'
+                      }`}
+                    >
+                      RSVP List ({registrations.length})
+                    </button>
+                    <button
+                      onClick={() => setAttendeeTab('checked_in')}
+                      className={`text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
+                        attendeeTab === 'checked_in'
+                          ? 'bg-primary-500 text-white shadow-sm'
+                          : 'text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100'
+                      }`}
+                    >
+                      <span>QR Checked In ({checkins.length})</span>
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    </button>
+                  </div>
+
                   {isAdmin && (
                     <button
                       onClick={handleExportCSV}
@@ -206,24 +260,52 @@ export function EventDetailPage() {
                 </div>
 
                 <div className="border border-neutral-200 rounded-xl overflow-hidden max-h-60 overflow-y-auto divide-y divide-neutral-100">
-                  {registrations.length === 0 ? (
+                  {attendeeTab === 'registered' ? (
+                    registrations.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-neutral-400">
+                        Be the first to RSVP for this event!
+                      </div>
+                    ) : (
+                      registrations.map((reg, idx) => (
+                        <div key={idx} className="p-3 flex items-center justify-between text-xs hover:bg-neutral-50">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-full bg-primary-100 text-primary-700 font-bold flex items-center justify-center text-[11px]">
+                              {reg.full_name?.charAt(0) || 'M'}
+                            </div>
+                            <div>
+                              <p className="font-semibold text-neutral-900">{reg.full_name}</p>
+                              <p className="text-[11px] text-neutral-400">{reg.department || 'Engineering'}</p>
+                            </div>
+                          </div>
+                          <span className="text-[10px] text-neutral-400">
+                            {formatDate(reg.registered_at)}
+                          </span>
+                        </div>
+                      ))
+                    )
+                  ) : checkins.length === 0 ? (
                     <div className="p-6 text-center text-xs text-neutral-400">
-                      Be the first to RSVP for this event!
+                      No members have checked in via QR code yet.
                     </div>
                   ) : (
-                    registrations.map((reg, idx) => (
+                    checkins.map((chk, idx) => (
                       <div key={idx} className="p-3 flex items-center justify-between text-xs hover:bg-neutral-50">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-full bg-primary-100 text-primary-700 font-bold flex items-center justify-center text-[11px]">
-                            {reg.full_name?.charAt(0) || 'M'}
-                          </div>
+                          <img
+                            src={chk.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
+                            alt=""
+                            className="w-7 h-7 rounded-full object-cover border border-neutral-200"
+                          />
                           <div>
-                            <p className="font-semibold text-neutral-900">{reg.full_name}</p>
-                            <p className="text-[11px] text-neutral-400">{reg.department || 'Engineering'}</p>
+                            <p className="font-semibold text-neutral-900 flex items-center gap-1.5">
+                              <span>{chk.full_name}</span>
+                              <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded font-bold">✓ Attended</span>
+                            </p>
+                            <p className="text-[11px] text-neutral-400">{chk.student_id} · {chk.branch}</p>
                           </div>
                         </div>
-                        <span className="text-[10px] text-neutral-400">
-                          {formatDate(reg.registered_at)}
+                        <span className="text-[10px] font-semibold text-emerald-700">
+                          +50 pts
                         </span>
                       </div>
                     ))
@@ -234,6 +316,31 @@ export function EventDetailPage() {
 
             {/* Right 1 col: Key Details Box & RSVP */}
             <div className="space-y-6">
+              {/* ADMIN QR PROJECTOR ACTION (Role-gated) */}
+              {isAdmin && (
+                <div className="p-6 rounded-2xl bg-neutral-900 border border-neutral-800 text-white space-y-4 shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-warning-400 flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4" /> Admin Operations
+                    </span>
+                    <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded font-mono text-neutral-300">
+                      {checkins.length} Checked In
+                    </span>
+                  </div>
+                  <p className="text-xs text-neutral-400 leading-relaxed">
+                    Generate the unique verification QR code to display on the workshop projector. Attending members scan with their phone camera or ATC mobile app to earn 50 points.
+                  </p>
+                  <button
+                    onClick={handleGenerateQR}
+                    disabled={generatingQR}
+                    className="w-full py-2.5 px-4 rounded-xl bg-primary-500 hover:bg-primary-600 font-bold text-xs text-white shadow-md transition-all flex items-center justify-center gap-2"
+                  >
+                    <QrCode className="w-4 h-4" />
+                    <span>{generatingQR ? 'Generating Token...' : 'Project Event Check-in QR'}</span>
+                  </button>
+                </div>
+              )}
+
               <div className="p-6 rounded-2xl bg-neutral-50 border border-neutral-200 space-y-5">
                 <h4 className="text-sm font-bold text-neutral-900 uppercase tracking-wider">
                   Event Logistics
@@ -279,7 +386,7 @@ export function EventDetailPage() {
                     <div className="space-y-2">
                       <div className="p-3 bg-success-50 text-success-700 rounded-xl border border-success-200 text-xs font-medium flex items-center gap-2">
                         <CheckCircle2 className="w-4 h-4 text-success-600 shrink-0" />
-                        <span>You are registered for this event.</span>
+                        <span>You are registered for this event (+10 pts).</span>
                       </div>
                       <button
                         onClick={handleRegisterToggle}
@@ -294,7 +401,7 @@ export function EventDetailPage() {
                       disabled={spotsLeft <= 0}
                       className="w-full btn-primary py-2.5 text-sm shadow-md"
                     >
-                      {spotsLeft <= 0 ? 'Event Full (Waitlist)' : 'Confirm 1-Tap RSVP'}
+                      {spotsLeft <= 0 ? 'Event Full (Waitlist)' : 'Confirm 1-Tap RSVP (+10 pts)'}
                     </button>
                   )}
                 </div>
@@ -303,6 +410,68 @@ export function EventDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* ADMIN QR PROJECTOR MODAL */}
+      {isQRModalOpen && qrData && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="max-w-lg w-full bg-white rounded-3xl p-8 text-center space-y-6 shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-neutral-100 pb-4">
+              <div className="flex items-center gap-2 text-left">
+                <QrCode className="w-5 h-5 text-primary-500" />
+                <div>
+                  <h3 className="font-extrabold text-sm text-neutral-900">Event Check-in Projector</h3>
+                  <p className="text-[11px] text-neutral-400 truncate max-w-xs">{event.title}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsQRModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-600 font-bold text-sm flex items-center justify-center"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* High-Resolution QR Display */}
+            <div className="p-6 bg-neutral-900 rounded-2xl flex flex-col items-center justify-center border-2 border-primary-500 shadow-inner">
+              <div className="bg-white p-4 rounded-xl shadow-md">
+                <QRCode
+                  value={qrData.checkinUrl}
+                  size={260}
+                  bgColor="#ffffff"
+                  fgColor="#0f172a"
+                />
+              </div>
+              <div className="mt-4 flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-lg text-primary-300 font-mono text-xs font-bold">
+                <span>{qrData.token}</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-neutral-500">
+              Project this screen on the classroom or auditorium display. Attendees scanning with camera or ATC App instantly earn <strong>+50 points</strong>.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(qrData.checkinUrl);
+                  setCopiedLink(true);
+                  setTimeout(() => setCopiedLink(false), 2000);
+                }}
+                className="flex-1 py-3 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>{copiedLink ? 'Copied URL ✓' : 'Copy Checkin Link'}</span>
+              </button>
+              <button
+                onClick={() => setIsQRModalOpen(false)}
+                className="flex-1 py-3 rounded-xl bg-neutral-900 text-white font-bold text-xs hover:bg-neutral-800 transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

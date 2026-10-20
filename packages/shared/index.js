@@ -11,6 +11,7 @@ export * from './api/resources.js';
 export * from './api/profiles.js';
 export * from './api/notifications.js';
 export * from './api/analytics.js';
+export * from './api/gamification.js';
 
 // Hooks
 export * from './hooks/useAuth.js';
@@ -19,6 +20,7 @@ export * from './hooks/useEvents.js';
 export * from './hooks/useResources.js';
 export * from './hooks/useNotifications.js';
 export * from './hooks/useMembers.js';
+export * from './hooks/useGamification.js';
 
 // Stores
 export * from './store/authStore.js';
