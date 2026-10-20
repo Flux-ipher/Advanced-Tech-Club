@@ -40,7 +40,11 @@ import {
   getAllBadges,
   getMemberBadges,
   awardPoints,
-  recordEventCheckin
+  recordEventCheckin,
+  adjustMemberPoints,
+  submitContributionReport,
+  fetchContributionReports,
+  reviewContributionReport
 } from '@atc/shared/api/gamification';
 import { idempotency } from '@atc/shared/utils/idempotency';
 import { canStudentCheckIn, validateAttendanceCheckInTransition } from '@atc/shared/utils/stateMachines';
@@ -136,6 +140,40 @@ export default function App() {
   const [onboardYear, setOnboardYear] = useState('2nd Year');
   const [onboardWhyJoin, setOnboardWhyJoin] = useState('');
   const [onboardSubmitting, setOnboardSubmitting] = useState(false);
+
+  // Floating Navbar FAB Action Menu State
+  const [isFabActionMenuOpen, setIsFabActionMenuOpen] = useState(false);
+
+  // Tasks Tab Sub-View ('vault' | 'contributions')
+  const [tasksSubTab, setTasksSubTab] = useState('vault');
+
+  // Student Contribution Submission State
+  const [isSubmitContributionOpen, setIsSubmitContributionOpen] = useState(false);
+  const [contribTitle, setContribTitle] = useState('');
+  const [contribCategory, setContribCategory] = useState('github_pr');
+  const [contribDesc, setContribDesc] = useState('');
+  const [contribProofUrl, setContribProofUrl] = useState('');
+  const [contribSubmitting, setContribSubmitting] = useState(false);
+  const [contributionReports, setContributionReports] = useState([]);
+
+  // Admin Manual Points Adjuster State
+  const [isAdjustPointsOpen, setIsAdjustPointsOpen] = useState(false);
+  const [adjustTargetUser, setAdjustTargetUser] = useState(null);
+  const [adjustPointsDelta, setAdjustPointsDelta] = useState('100');
+  const [adjustPointsReason, setAdjustPointsReason] = useState('');
+  const [adjustSubmitting, setAdjustSubmitting] = useState(false);
+
+  // Admin Contribution Report Review Modal State
+  const [isReviewReportModalOpen, setIsReviewReportModalOpen] = useState(false);
+  const [selectedReport, setSelectedReport] = useState(null);
+  const [reviewPoints, setReviewPoints] = useState('100');
+  const [reviewFeedback, setReviewFeedback] = useState('');
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+
+  // Multi-account Google Sign-In Input Toggle State
+  const [showNewGoogleInput, setShowNewGoogleInput] = useState(false);
+  const [customGoogleEmail, setCustomGoogleEmail] = useState('');
+  const [customGoogleName, setCustomGoogleName] = useState('');
 
   const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
 
@@ -388,6 +426,16 @@ export default function App() {
         }
       } catch (notifDiskErr) {
         console.warn('[ATC Mobile] Notif live fetch note:', notifDiskErr);
+      }
+
+      // Load Contribution Reports
+      try {
+        const reps = await fetchContributionReports(isAdmin ? null : (currentUser?.id || null));
+        if (reps && Array.isArray(reps)) {
+          setContributionReports(reps);
+        }
+      } catch (repErr) {
+        console.warn('[ATC Mobile] Contribution reports fetch note:', repErr);
       }
 
       // Re-sync current logged-in user profile & gamification directly from Supabase
@@ -688,13 +736,7 @@ export default function App() {
         return;
       }
       console.warn('[ATC Mobile] Native Google Sign-In notice:', err);
-      // If a saved Google account already exists on device, directly authenticate without extra modal prompts!
-      if (savedGoogleAccounts && savedGoogleAccounts.length > 0) {
-        const primaryAcc = savedGoogleAccounts[0];
-        await handleSelectGoogleAccount(primaryAcc.email, primaryAcc.name, primaryAcc.avatar);
-        return;
-      }
-      // If no saved account exists, open the selector modal
+      // Open Google Account Picker sheet modal so user can choose Admin, Member, or New Account
       setIsGoogleModalOpen(true);
     } finally {
       setGoogleSubmitting(false);
@@ -737,6 +779,12 @@ export default function App() {
             setIsGuest(false);
             setAuthEmail('');
             setAuthPassword('');
+            setAuthFullName('');
+            setIsApplyModalOpen(false);
+            setIsOnboardingOpen(false);
+            setCustomGoogleEmail('');
+            setCustomGoogleName('');
+            setShowNewGoogleInput(false);
             triggerToast('Signed out of ATC Mobile');
           }
         }
@@ -989,6 +1037,97 @@ export default function App() {
                 );
               })}
             </View>
+
+            {/* Divider */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 8 }}>
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.neutral[200] }} />
+              <Text style={{ color: colors.neutral[400], fontSize: 10, marginHorizontal: 8, fontWeight: 'bold' }}>
+                OR USE ANOTHER ACCOUNT
+              </Text>
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.neutral[200] }} />
+            </View>
+
+            {/* Custom Google Account Input Toggle */}
+            <TouchableOpacity
+              onPress={() => setShowNewGoogleInput(!showNewGoogleInput)}
+              style={{
+                paddingVertical: 10,
+                alignItems: 'center',
+                backgroundColor: showNewGoogleInput ? colors.neutral[100] : colors.primary[50],
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: showNewGoogleInput ? colors.neutral[200] : colors.primary[200],
+                marginBottom: 10
+              }}
+            >
+              <Text style={{ color: colors.primary[700], fontWeight: 'bold', fontSize: 12 }}>
+                {showNewGoogleInput ? 'Hide Account Input' : '+ Sign in with a different Google account'}
+              </Text>
+            </TouchableOpacity>
+
+            {showNewGoogleInput && (
+              <View style={{ gap: 8, marginBottom: 12 }}>
+                <TextInput
+                  placeholder="Google Email (e.g. newstudent@gmail.com)"
+                  placeholderTextColor={colors.neutral[400]}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  value={customGoogleEmail}
+                  onChangeText={setCustomGoogleEmail}
+                  style={{
+                    backgroundColor: colors.neutral[50],
+                    borderWidth: 1,
+                    borderColor: colors.neutral[300],
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    fontSize: 13,
+                    color: colors.neutral[900]
+                  }}
+                />
+                <TextInput
+                  placeholder="Full Name (e.g. John Doe)"
+                  placeholderTextColor={colors.neutral[400]}
+                  value={customGoogleName}
+                  onChangeText={setCustomGoogleName}
+                  style={{
+                    backgroundColor: colors.neutral[50],
+                    borderWidth: 1,
+                    borderColor: colors.neutral[300],
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    fontSize: 13,
+                    color: colors.neutral[900]
+                  }}
+                />
+                <TouchableOpacity
+                  onPress={() => {
+                    if (!customGoogleEmail.trim()) {
+                      Alert.alert('Required', 'Please enter your Google email address.');
+                      return;
+                    }
+                    handleSelectGoogleAccount(customGoogleEmail.trim(), customGoogleName.trim());
+                  }}
+                  disabled={googleSubmitting}
+                  style={{
+                    backgroundColor: colors.primary[500],
+                    paddingVertical: 12,
+                    borderRadius: 10,
+                    alignItems: 'center',
+                    marginTop: 4
+                  }}
+                >
+                  {googleSubmitting ? (
+                    <ActivityIndicator color="#ffffff" size="small" />
+                  ) : (
+                    <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
+                      Continue with this Account
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
           </ScrollView>
 
           {/* Cancel */}
@@ -2267,6 +2406,950 @@ export default function App() {
     }
   };
 
+  // =========================================================================
+  // STUDENT CONTRIBUTIONS & MANUAL POINTS HANDLERS
+  // =========================================================================
+
+  // Submit Student Contribution (GitHub PR / Project / Bug Bounty)
+  const handleSubmitContribution = async () => {
+    if (!contribTitle.trim()) {
+      Alert.alert('Required', 'Please enter a title for your contribution or PR.');
+      return;
+    }
+    if (!contribProofUrl.trim()) {
+      Alert.alert('Required', 'Please enter a GitHub PR URL or proof link.');
+      return;
+    }
+
+    setContribSubmitting(true);
+    try {
+      const result = await submitContributionReport({
+        userId: currentUser?.id || `usr-${Date.now()}`,
+        userName: currentUser?.full_name || 'Member',
+        userEmail: currentUser?.email || '',
+        title: contribTitle.trim(),
+        category: contribCategory,
+        description: contribDesc.trim(),
+        proofUrl: contribProofUrl.trim()
+      });
+
+      if (result.success) {
+        setContributionReports((prev) => [result.data, ...prev]);
+        setIsSubmitContributionOpen(false);
+        setContribTitle('');
+        setContribDesc('');
+        setContribProofUrl('');
+        triggerToast('Contribution Submitted! Reviewing by Admin (Ritesh Mishra) ⏳');
+      } else {
+        Alert.alert('Submission Error', result.reason || 'Failed to submit report');
+      }
+    } catch (err) {
+      Alert.alert('Error', err.message || 'Could not submit contribution report');
+    } finally {
+      setContribSubmitting(false);
+    }
+  };
+
+  // Admin Review Contribution Report (Approve / Reject)
+  const handleReviewReportSubmit = async (status) => {
+    if (!selectedReport) return;
+    setReviewSubmitting(true);
+    try {
+      const points = status === 'approved' ? (parseInt(reviewPoints, 10) || 100) : 0;
+      const res = await reviewContributionReport(
+        currentUser?.id || 'admin',
+        selectedReport.id,
+        selectedReport.user_id,
+        status,
+        points,
+        reviewFeedback.trim(),
+        selectedReport.title
+      );
+
+      if (res.success) {
+        setContributionReports((prev) =>
+          prev.map((r) =>
+            r.id === selectedReport.id
+              ? {
+                  ...r,
+                  status,
+                  points_awarded: points,
+                  admin_feedback: reviewFeedback.trim(),
+                  reviewed_at: new Date().toISOString()
+                }
+              : r
+          )
+        );
+        setIsReviewReportModalOpen(false);
+        setSelectedReport(null);
+        setReviewFeedback('');
+        triggerToast(status === 'approved' ? `Approved & +${points} XP Awarded! 🎉` : 'Submission Reviewed ✓');
+      } else {
+        Alert.alert('Error', res.error || 'Failed to update review status');
+      }
+    } catch (err) {
+      Alert.alert('Review Error', err.message || 'Could not save review');
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
+  // Admin Direct Member Points Adjuster
+  const handleExecuteAdjustPoints = async () => {
+    if (!adjustTargetUser) {
+      Alert.alert('Required', 'Please select a member to adjust points for.');
+      return;
+    }
+    const delta = parseInt(adjustPointsDelta, 10);
+    if (isNaN(delta) || delta === 0) {
+      Alert.alert('Invalid Points', 'Please enter a valid points adjustment (+/-).');
+      return;
+    }
+    if (!adjustPointsReason.trim()) {
+      Alert.alert('Required', 'Please provide a reason for this points adjustment.');
+      return;
+    }
+
+    setAdjustSubmitting(true);
+    try {
+      const res = await adjustMemberPoints(
+        currentUser?.id || 'admin',
+        adjustTargetUser.id,
+        delta,
+        adjustPointsReason.trim()
+      );
+
+      if (res.success) {
+        setIsAdjustPointsOpen(false);
+        setAdjustPointsReason('');
+        setAdjustPointsDelta('100');
+        if (currentUser?.id === adjustTargetUser.id) {
+          setMemberPoints(res.newTotal);
+        }
+        triggerToast(`Points updated (${delta > 0 ? `+${delta}` : delta} XP) ✓`);
+      } else {
+        Alert.alert('Adjustment Error', res.error || 'Failed to adjust points');
+      }
+    } catch (err) {
+      Alert.alert('Error', err.message || 'Could not adjust points');
+    } finally {
+      setAdjustSubmitting(false);
+    }
+  };
+
+  // STUDENT MEMBERSHIP APPLICATION MODAL
+  const renderApplyModal = () => (
+    <Modal visible={isApplyModalOpen} animationType="slide" transparent>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 }}
+      >
+        <View style={{ backgroundColor: '#ffffff', borderRadius: 20, padding: 20, maxHeight: '85%' }}>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <Text style={{ fontSize: 17, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 4 }}>
+              Student Membership Application
+            </Text>
+            <Text style={{ fontSize: 11, color: colors.neutral[500], marginBottom: 16 }}>
+              Fill in your student credentials. Applications are verified by Club Admin (Ritesh Mishra).
+            </Text>
+
+            <View style={{ gap: 12 }}>
+              {!currentUser && (
+                <>
+                  <View>
+                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>Full Name *</Text>
+                    <TextInput
+                      placeholder="e.g. Student Full Name"
+                      value={applyFullName}
+                      onChangeText={setApplyFullName}
+                      style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 8, padding: 10, fontSize: 13 }}
+                    />
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>University Email *</Text>
+                    <TextInput
+                      placeholder="name@university.edu"
+                      value={applyEmail}
+                      onChangeText={setApplyEmail}
+                      autoCapitalize="none"
+                      keyboardType="email-address"
+                      style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 8, padding: 10, fontSize: 13 }}
+                    />
+                  </View>
+                </>
+              )}
+
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>Student ID *</Text>
+                <TextInput
+                  placeholder="e.g. CS2026-088"
+                  value={applyStudentId}
+                  onChangeText={setApplyStudentId}
+                  autoCapitalize="characters"
+                  style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 8, padding: 10, fontSize: 13 }}
+                />
+              </View>
+
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>Department</Text>
+                <TextInput
+                  value={applyDept}
+                  editable={false}
+                  style={{ backgroundColor: colors.neutral[100], borderWidth: 1, borderColor: colors.neutral[200], borderRadius: 8, padding: 10, fontSize: 13, color: colors.neutral[600] }}
+                />
+              </View>
+
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>Year of Study</Text>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  {['1st Year', '2nd Year', '3rd Year', '4th Year'].map((y) => (
+                    <TouchableOpacity
+                      key={y}
+                      onPress={() => setApplyYear(y)}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 8,
+                        borderRadius: 8,
+                        backgroundColor: applyYear === y ? colors.primary[500] : colors.neutral[100],
+                        alignItems: 'center'
+                      }}
+                    >
+                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: applyYear === y ? '#ffffff' : colors.neutral[700] }}>
+                        {y.split(' ')[0]}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>Technical Interests</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {availableInterests.map((item) => {
+                    const selected = applyInterests.includes(item);
+                    return (
+                      <TouchableOpacity
+                        key={item}
+                        onPress={() => {
+                          if (selected) {
+                            setApplyInterests((prev) => prev.filter((i) => i !== item));
+                          } else {
+                            setApplyInterests((prev) => [...prev, item]);
+                          }
+                        }}
+                        style={{
+                          paddingHorizontal: 8,
+                          paddingVertical: 5,
+                          borderRadius: 6,
+                          backgroundColor: selected ? colors.primary[500] : colors.neutral[100]
+                        }}
+                      >
+                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: selected ? '#ffffff' : colors.neutral[700] }}>
+                          {item}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>GitHub / Portfolio Profile</Text>
+                <TextInput
+                  placeholder="https://github.com/username"
+                  value={applyGithub}
+                  onChangeText={setApplyGithub}
+                  autoCapitalize="none"
+                  style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 8, padding: 10, fontSize: 13 }}
+                />
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 20 }}>
+              <TouchableOpacity
+                onPress={() => setIsApplyModalOpen(false)}
+                style={{ flex: 1, backgroundColor: colors.neutral[100], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+              >
+                <Text style={{ color: colors.neutral[700], fontWeight: 'bold', fontSize: 13 }}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleSubmitApplication}
+                style={{ flex: 1, backgroundColor: colors.primary[500], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+              >
+                <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>Submit Application</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+
+  // STUDENT CONTRIBUTION SUBMISSION MODAL
+  const renderSubmitContributionModal = () => (
+    <Modal visible={isSubmitContributionOpen} animationType="slide" transparent>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center', padding: 20 }}
+      >
+        <View style={{ backgroundColor: '#ffffff', borderRadius: 24, padding: 22, maxHeight: '88%' }}>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary[50], justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ fontSize: 20 }}>🚀</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 17, fontWeight: 'bold', color: colors.neutral[900] }}>
+                  Submit Contribution / PR
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.neutral[500] }}>
+                  Earn verified XP & prizes for your code and campus tasks
+                </Text>
+              </View>
+            </View>
+
+            <View style={{ gap: 12, marginTop: 12 }}>
+              {/* Category Selection */}
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 6 }}>
+                  Contribution Category *
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {[
+                    { id: 'github_pr', label: '🐙 GitHub PR' },
+                    { id: 'bug_report', label: '🐞 Bug Fix' },
+                    { id: 'workshop_help', label: '🤝 Workshop Help' },
+                    { id: 'open_request', label: '📌 Club Request' },
+                    { id: 'custom', label: '⭐ Other Task' }
+                  ].map((c) => (
+                    <TouchableOpacity
+                      key={c.id}
+                      onPress={() => setContribCategory(c.id)}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 7,
+                        borderRadius: 8,
+                        backgroundColor: contribCategory === c.id ? colors.primary[500] : colors.neutral[100]
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: contribCategory === c.id ? '#ffffff' : colors.neutral[700] }}>
+                        {c.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Title */}
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                  Contribution Title *
+                </Text>
+                <TextInput
+                  placeholder="e.g. PR #42: Fixed Dark Mode in Web Portal"
+                  placeholderTextColor={colors.neutral[400]}
+                  value={contribTitle}
+                  onChangeText={setContribTitle}
+                  style={{
+                    backgroundColor: colors.neutral[50],
+                    borderWidth: 1,
+                    borderColor: colors.neutral[300],
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    fontSize: 13,
+                    color: colors.neutral[900]
+                  }}
+                />
+              </View>
+
+              {/* Proof Link / PR URL */}
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                  Proof / GitHub PR URL *
+                </Text>
+                <TextInput
+                  placeholder="https://github.com/Flux-ipher/Advanced-Tech-Club/pull/42"
+                  placeholderTextColor={colors.neutral[400]}
+                  autoCapitalize="none"
+                  keyboardType="url"
+                  value={contribProofUrl}
+                  onChangeText={setContribProofUrl}
+                  style={{
+                    backgroundColor: colors.neutral[50],
+                    borderWidth: 1,
+                    borderColor: colors.neutral[300],
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    fontSize: 13,
+                    color: colors.neutral[900]
+                  }}
+                />
+              </View>
+
+              {/* Description */}
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                  Description / What was built or solved?
+                </Text>
+                <TextInput
+                  placeholder="Briefly describe what you changed, how to test it, or what issue was resolved..."
+                  placeholderTextColor={colors.neutral[400]}
+                  multiline
+                  numberOfLines={3}
+                  value={contribDesc}
+                  onChangeText={setContribDesc}
+                  style={{
+                    backgroundColor: colors.neutral[50],
+                    borderWidth: 1,
+                    borderColor: colors.neutral[300],
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    fontSize: 13,
+                    color: colors.neutral[900],
+                    height: 75,
+                    textAlignVertical: 'top'
+                  }}
+                />
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 20 }}>
+              <TouchableOpacity
+                onPress={() => setIsSubmitContributionOpen(false)}
+                disabled={contribSubmitting}
+                style={{
+                  flex: 1,
+                  backgroundColor: colors.neutral[100],
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{ color: colors.neutral[700], fontWeight: 'bold', fontSize: 13 }}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleSubmitContribution}
+                disabled={contribSubmitting}
+                style={{
+                  flex: 1,
+                  backgroundColor: colors.primary[500],
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  alignItems: 'center'
+                }}
+              >
+                {contribSubmitting ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
+                    Submit for Review
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+
+  // ADMIN REVIEW CONTRIBUTION MODAL
+  const renderReviewContributionModal = () => (
+    <Modal visible={isReviewReportModalOpen} animationType="slide" transparent>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center', padding: 20 }}
+      >
+        <View style={{ backgroundColor: '#ffffff', borderRadius: 24, padding: 22, maxHeight: '88%' }}>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <Text style={{ fontSize: 17, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 4 }}>
+              Review Student Contribution
+            </Text>
+            <Text style={{ fontSize: 11, color: colors.neutral[500], marginBottom: 14 }}>
+              Verify student's PR, grant points, and record in their audit history.
+            </Text>
+
+            {selectedReport && (
+              <View style={{ gap: 12 }}>
+                {/* Student Info Card */}
+                <View style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[200], borderRadius: 12, padding: 12 }}>
+                  <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900] }}>
+                    {selectedReport.user_name || 'Member'}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: colors.neutral[500] }}>
+                    {selectedReport.user_email}
+                  </Text>
+                  <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.neutral[200] }}>
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.primary[700] }}>
+                      {selectedReport.title}
+                    </Text>
+                    {selectedReport.description ? (
+                      <Text style={{ fontSize: 12, color: colors.neutral[700], marginTop: 4 }}>
+                        {selectedReport.description}
+                      </Text>
+                    ) : null}
+                    {selectedReport.proof_url ? (
+                      <Text style={{ fontSize: 11, color: '#2563eb', marginTop: 6, textDecorationLine: 'underline' }}>
+                        🔗 {selectedReport.proof_url}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+
+                {/* Points Award Input */}
+                <View>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 6 }}>
+                    Points to Award (XP) *
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8 }}>
+                    {['50', '100', '150', '250', '500'].map((pts) => (
+                      <TouchableOpacity
+                        key={pts}
+                        onPress={() => setReviewPoints(pts)}
+                        style={{
+                          flex: 1,
+                          paddingVertical: 7,
+                          borderRadius: 8,
+                          alignItems: 'center',
+                          backgroundColor: reviewPoints === pts ? colors.primary[500] : colors.neutral[100]
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: reviewPoints === pts ? '#ffffff' : colors.neutral[700] }}>
+                          +{pts}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <TextInput
+                    placeholder="Custom Points (e.g. 150)"
+                    keyboardType="numeric"
+                    value={reviewPoints}
+                    onChangeText={setReviewPoints}
+                    style={{
+                      backgroundColor: colors.neutral[50],
+                      borderWidth: 1,
+                      borderColor: colors.neutral[300],
+                      borderRadius: 10,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      fontSize: 13,
+                      color: colors.neutral[900]
+                    }}
+                  />
+                </View>
+
+                {/* Admin Feedback */}
+                <View>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                    Admin Feedback Note (Optional)
+                  </Text>
+                  <TextInput
+                    placeholder="e.g. Great PR! Clean commits and resolved issue #42."
+                    value={reviewFeedback}
+                    onChangeText={setReviewFeedback}
+                    style={{
+                      backgroundColor: colors.neutral[50],
+                      borderWidth: 1,
+                      borderColor: colors.neutral[300],
+                      borderRadius: 10,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      fontSize: 13,
+                      color: colors.neutral[900]
+                    }}
+                  />
+                </View>
+              </View>
+            )}
+
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 20 }}>
+              <TouchableOpacity
+                onPress={() => setIsReviewReportModalOpen(false)}
+                disabled={reviewSubmitting}
+                style={{
+                  flex: 1,
+                  backgroundColor: colors.neutral[100],
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{ color: colors.neutral[700], fontWeight: 'bold', fontSize: 13 }}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => handleReviewReportSubmit('rejected')}
+                disabled={reviewSubmitting}
+                style={{
+                  flex: 1,
+                  backgroundColor: colors.danger[50],
+                  borderWidth: 1,
+                  borderColor: colors.danger[200],
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{ color: colors.danger[700], fontWeight: 'bold', fontSize: 13 }}>Reject</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => handleReviewReportSubmit('approved')}
+                disabled={reviewSubmitting}
+                style={{
+                  flex: 1.5,
+                  backgroundColor: colors.success[500],
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  alignItems: 'center'
+                }}
+              >
+                {reviewSubmitting ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
+                    Approve (+{reviewPoints} XP)
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+
+  // ADMIN MANUAL POINTS ADJUSTER MODAL
+  const renderAdjustPointsModal = () => (
+    <Modal visible={isAdjustPointsOpen} animationType="slide" transparent>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center', padding: 20 }}
+      >
+        <View style={{ backgroundColor: '#ffffff', borderRadius: 24, padding: 22, maxHeight: '88%' }}>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary[50], justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ fontSize: 20 }}>⭐</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 17, fontWeight: 'bold', color: colors.neutral[900] }}>
+                  Adjust Member Points
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.neutral[500] }}>
+                  Reward or deduct XP with full audit trail in points_log
+                </Text>
+              </View>
+            </View>
+
+            <View style={{ gap: 12, marginTop: 10 }}>
+              {/* Member Target Selector / Display */}
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                  Target Member *
+                </Text>
+                {adjustTargetUser ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.primary[50], borderWidth: 1, borderColor: colors.primary[200], borderRadius: 10, padding: 10 }}>
+                    <View>
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.primary[900] }}>
+                        {adjustTargetUser.full_name || adjustTargetUser.email}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: colors.primary[700] }}>
+                        {adjustTargetUser.email}
+                      </Text>
+                    </View>
+                    <TouchableOpacity onPress={() => setAdjustTargetUser(null)}>
+                      <Text style={{ fontSize: 12, color: colors.primary[600], fontWeight: 'bold' }}>Change</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={{ gap: 6 }}>
+                    <Text style={{ fontSize: 11, color: colors.neutral[500] }}>Select from recent members or self:</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                      {currentUser && (
+                        <TouchableOpacity
+                          onPress={() => setAdjustTargetUser(currentUser)}
+                          style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.neutral[100] }}
+                        >
+                          <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[800] }}>
+                            Me ({currentUser.full_name})
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                      {pendingMembers.slice(0, 4).map((p) => (
+                        <TouchableOpacity
+                          key={p.id}
+                          onPress={() => setAdjustTargetUser(p)}
+                          style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.neutral[100] }}
+                        >
+                          <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[800] }}>
+                            {p.full_name}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* Preset Chips */}
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 6 }}>
+                  Preset XP Actions
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {[
+                    { label: '+50 XP (Active Attendee)', val: '50', reason: 'Active participation in club workshop' },
+                    { label: '+100 XP (PR Merged)', val: '100', reason: 'Merged open source pull request on GitHub' },
+                    { label: '+250 XP (Hackathon Sprint)', val: '250', reason: 'Completed campus hackathon technical sprint' },
+                    { label: '-50 XP (Penalty/Deduction)', val: '-50', reason: 'Missed mandatory check-in duty' }
+                  ].map((preset) => (
+                    <TouchableOpacity
+                      key={preset.label}
+                      onPress={() => {
+                        setAdjustPointsDelta(preset.val);
+                        setAdjustPointsReason(preset.reason);
+                      }}
+                      style={{
+                        paddingHorizontal: 9,
+                        paddingVertical: 6,
+                        borderRadius: 8,
+                        backgroundColor: adjustPointsDelta === preset.val ? colors.primary[500] : colors.neutral[100]
+                      }}
+                    >
+                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: adjustPointsDelta === preset.val ? '#ffffff' : colors.neutral[700] }}>
+                        {preset.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Points Delta Input */}
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                  Points Delta (+ to reward, - to deduct) *
+                </Text>
+                <TextInput
+                  placeholder="e.g. 100 or -50"
+                  placeholderTextColor={colors.neutral[400]}
+                  keyboardType="numeric"
+                  value={adjustPointsDelta}
+                  onChangeText={setAdjustPointsDelta}
+                  style={{
+                    backgroundColor: colors.neutral[50],
+                    borderWidth: 1,
+                    borderColor: colors.neutral[300],
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    fontSize: 13,
+                    color: colors.neutral[900]
+                  }}
+                />
+              </View>
+
+              {/* Reason Input */}
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                  Reason / Activity Note *
+                </Text>
+                <TextInput
+                  placeholder="e.g. Merged PR #42 or Assisted during AI lab"
+                  placeholderTextColor={colors.neutral[400]}
+                  value={adjustPointsReason}
+                  onChangeText={setAdjustPointsReason}
+                  style={{
+                    backgroundColor: colors.neutral[50],
+                    borderWidth: 1,
+                    borderColor: colors.neutral[300],
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    fontSize: 13,
+                    color: colors.neutral[900]
+                  }}
+                />
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 20 }}>
+              <TouchableOpacity
+                onPress={() => setIsAdjustPointsOpen(false)}
+                disabled={adjustSubmitting}
+                style={{
+                  flex: 1,
+                  backgroundColor: colors.neutral[100],
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{ color: colors.neutral[700], fontWeight: 'bold', fontSize: 13 }}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleExecuteAdjustPoints}
+                disabled={adjustSubmitting}
+                style={{
+                  flex: 1.5,
+                  backgroundColor: colors.primary[500],
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  alignItems: 'center'
+                }}
+              >
+                {adjustSubmitting ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
+                    Save & Update XP
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+
+  // FAB QUICK ACTION SHEET MODAL
+  const renderFabActionModal = () => (
+    <Modal visible={isFabActionMenuOpen} animationType="fade" transparent>
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={() => setIsFabActionMenuOpen(false)}
+        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', padding: 16, paddingBottom: Platform.OS === 'ios' ? 90 : 80 }}
+      >
+        <TouchableWithoutFeedback>
+          <View style={{ backgroundColor: '#ffffff', borderRadius: 24, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 10 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.neutral[900] }}>
+                Quick Actions
+              </Text>
+              <TouchableOpacity onPress={() => setIsFabActionMenuOpen(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 14, color: colors.neutral[400] }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ gap: 8 }}>
+              {isAdmin ? (
+                <>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setIsFabActionMenuOpen(false);
+                      openAdminScanner();
+                    }}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#f5f3ff', padding: 12, borderRadius: 14, borderWidth: 1, borderColor: '#ddd6fe' }}
+                  >
+                    <Text style={{ fontSize: 20 }}>📷</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#6d28d9' }}>Scan Student Event Pass</Text>
+                      <Text style={{ fontSize: 11, color: colors.neutral[500] }}>Verify QR door check-in & record attendance</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      setIsFabActionMenuOpen(false);
+                      setIsAdjustPointsOpen(true);
+                    }}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.primary[50], padding: 12, borderRadius: 14, borderWidth: 1, borderColor: colors.primary[200] }}
+                  >
+                    <Text style={{ fontSize: 20 }}>⭐</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.primary[900] }}>Award / Deduct Member XP</Text>
+                      <Text style={{ fontSize: 11, color: colors.neutral[500] }}>Manually reward points for contributions & PRs</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      setIsFabActionMenuOpen(false);
+                      setCurrentTab('resources');
+                      setTasksSubTab('contributions');
+                    }}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.neutral[50], padding: 12, borderRadius: 14, borderWidth: 1, borderColor: colors.neutral[200] }}
+                  >
+                    <Text style={{ fontSize: 20 }}>📝</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900] }}>Review Student PRs & Submissions</Text>
+                      <Text style={{ fontSize: 11, color: colors.neutral[500] }}>Verify open PRs and approve reward points</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      setIsFabActionMenuOpen(false);
+                      setIsBroadcastModalOpen(true);
+                    }}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.neutral[50], padding: 12, borderRadius: 14, borderWidth: 1, borderColor: colors.neutral[200] }}
+                  >
+                    <Text style={{ fontSize: 20 }}>📢</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900] }}>Post Campus Announcement</Text>
+                      <Text style={{ fontSize: 11, color: colors.neutral[500] }}>Broadcast to all registered club members</Text>
+                    </View>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setIsFabActionMenuOpen(false);
+                      setIsQrPassOpen(true);
+                    }}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.primary[50], padding: 12, borderRadius: 14, borderWidth: 1, borderColor: colors.primary[200] }}
+                  >
+                    <Text style={{ fontSize: 20 }}>🪪</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.primary[900] }}>Digital Campus Pass</Text>
+                      <Text style={{ fontSize: 11, color: colors.neutral[500] }}>Show QR pass for workshop door entry</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      setIsFabActionMenuOpen(false);
+                      setIsSubmitContributionOpen(true);
+                    }}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#f0fdf4', padding: 12, borderRadius: 14, borderWidth: 1, borderColor: '#bbf7d0' }}
+                  >
+                    <Text style={{ fontSize: 20 }}>🚀</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#15803d' }}>Submit Contribution / PR</Text>
+                      <Text style={{ fontSize: 11, color: colors.neutral[500] }}>Submit your merged GitHub PR to earn XP</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      setIsFabActionMenuOpen(false);
+                      setIsLeaderboardOpen(true);
+                    }}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.neutral[50], padding: 12, borderRadius: 14, borderWidth: 1, borderColor: colors.neutral[200] }}
+                  >
+                    <Text style={{ fontSize: 20 }}>🏆</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900] }}>XP Leaderboard & Badges</Text>
+                      <Text style={{ fontSize: 11, color: colors.neutral[500] }}>View campus rankings and unlocked badges</Text>
+                    </View>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </TouchableOpacity>
+    </Modal>
+  );
+
   // Helper: Persist read notification IDs to disk
   const persistReadNotificationIds = async (ids) => {
     try {
@@ -2357,10 +3440,96 @@ export default function App() {
     triggerToast('New Workshop Published! 📅');
   };
 
-  // Admin Approve Member
-  const handleApproveMember = (studentId) => {
-    setPendingMembers((prev) => prev.filter((m) => m.student_id !== studentId));
-    triggerToast('Student Approved & Verified ✓');
+  // Admin Approve Member with permanent Supabase DB persistence
+  const handleApproveMember = async (targetId) => {
+    if (!targetId) return;
+    try {
+      // 1. Immediate UI update
+      setPendingMembers((prev) => prev.filter((m) => m.id !== targetId && m.student_id !== targetId));
+      triggerToast('Student Approved & Verified ✓');
+
+      // 2. Persist to Supabase profiles table safely
+      const safeVerifier = (currentUser?.id && !currentUser.id.startsWith('user-') && currentUser.id !== 'admin')
+        ? currentUser.id
+        : null;
+
+      const payload = {
+        is_verified: true,
+        verification_status: 'verified',
+        verified_at: new Date().toISOString(),
+        verified_by: safeVerifier
+      };
+
+      let { data, error } = await supabase
+        .from('profiles')
+        .update(payload)
+        .eq('id', targetId)
+        .select();
+
+      if (!data || data.length === 0) {
+        const fallbackRes = await supabase
+          .from('profiles')
+          .update(payload)
+          .eq('student_id', targetId)
+          .select();
+        error = fallbackRes.error;
+      }
+
+      if (error) {
+        console.warn('[ATC Mobile] Supabase approve error:', error);
+      }
+
+      // 3. Notify student
+      try {
+        await supabase.from('notifications_log').insert({
+          user_id: targetId,
+          title: 'Membership Approved! 🚀',
+          message: 'Welcome to Advanced Tech Club! Your student membership application has been approved by Admin.',
+          type: 'general',
+          read: false,
+          created_at: new Date().toISOString()
+        });
+      } catch (notifErr) {}
+    } catch (err) {
+      console.warn('[ATC Mobile] handleApproveMember error:', err);
+    }
+  };
+
+  // Admin Reject Member with permanent Supabase DB persistence
+  const handleRejectMember = async (targetId) => {
+    if (!targetId) return;
+    try {
+      // 1. Immediate UI update
+      setPendingMembers((prev) => prev.filter((m) => m.id !== targetId && m.student_id !== targetId));
+      triggerToast('Applicant rejected');
+
+      // 2. Persist to Supabase profiles table safely
+      const payload = {
+        is_verified: false,
+        verification_status: 'rejected'
+      };
+
+      let { data, error } = await supabase
+        .from('profiles')
+        .update(payload)
+        .eq('id', targetId)
+        .select();
+
+      if (!data || data.length === 0) {
+        const fallbackRes = await supabase
+          .from('profiles')
+          .update(payload)
+          .eq('student_id', targetId)
+          .select();
+        error = fallbackRes.error;
+      }
+
+      if (error) {
+        console.warn('[ATC Mobile] Supabase reject error:', error);
+      }
+    } catch (err) {
+      console.warn('[ATC Mobile] handleRejectMember error:', err);
+    }
   };
 
   // Filtering Logic
@@ -2532,23 +3701,23 @@ export default function App() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => setIsApplyModalOpen(true)}
+                onPress={() => setAuthMode('signup')}
                 style={{
                   flex: 1,
                   paddingVertical: 10,
                   borderRadius: 9,
-                  backgroundColor: 'transparent',
+                  backgroundColor: authMode === 'signup' ? colors.primary[500] : 'transparent',
                   alignItems: 'center'
                 }}
               >
                 <Text
                   style={{
-                    color: colors.neutral[400],
+                    color: authMode === 'signup' ? '#ffffff' : colors.neutral[400],
                     fontWeight: 'bold',
                     fontSize: 13
                   }}
                 >
-                  Sign Up (Apply)
+                  Sign Up
                 </Text>
               </TouchableOpacity>
             </View>
@@ -2567,7 +3736,7 @@ export default function App() {
               {authMode === 'signup' && (
                 <View>
                   <Text style={{ color: colors.neutral[300], fontSize: 12, fontWeight: 'bold', marginBottom: 6 }}>
-                    Full Name
+                    Full Name *
                   </Text>
                   <TextInput
                     placeholder="e.g. Student Full Name"
@@ -2590,7 +3759,7 @@ export default function App() {
 
               <View>
                 <Text style={{ color: colors.neutral[300], fontSize: 12, fontWeight: 'bold', marginBottom: 6 }}>
-                  Email Address
+                  Email Address *
                 </Text>
                 <TextInput
                   placeholder="name@university.edu or gmail"
@@ -2612,9 +3781,34 @@ export default function App() {
                 />
               </View>
 
+              {authMode === 'signup' && (
+                <View>
+                  <Text style={{ color: colors.neutral[300], fontSize: 12, fontWeight: 'bold', marginBottom: 6 }}>
+                    Student ID / University Roll No *
+                  </Text>
+                  <TextInput
+                    placeholder="e.g. 23CS041 or CS2026-088"
+                    placeholderTextColor={colors.neutral[500]}
+                    autoCapitalize="characters"
+                    value={onboardRoll}
+                    onChangeText={setOnboardRoll}
+                    style={{
+                      backgroundColor: colors.neutral[900],
+                      borderWidth: 1,
+                      borderColor: colors.neutral[700],
+                      borderRadius: 12,
+                      paddingHorizontal: 14,
+                      paddingVertical: 12,
+                      color: '#ffffff',
+                      fontSize: 14
+                    }}
+                  />
+                </View>
+              )}
+
               <View>
                 <Text style={{ color: colors.neutral[300], fontSize: 12, fontWeight: 'bold', marginBottom: 6 }}>
-                  Password
+                  Password *
                 </Text>
                 <View
                   style={{
@@ -2667,9 +3861,21 @@ export default function App() {
                 }}
               >
                 <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 14 }}>
-                  {authLoading ? 'Verifying...' : authMode === 'login' ? 'Log In to Club Portal' : 'Create Club Account'}
+                  {authLoading ? 'Verifying...' : authMode === 'login' ? 'Log In to Club Portal' : 'Create Account & Apply'}
                 </Text>
               </TouchableOpacity>
+
+              {/* Shortcut to Full Application */}
+              {authMode === 'signup' && (
+                <TouchableOpacity
+                  onPress={() => setIsApplyModalOpen(true)}
+                  style={{ alignItems: 'center', paddingVertical: 4 }}
+                >
+                  <Text style={{ color: colors.primary[400], fontSize: 12, fontWeight: 'bold' }}>
+                    Or Open Comprehensive Student Application →
+                  </Text>
+                </TouchableOpacity>
+              )}
 
               {/* Divider */}
               <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 2 }}>
@@ -2712,6 +3918,7 @@ export default function App() {
           </ScrollView>
         </KeyboardAvoidingView>
         {renderGoogleModal()}
+        {renderApplyModal()}
       </SafeAreaView>
     );
   }
@@ -3027,7 +4234,7 @@ export default function App() {
 
       {/* 2. MAIN SCROLLABLE CONTENT */}
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -3574,114 +4781,476 @@ export default function App() {
         {/* ========================================================= */}
         {/* TAB 3: KNOWLEDGE VAULT (RESOURCES)                        */}
         {/* ========================================================= */}
+        {/* ========================================================= */}
+        {/* TAB 3: TASKS & KNOWLEDGE VAULT                            */}
+        {/* ========================================================= */}
         {currentTab === 'resources' && (
-          <View style={{ gap: 12 }}>
-            {downloadProgress !== null && (
-              <View style={{ backgroundColor: colors.primary[50], padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.primary[200], marginBottom: 4 }}>
-                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[800], marginBottom: 4 }}>
-                  Downloading Vault Package ({downloadProgress}%)...
-                </Text>
-                <View style={{ height: 6, backgroundColor: colors.primary[200], borderRadius: 3, overflow: 'hidden' }}>
-                  <View style={{ width: `${downloadProgress}%`, height: '100%', backgroundColor: colors.primary[600] }} />
-                </View>
-              </View>
-            )}
-
-            {filteredResources.length === 0 ? (
-              <View
+          <View style={{ gap: 14 }}>
+            {/* Sub-Tab Switcher: Knowledge Vault vs Open PRs & Tasks */}
+            <View
+              style={{
+                flexDirection: 'row',
+                backgroundColor: colors.neutral[100],
+                padding: 4,
+                borderRadius: 14,
+                gap: 4
+              }}
+            >
+              <TouchableOpacity
+                onPress={() => setTasksSubTab('vault')}
                 style={{
-                  backgroundColor: '#ffffff',
-                  borderRadius: 16,
-                  borderWidth: 1,
-                  borderColor: colors.neutral[200],
-                  padding: 24,
+                  flex: 1,
+                  paddingVertical: 10,
+                  borderRadius: 10,
+                  backgroundColor: tasksSubTab === 'vault' ? '#ffffff' : 'transparent',
                   alignItems: 'center',
-                  marginVertical: 8
+                  shadowColor: tasksSubTab === 'vault' ? '#000' : 'transparent',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: tasksSubTab === 'vault' ? 0.08 : 0,
+                  shadowRadius: 4,
+                  elevation: tasksSubTab === 'vault' ? 2 : 0
                 }}
               >
-                <View
+                <Text
                   style={{
-                    width: 52,
-                    height: 52,
-                    borderRadius: 26,
-                    backgroundColor: colors.primary[50],
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    marginBottom: 12
+                    fontSize: 12,
+                    fontWeight: tasksSubTab === 'vault' ? 'bold' : '600',
+                    color: tasksSubTab === 'vault' ? colors.neutral[900] : colors.neutral[500]
                   }}
                 >
-                  <Text style={{ fontSize: 24 }}>▤</Text>
-                </View>
-                <Text style={{ fontSize: 15, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 4 }}>
-                  No Vault Resources Found
+                  ▤ Knowledge Vault
                 </Text>
-                <Text style={{ fontSize: 12, color: colors.neutral[500], textAlign: 'center', marginBottom: 16, lineHeight: 18 }}>
-                  {searchQuery || resourceCategory !== 'all' || showSavedOnly
-                    ? `No guides match "${searchQuery || resourceCategory}". Try clearing your filters.`
-                    : 'The Knowledge Vault is being populated by club admins.'}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setTasksSubTab('contributions')}
+                style={{
+                  flex: 1,
+                  paddingVertical: 10,
+                  borderRadius: 10,
+                  backgroundColor: tasksSubTab === 'contributions' ? '#ffffff' : 'transparent',
+                  alignItems: 'center',
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  gap: 6,
+                  shadowColor: tasksSubTab === 'contributions' ? '#000' : 'transparent',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: tasksSubTab === 'contributions' ? 0.08 : 0,
+                  shadowRadius: 4,
+                  elevation: tasksSubTab === 'contributions' ? 2 : 0
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: tasksSubTab === 'contributions' ? 'bold' : '600',
+                    color: tasksSubTab === 'contributions' ? colors.primary[700] : colors.neutral[500]
+                  }}
+                >
+                  🚀 Open PRs & Tasks
                 </Text>
-                {(searchQuery !== '' || resourceCategory !== 'all' || showSavedOnly) && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      setSearchQuery('');
-                      setResourceCategory('all');
-                      setShowSavedOnly(false);
-                    }}
+                {contributionReports.filter((r) => r.status === 'pending').length > 0 && (
+                  <View
                     style={{
-                      backgroundColor: colors.primary[500],
-                      paddingHorizontal: 16,
-                      paddingVertical: 9,
+                      backgroundColor: colors.warning[500],
+                      paddingHorizontal: 6,
+                      paddingVertical: 1,
                       borderRadius: 10
                     }}
                   >
-                    <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: 'bold' }}>Show All Vault Guides</Text>
-                  </TouchableOpacity>
+                    <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#ffffff' }}>
+                      {contributionReports.filter((r) => r.status === 'pending').length}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* SUBTAB 1: KNOWLEDGE VAULT */}
+            {tasksSubTab === 'vault' && (
+              <View style={{ gap: 12 }}>
+                {downloadProgress !== null && (
+                  <View style={{ backgroundColor: colors.primary[50], padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.primary[200], marginBottom: 4 }}>
+                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[800], marginBottom: 4 }}>
+                      Downloading Vault Package ({downloadProgress}%)...
+                    </Text>
+                    <View style={{ height: 6, backgroundColor: colors.primary[200], borderRadius: 3, overflow: 'hidden' }}>
+                      <View style={{ width: `${downloadProgress}%`, height: '100%', backgroundColor: colors.primary[600] }} />
+                    </View>
+                  </View>
+                )}
+
+                {filteredResources.length === 0 ? (
+                  <View
+                    style={{
+                      backgroundColor: '#ffffff',
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: colors.neutral[200],
+                      padding: 24,
+                      alignItems: 'center',
+                      marginVertical: 8
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 52,
+                        height: 52,
+                        borderRadius: 26,
+                        backgroundColor: colors.primary[50],
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        marginBottom: 12
+                      }}
+                    >
+                      <Text style={{ fontSize: 24 }}>▤</Text>
+                    </View>
+                    <Text style={{ fontSize: 15, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 4 }}>
+                      No Vault Resources Found
+                    </Text>
+                    <Text style={{ fontSize: 12, color: colors.neutral[500], textAlign: 'center', marginBottom: 16, lineHeight: 18 }}>
+                      {searchQuery || resourceCategory !== 'all' || showSavedOnly
+                        ? `No guides match "${searchQuery || resourceCategory}". Try clearing your filters.`
+                        : 'The Knowledge Vault is being populated by club admins.'}
+                    </Text>
+                    {(searchQuery !== '' || resourceCategory !== 'all' || showSavedOnly) && (
+                      <TouchableOpacity
+                        onPress={() => {
+                          setSearchQuery('');
+                          setResourceCategory('all');
+                          setShowSavedOnly(false);
+                        }}
+                        style={{
+                          backgroundColor: colors.primary[500],
+                          paddingHorizontal: 16,
+                          paddingVertical: 9,
+                          borderRadius: 10
+                        }}
+                      >
+                        <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: 'bold' }}>Show All Vault Guides</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ) : (
+                  filteredResources.map((res) => (
+                    <View
+                      key={res.id}
+                      style={{
+                        backgroundColor: '#ffffff',
+                        borderWidth: 1,
+                        borderColor: colors.neutral[200],
+                        borderRadius: 14,
+                        padding: 14
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <View style={{ flex: 1, marginRight: 8 }}>
+                          <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary[600], textTransform: 'uppercase', marginBottom: 2 }}>
+                            {res.category} · {res.file_size || '12MB'}
+                          </Text>
+                          <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.neutral[900] }}>
+                            {res.title}
+                          </Text>
+                          <Text style={{ fontSize: 12, color: colors.neutral[500], marginTop: 2 }}>
+                            {res.description}
+                          </Text>
+                        </View>
+
+                        <TouchableOpacity onPress={() => handleToggleBookmark(res.id)}>
+                          <Text style={{ fontSize: 14 }}>{bookmarkedIds.includes(res.id) ? '⭐' : '☆'}</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.neutral[100] }}>
+                        <TouchableOpacity onPress={() => setSelectedResource(res)}>
+                          <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[600] }}>View Outline →</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          onPress={() => handleDownloadResource(res)}
+                          style={{ backgroundColor: colors.neutral[900], paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
+                        >
+                          <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>Download File</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))
                 )}
               </View>
-            ) : (
-              filteredResources.map((res) => (
+            )}
+
+            {/* SUBTAB 2: OPEN PRS & TASKS BOUNTY */}
+            {tasksSubTab === 'contributions' && (
+              <View style={{ gap: 14 }}>
+                {/* Hero Action Card */}
                 <View
-                  key={res.id}
                   style={{
-                    backgroundColor: '#ffffff',
-                    borderWidth: 1,
-                    borderColor: colors.neutral[200],
-                    borderRadius: 14,
-                    padding: 14
+                    backgroundColor: colors.neutral[900],
+                    borderRadius: 20,
+                    padding: 18,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.12,
+                    shadowRadius: 10,
+                    elevation: 4
                   }}
                 >
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <View style={{ flex: 1, marginRight: 8 }}>
-                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary[600], textTransform: 'uppercase', marginBottom: 2 }}>
-                        {res.category} · {res.file_size || '12MB'}
-                      </Text>
-                      <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.neutral[900] }}>
-                        {res.title}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: colors.neutral[500], marginTop: 2 }}>
-                        {res.description}
-                      </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <Text style={{ fontSize: 18 }}>🚀</Text>
+                    <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#ffffff' }}>
+                      Earn XP Through Contributions
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 12, color: colors.neutral[400], lineHeight: 18, marginBottom: 14 }}>
+                    Did you open a Pull Request on ATC GitHub, build a project, fix a bug, or fulfill a club request? Submit your work below for Club Admin review to get awarded XP and redeem prizes.
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setIsSubmitContributionOpen(true)}
+                    style={{
+                      backgroundColor: colors.primary[500],
+                      paddingVertical: 11,
+                      paddingHorizontal: 16,
+                      borderRadius: 12,
+                      alignItems: 'center',
+                      flexDirection: 'row',
+                      justifyContent: 'center',
+                      gap: 6
+                    }}
+                  >
+                    <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: 'bold' }}>
+                      + Submit Contribution / PR
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Admin PR Review Queue */}
+                {isAdmin && (
+                  <View
+                    style={{
+                      backgroundColor: '#f5f3ff',
+                      borderWidth: 1,
+                      borderColor: '#ddd6fe',
+                      borderRadius: 18,
+                      padding: 16,
+                      gap: 12
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Text style={{ fontSize: 16 }}>🛡️</Text>
+                        <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#5b21b6' }}>
+                          Admin Review Queue ({contributionReports.filter((r) => r.status === 'pending').length})
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => setIsAdjustPointsOpen(true)}
+                        style={{
+                          backgroundColor: '#6d28d9',
+                          paddingHorizontal: 10,
+                          paddingVertical: 5,
+                          borderRadius: 8
+                        }}
+                      >
+                        <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: 'bold' }}>
+                          ⭐ Manual Adjust
+                        </Text>
+                      </TouchableOpacity>
                     </View>
 
-                    <TouchableOpacity onPress={() => handleToggleBookmark(res.id)}>
-                      <Text style={{ fontSize: 14 }}>{bookmarkedIds.includes(res.id) ? '⭐' : '☆'}</Text>
-                    </TouchableOpacity>
-                  </View>
+                    {contributionReports.filter((r) => r.status === 'pending').length === 0 ? (
+                      <Text style={{ fontSize: 12, color: '#6d28d9', fontStyle: 'italic' }}>
+                        No pending student PRs waiting for verification. All clear! ✓
+                      </Text>
+                    ) : (
+                      contributionReports
+                        .filter((r) => r.status === 'pending')
+                        .map((r) => (
+                          <View
+                            key={r.id}
+                            style={{
+                              backgroundColor: '#ffffff',
+                              borderRadius: 14,
+                              padding: 14,
+                              borderWidth: 1,
+                              borderColor: '#e9d5ff',
+                              gap: 6
+                            }}
+                          >
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                              <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                                  <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#7c3aed', textTransform: 'uppercase' }}>
+                                    {r.category?.replace('_', ' ')}
+                                  </Text>
+                                  <Text style={{ fontSize: 11, color: colors.neutral[500] }}>
+                                    by {r.user_name || 'Member'}
+                                  </Text>
+                                </View>
+                                <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900] }}>
+                                  {r.title}
+                                </Text>
+                              </View>
+                              <View style={{ backgroundColor: colors.warning[100], paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                                <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.warning[800] }}>Pending</Text>
+                              </View>
+                            </View>
 
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.neutral[100] }}>
-                    <TouchableOpacity onPress={() => setSelectedResource(res)}>
-                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[600] }}>View Outline →</Text>
-                    </TouchableOpacity>
+                            {r.description ? (
+                              <Text style={{ fontSize: 11, color: colors.neutral[600], lineHeight: 16 }}>
+                                {r.description}
+                              </Text>
+                            ) : null}
 
-                    <TouchableOpacity
-                      onPress={() => handleDownloadResource(res)}
-                      style={{ backgroundColor: colors.neutral[900], paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
-                    >
-                      <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>Download File</Text>
-                    </TouchableOpacity>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.neutral[100] }}>
+                              <Text
+                                numberOfLines={1}
+                                style={{ flex: 1, fontSize: 10, color: colors.primary[600], fontStyle: 'italic', marginRight: 10 }}
+                              >
+                                🔗 {r.proof_url}
+                              </Text>
+                              <TouchableOpacity
+                                onPress={() => {
+                                  setSelectedReport(r);
+                                  setReviewPoints('100');
+                                  setReviewFeedback('');
+                                  setIsReviewReportModalOpen(true);
+                                }}
+                                style={{ backgroundColor: '#6d28d9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
+                              >
+                                <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>Review & Award XP</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        ))
+                    )}
                   </View>
+                )}
+
+                {/* Submitted PRs & Contributions Stream */}
+                <View style={{ gap: 10 }}>
+                  <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[800] }}>
+                    Student Submissions & Log ({contributionReports.length})
+                  </Text>
+
+                  {contributionReports.length === 0 ? (
+                    <View style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 24, borderWidth: 1, borderColor: colors.neutral[200], alignItems: 'center' }}>
+                      <Text style={{ fontSize: 24, marginBottom: 8 }}>📝</Text>
+                      <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.neutral[800], marginBottom: 4 }}>
+                        No Contributions Recorded Yet
+                      </Text>
+                      <Text style={{ fontSize: 12, color: colors.neutral[500], textAlign: 'center' }}>
+                        Be the first to submit a GitHub PR or completed task to earn club points!
+                      </Text>
+                    </View>
+                  ) : (
+                    contributionReports.map((r) => {
+                      const isApproved = r.status === 'approved';
+                      const isPending = r.status === 'pending';
+                      const isRejected = r.status === 'rejected';
+
+                      return (
+                        <View
+                          key={r.id}
+                          style={{
+                            backgroundColor: '#ffffff',
+                            borderRadius: 16,
+                            padding: 14,
+                            borderWidth: 1,
+                            borderColor: isApproved ? colors.success[200] : colors.neutral[200],
+                            gap: 6
+                          }}
+                        >
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <View style={{ flex: 1, marginRight: 8 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                                <Text style={{ fontSize: 9, fontWeight: 'bold', color: colors.primary[700], textTransform: 'uppercase' }}>
+                                  {r.category?.replace('_', ' ')}
+                                </Text>
+                                <Text style={{ fontSize: 11, color: colors.neutral[500] }}>
+                                  · {r.user_name || 'Member'}
+                                </Text>
+                              </View>
+                              <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900] }}>
+                                {r.title}
+                              </Text>
+                            </View>
+
+                            {/* Status Pill */}
+                            <View
+                              style={{
+                                paddingHorizontal: 8,
+                                paddingVertical: 4,
+                                borderRadius: 8,
+                                backgroundColor: isApproved
+                                  ? colors.success[50]
+                                  : isPending
+                                  ? colors.warning[50]
+                                  : colors.danger[50],
+                                borderWidth: 1,
+                                borderColor: isApproved
+                                  ? colors.success[200]
+                                  : isPending
+                                  ? colors.warning[200]
+                                  : colors.danger[200]
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 'bold',
+                                  color: isApproved
+                                    ? colors.success[700]
+                                    : isPending
+                                    ? colors.warning[700]
+                                    : colors.danger[700]
+                                }}
+                              >
+                                {isApproved
+                                  ? `+${r.points_awarded || 100} XP 🎉`
+                                  : isPending
+                                  ? 'Pending ⏳'
+                                  : 'Declined ❌'}
+                              </Text>
+                            </View>
+                          </View>
+
+                          {r.description ? (
+                            <Text style={{ fontSize: 11, color: colors.neutral[600], lineHeight: 16 }}>
+                              {r.description}
+                            </Text>
+                          ) : null}
+
+                          {r.proof_url ? (
+                            <Text numberOfLines={1} style={{ fontSize: 10, color: colors.primary[600], marginTop: 2 }}>
+                              🔗 Proof: {r.proof_url}
+                            </Text>
+                          ) : null}
+
+                          {r.admin_feedback ? (
+                            <View
+                              style={{
+                                backgroundColor: isApproved ? colors.success[50] : colors.neutral[50],
+                                padding: 8,
+                                borderRadius: 8,
+                                marginTop: 4,
+                                borderWidth: 1,
+                                borderColor: isApproved ? colors.success[100] : colors.neutral[200]
+                              }}
+                            >
+                              <Text style={{ fontSize: 10, fontWeight: 'bold', color: isApproved ? colors.success[800] : colors.neutral[700] }}>
+                                Admin Note:
+                              </Text>
+                              <Text style={{ fontSize: 11, color: colors.neutral[700], fontStyle: 'italic', marginTop: 1 }}>
+                                "{r.admin_feedback}"
+                              </Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      );
+                    })
+                  )}
                 </View>
-              ))
+              </View>
             )}
           </View>
         )}
@@ -3956,6 +5525,29 @@ export default function App() {
                       >
                         <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[800] }}>
                           📊 Analytics
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <TouchableOpacity
+                        onPress={() => setIsAdjustPointsOpen(true)}
+                        style={{ flex: 1, backgroundColor: colors.primary[50], padding: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.primary[200], alignItems: 'center' }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[800] }}>
+                          ⭐ Adjust Points (+/-)
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        onPress={() => {
+                          setCurrentTab('resources');
+                          setTasksSubTab('contributions');
+                        }}
+                        style={{ flex: 1, backgroundColor: '#f5f3ff', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#ddd6fe', alignItems: 'center' }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#6d28d9' }}>
+                          📝 PR Reviews ({contributionReports.filter((r) => r.status === 'pending').length})
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -4299,152 +5891,7 @@ export default function App() {
         </View>
       </Modal>
 
-      {/* STUDENT MEMBERSHIP APPLICATION MODAL */}
-      <Modal visible={isApplyModalOpen} animationType="slide" transparent>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 }}
-        >
-          <View style={{ backgroundColor: '#ffffff', borderRadius: 20, padding: 20, maxHeight: '85%' }}>
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              <Text style={{ fontSize: 17, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 4 }}>
-                Student Membership Application
-              </Text>
-              <Text style={{ fontSize: 11, color: colors.neutral[500], marginBottom: 16 }}>
-                Fill in your student credentials. Applications are verified by Club Admin (Ritesh Mishra).
-              </Text>
-
-              <View style={{ gap: 12 }}>
-                {!currentUser && (
-                  <>
-                    <View>
-                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>Full Name *</Text>
-                      <TextInput
-                        placeholder="e.g. Student Full Name"
-                        value={applyFullName}
-                        onChangeText={setApplyFullName}
-                        style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 8, padding: 10, fontSize: 13 }}
-                      />
-                    </View>
-                    <View>
-                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>University Email *</Text>
-                      <TextInput
-                        placeholder="name@university.edu"
-                        value={applyEmail}
-                        onChangeText={setApplyEmail}
-                        autoCapitalize="none"
-                        keyboardType="email-address"
-                        style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 8, padding: 10, fontSize: 13 }}
-                      />
-                    </View>
-                  </>
-                )}
-
-                <View>
-                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>Student ID *</Text>
-                  <TextInput
-                    placeholder="e.g. CS2026-088"
-                    value={applyStudentId}
-                    onChangeText={setApplyStudentId}
-                    autoCapitalize="characters"
-                    style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 8, padding: 10, fontSize: 13 }}
-                  />
-                </View>
-
-                <View>
-                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>Department</Text>
-                  <TextInput
-                    value={applyDept}
-                    editable={false}
-                    style={{ backgroundColor: colors.neutral[100], borderWidth: 1, borderColor: colors.neutral[200], borderRadius: 8, padding: 10, fontSize: 13, color: colors.neutral[600] }}
-                  />
-                </View>
-
-                <View>
-                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>Year of Study</Text>
-                  <View style={{ flexDirection: 'row', gap: 6 }}>
-                    {['1st Year', '2nd Year', '3rd Year', '4th Year'].map((y) => (
-                      <TouchableOpacity
-                        key={y}
-                        onPress={() => setApplyYear(y)}
-                        style={{
-                          flex: 1,
-                          paddingVertical: 8,
-                          borderRadius: 8,
-                          backgroundColor: applyYear === y ? colors.primary[500] : colors.neutral[100],
-                          alignItems: 'center'
-                        }}
-                      >
-                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: applyYear === y ? '#ffffff' : colors.neutral[700] }}>
-                          {y.split(' ')[0]}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                <View>
-                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>Technical Interests (Select All That Apply)</Text>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                    {availableInterests.map((item) => {
-                      const selected = applyInterests.includes(item);
-                      return (
-                        <TouchableOpacity
-                          key={item}
-                          onPress={() => {
-                            if (selected) {
-                              setApplyInterests((prev) => prev.filter((i) => i !== item));
-                            } else {
-                              setApplyInterests((prev) => [...prev, item]);
-                            }
-                          }}
-                          style={{
-                            paddingHorizontal: 8,
-                            paddingVertical: 5,
-                            borderRadius: 6,
-                            backgroundColor: selected ? colors.primary[500] : colors.neutral[100]
-                          }}
-                        >
-                          <Text style={{ fontSize: 10, fontWeight: 'bold', color: selected ? '#ffffff' : colors.neutral[700] }}>
-                            {item}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-
-                <View>
-                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>GitHub / Portfolio Profile</Text>
-                  <TextInput
-                    placeholder="https://github.com/username"
-                    value={applyGithub}
-                    onChangeText={setApplyGithub}
-                    autoCapitalize="none"
-                    style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 8, padding: 10, fontSize: 13 }}
-                  />
-                </View>
-              </View>
-
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 20 }}>
-                <TouchableOpacity
-                  onPress={() => setIsApplyModalOpen(false)}
-                  style={{ flex: 1, backgroundColor: colors.neutral[100], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
-                >
-                  <Text style={{ color: colors.neutral[700], fontWeight: 'bold', fontSize: 13 }}>Cancel</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={handleSubmitApplication}
-                  style={{ flex: 1, backgroundColor: colors.primary[500], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
-                >
-                  <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>Submit Application</Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      {renderApplyModal()}
 
       {/* APPLICATION STATUS CHECKER MODAL */}
       <Modal visible={isStatusModalOpen} animationType="slide" transparent>
@@ -4609,17 +6056,14 @@ export default function App() {
 
                     <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
                       <TouchableOpacity
-                        onPress={() => handleApproveMember(m.student_id)}
-                        style={{ flex: 1, backgroundColor: colors.success[500], paddingVertical: 6, borderRadius: 6, alignItems: 'center' }}
+                        onPress={() => handleApproveMember(m.id || m.student_id)}
+                        style={{ flex: 1, backgroundColor: colors.success[500], paddingVertical: 8, borderRadius: 8, alignItems: 'center' }}
                       >
                         <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>Approve</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
-                        onPress={() => {
-                          setPendingMembers((prev) => prev.filter((p) => p.student_id !== m.student_id));
-                          triggerToast('Applicant removed');
-                        }}
-                        style={{ flex: 1, backgroundColor: colors.danger[50], paddingVertical: 6, borderRadius: 6, alignItems: 'center' }}
+                        onPress={() => handleRejectMember(m.id || m.student_id)}
+                        style={{ flex: 1, backgroundColor: colors.danger[50], paddingVertical: 8, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: colors.danger[200] }}
                       >
                         <Text style={{ color: colors.danger[700], fontSize: 11, fontWeight: 'bold' }}>Reject</Text>
                       </TouchableOpacity>
@@ -4876,177 +6320,179 @@ export default function App() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* 4. BOTTOM TAB BAR NAVIGATION (5-TAB WITH RAISED CENTER ACTION FAB) */}
+      {/* ========================================================= */}
+      {/* FLOATING PILL BOTTOM NAVIGATION (MATCHING SCREENSHOT)     */}
+      {/* ========================================================= */}
       <View
         style={{
           position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
+          bottom: Platform.OS === 'ios' ? 24 : 16,
+          left: 16,
+          right: 16,
+          height: 64,
+          borderRadius: 36,
           backgroundColor: '#ffffff',
-          borderTopWidth: 1,
-          borderTopColor: colors.neutral[200],
           flexDirection: 'row',
-          justifyContent: 'space-around',
           alignItems: 'center',
-          paddingVertical: 6,
-          paddingBottom: Platform.OS === 'ios' ? 22 : 8,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.05,
-          shadowRadius: 4,
-          elevation: 5
+          justifyContent: 'space-around',
+          paddingHorizontal: 8,
+          borderWidth: 1,
+          borderColor: 'rgba(0, 0, 0, 0.08)',
+          shadowColor: '#000000',
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.12,
+          shadowRadius: 14,
+          elevation: 12,
+          zIndex: 99
         }}
       >
-        {/* Tab 1: Feed */}
+        {/* Tab 1: Home */}
         <TouchableOpacity
           onPress={() => handleSwitchTab('home')}
-          style={{
-            alignItems: 'center',
-            paddingHorizontal: 12,
-            paddingVertical: 4,
-            borderRadius: 10,
-            backgroundColor: currentTab === 'home' ? colors.primary[50] : 'transparent'
-          }}
+          style={{ alignItems: 'center', justifyContent: 'center', minWidth: 54 }}
         >
-          <Text style={{ fontSize: 16, color: currentTab === 'home' ? colors.primary[600] : colors.neutral[400] }}>
-            📢
+          <Text style={{ fontSize: 18, color: currentTab === 'home' ? '#111827' : '#9ca3af' }}>
+            ⊞
           </Text>
           <Text
             style={{
               fontSize: 10,
-              fontWeight: currentTab === 'home' ? 'bold' : 'normal',
-              color: currentTab === 'home' ? colors.primary[700] : colors.neutral[500],
+              fontWeight: currentTab === 'home' ? 'bold' : '600',
+              color: currentTab === 'home' ? '#111827' : '#9ca3af',
               marginTop: 1
             }}
           >
-            Feed
+            Home
           </Text>
+          <View
+            style={{
+              width: 4,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: currentTab === 'home' ? '#111827' : 'transparent',
+              marginTop: 2
+            }}
+          />
         </TouchableOpacity>
 
-        {/* Tab 2: Events */}
+        {/* Tab 2: Calendar */}
         <TouchableOpacity
           onPress={() => handleSwitchTab('events')}
-          style={{
-            alignItems: 'center',
-            paddingHorizontal: 12,
-            paddingVertical: 4,
-            borderRadius: 10,
-            backgroundColor: currentTab === 'events' ? colors.primary[50] : 'transparent'
-          }}
+          style={{ alignItems: 'center', justifyContent: 'center', minWidth: 54 }}
         >
-          <Text style={{ fontSize: 16, color: currentTab === 'events' ? colors.primary[600] : colors.neutral[400] }}>
+          <Text style={{ fontSize: 17, color: currentTab === 'events' ? '#111827' : '#9ca3af' }}>
             📅
           </Text>
           <Text
             style={{
               fontSize: 10,
-              fontWeight: currentTab === 'events' ? 'bold' : 'normal',
-              color: currentTab === 'events' ? colors.primary[700] : colors.neutral[500],
+              fontWeight: currentTab === 'events' ? 'bold' : '600',
+              color: currentTab === 'events' ? '#111827' : '#9ca3af',
               marginTop: 1
             }}
           >
-            Events
+            Calendar
           </Text>
+          <View
+            style={{
+              width: 4,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: currentTab === 'events' ? '#111827' : 'transparent',
+              marginTop: 2
+            }}
+          />
         </TouchableOpacity>
 
-        {/* Tab 3: Raised Center Action FAB (Admin Scanner or Member Campus Pass) */}
+        {/* Center Raised Glowing FAB (+) */}
         <TouchableOpacity
-          onPress={() => {
-            if (isAdmin) {
-              openAdminScanner();
-            } else {
-              setIsQrPassOpen(true);
-            }
-          }}
-          activeOpacity={0.85}
+          onPress={() => setIsFabActionMenuOpen(true)}
+          activeOpacity={0.88}
           style={{
-            top: -14,
+            marginTop: -28,
             alignItems: 'center',
             justifyContent: 'center'
           }}
         >
           <View
             style={{
-              width: 52,
-              height: 52,
-              borderRadius: 26,
-              backgroundColor: isAdmin ? '#6d28d9' : colors.primary[600],
+              width: 56,
+              height: 56,
+              borderRadius: 28,
+              backgroundColor: '#00e676', // Glowing bright emerald
               alignItems: 'center',
               justifyContent: 'center',
-              shadowColor: isAdmin ? '#6d28d9' : colors.primary[900],
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.35,
-              shadowRadius: 6,
-              elevation: 8,
-              borderWidth: 3,
-              borderColor: '#ffffff'
+              borderWidth: 4,
+              borderColor: '#ffffff',
+              shadowColor: '#00e676',
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 0.45,
+              shadowRadius: 10,
+              elevation: 14
             }}
           >
-            <Text style={{ fontSize: 22 }}>{isAdmin ? '📷' : '🪪'}</Text>
+            <Text style={{ fontSize: 28, color: '#ffffff', fontWeight: 'bold', lineHeight: 30, textAlign: 'center' }}>
+              +
+            </Text>
           </View>
-          <Text
-            style={{
-              fontSize: 10,
-              fontWeight: 'bold',
-              color: isAdmin ? '#6d28d9' : colors.primary[700],
-              marginTop: 2
-            }}
-          >
-            {isAdmin ? 'Scan' : 'My Pass'}
-          </Text>
         </TouchableOpacity>
 
-        {/* Tab 4: Vault */}
+        {/* Tab 3: Tasks */}
         <TouchableOpacity
           onPress={() => handleSwitchTab('resources')}
-          style={{
-            alignItems: 'center',
-            paddingHorizontal: 12,
-            paddingVertical: 4,
-            borderRadius: 10,
-            backgroundColor: currentTab === 'resources' ? colors.primary[50] : 'transparent'
-          }}
+          style={{ alignItems: 'center', justifyContent: 'center', minWidth: 54 }}
         >
-          <Text style={{ fontSize: 16, color: currentTab === 'resources' ? colors.primary[600] : colors.neutral[400] }}>
-            ▤
+          <Text style={{ fontSize: 18, color: currentTab === 'resources' ? '#111827' : '#9ca3af' }}>
+            ☑
           </Text>
           <Text
             style={{
               fontSize: 10,
-              fontWeight: currentTab === 'resources' ? 'bold' : 'normal',
-              color: currentTab === 'resources' ? colors.primary[700] : colors.neutral[500],
+              fontWeight: currentTab === 'resources' ? 'bold' : '600',
+              color: currentTab === 'resources' ? '#111827' : '#9ca3af',
               marginTop: 1
             }}
           >
-            Vault
+            Tasks
           </Text>
+          <View
+            style={{
+              width: 4,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: currentTab === 'resources' ? '#111827' : 'transparent',
+              marginTop: 2
+            }}
+          />
         </TouchableOpacity>
 
-        {/* Tab 5: Profile */}
+        {/* Tab 4: Menu */}
         <TouchableOpacity
           onPress={() => handleSwitchTab('profile')}
-          style={{
-            alignItems: 'center',
-            paddingHorizontal: 12,
-            paddingVertical: 4,
-            borderRadius: 10,
-            backgroundColor: currentTab === 'profile' ? colors.primary[50] : 'transparent'
-          }}
+          style={{ alignItems: 'center', justifyContent: 'center', minWidth: 54 }}
         >
-          <Text style={{ fontSize: 16, color: currentTab === 'profile' ? colors.primary[600] : colors.neutral[400] }}>
-            ◉
+          <Text style={{ fontSize: 18, color: currentTab === 'profile' ? '#111827' : '#9ca3af' }}>
+            ▦
           </Text>
           <Text
             style={{
               fontSize: 10,
-              fontWeight: currentTab === 'profile' ? 'bold' : 'normal',
-              color: currentTab === 'profile' ? colors.primary[700] : colors.neutral[500],
+              fontWeight: currentTab === 'profile' ? 'bold' : '600',
+              color: currentTab === 'profile' ? '#111827' : '#9ca3af',
               marginTop: 1
             }}
           >
-            Profile
+            Menu
           </Text>
+          <View
+            style={{
+              width: 4,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: currentTab === 'profile' ? '#111827' : 'transparent',
+              marginTop: 2
+            }}
+          />
         </TouchableOpacity>
       </View>
 
@@ -5055,7 +6501,7 @@ export default function App() {
         <View
           style={{
             position: 'absolute',
-            bottom: 74,
+            bottom: 92,
             alignSelf: 'center',
             backgroundColor: colors.neutral[900],
             paddingHorizontal: 16,
@@ -5082,6 +6528,10 @@ export default function App() {
       {renderOnboardingModal()}
       {renderLeaderboardModal()}
       {renderBadgeCelebrationModal()}
+      {renderSubmitContributionModal()}
+      {renderReviewContributionModal()}
+      {renderAdjustPointsModal()}
+      {renderFabActionModal()}
     </SafeAreaView>
   );
 }

@@ -67,11 +67,16 @@ export async function updatePushToken(userId, token) {
 }
 
 export async function verifyMember(userId, verifierId) {
+  // Ensure verifierId does not violate foreign key constraint if it is a mock string or admin placeholder
+  const safeVerifierId = (verifierId && !verifierId.startsWith('user-') && verifierId !== 'admin')
+    ? verifierId
+    : null;
+
   return updateProfile(userId, {
     is_verified: true,
     verification_status: 'verified',
     verified_at: new Date().toISOString(),
-    verified_by: verifierId || null
+    verified_by: safeVerifierId
   });
 }
 

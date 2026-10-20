@@ -106,16 +106,26 @@ export function MembersAdminPage() {
 
   const handleVerifyStudent = async (studentId) => {
     const student = members.find((m) => m.id === studentId);
-    await verifyMemberAccount(studentId, user?.id);
-    setActionSuccess(`Verified ${student?.full_name || 'student'}. Portal access is now unlocked!`);
-    setTimeout(() => setActionSuccess(''), 4000);
+    try {
+      await verifyMemberAccount(studentId, user?.id);
+      setActionSuccess(`Verified ${student?.full_name || 'student'}. Portal access is now unlocked!`);
+      setTimeout(() => setActionSuccess(''), 4000);
+    } catch (err) {
+      console.error('Verify error:', err);
+      alert('Verification failed: ' + (err.message || 'Please check connection'));
+    }
   };
 
   const handleRejectStudent = async (studentId) => {
     const student = members.find((m) => m.id === studentId);
-    await rejectMemberAccount(studentId);
-    setActionSuccess(`Rejected application for ${student?.full_name || 'student'}.`);
-    setTimeout(() => setActionSuccess(''), 4000);
+    try {
+      await rejectMemberAccount(studentId);
+      setActionSuccess(`Rejected application for ${student?.full_name || 'student'}.`);
+      setTimeout(() => setActionSuccess(''), 4000);
+    } catch (err) {
+      console.error('Reject error:', err);
+      alert('Rejection failed: ' + (err.message || 'Please check connection'));
+    }
   };
 
   const pendingCount = pendingMembers.length;

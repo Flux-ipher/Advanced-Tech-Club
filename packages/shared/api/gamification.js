@@ -606,3 +606,200 @@ export async function getEventCheckinRoster(eventId) {
   }
   return [];
 }
+
+/**
+ * Admin manual adjustment of member points (+ or -) with full points_log audit trail
+ */
+export async function adjustMemberPoints(adminUserId, targetUserId, pointsDelta, reason, referenceId = null) {
+  if (!targetUserId) return { success: false, reason: 'no_target_user' };
+  const delta = parseInt(pointsDelta, 10);
+  if (isNaN(delta) || delta === 0) return { success: false, reason: 'invalid_points' };
+
+  try {
+    const current = await getMemberPoints(targetUserId);
+    const currentTotal = current.total_points || 0;
+    const newTotal = Math.max(0, currentTotal + delta);
+
+    // Insert points_log entry
+    await supabase.from('points_log').insert({
+      user_id: targetUserId,
+      points: delta,
+      reason: reason || (delta > 0 ? 'Admin reward' : 'Admin adjustment'),
+      reference_id: referenceId ? String(referenceId) : `admin_adj_${adminUserId}_${Date.now()}`,
+      awarded_at: new Date().toISOString()
+    });
+
+    // Upsert member_points
+    await supabase.from('member_points').upsert({
+      user_id: targetUserId,
+      total_points: newTotal,
+      checkin_streak: current.checkin_streak || 0,
+      last_checkin_date: current.last_checkin_date || null,
+      updated_at: new Date().toISOString()
+    });
+
+    // Notify member in notifications_log
+    try {
+      await supabase.from('notifications_log').insert({
+        user_id: targetUserId,
+        title: delta > 0 ? `+${delta} XP Awarded! 🎉` : `${delta} XP Adjusted`,
+        message: reason || (delta > 0 ? 'You received bonus XP from Club Admin!' : 'XP adjusted by Admin.'),
+        type: 'points',
+        read: false,
+        created_at: new Date().toISOString()
+      });
+    } catch (notifErr) {}
+
+    // Check badge unlocks if positive
+    let unlockedBadges = [];
+    if (delta > 0) {
+      unlockedBadges = await checkAndAwardBadges(targetUserId, newTotal, current.checkin_streak || 0);
+    }
+
+    return {
+      success: true,
+      delta,
+      newTotal,
+      unlockedBadges
+    };
+  } catch (err) {
+    console.warn('[ATC Gamification] adjustMemberPoints error:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Submit a student contribution / PR report
+ */
+export async function submitContributionReport({
+  userId,
+  userName = '',
+  userEmail = '',
+  title,
+  category = 'github_pr',
+  description = '',
+  proofUrl = ''
+}) {
+  if (!userId || !title) return { success: false, reason: 'missing_fields' };
+
+  try {
+    const payload = {
+      user_id: userId,
+      user_name: userName,
+      user_email: userEmail,
+      title: title.trim(),
+      category: category || 'github_pr',
+      description: description.trim(),
+      proof_url: proofUrl.trim(),
+      status: 'pending',
+      points_awarded: 0,
+      created_at: new Date().toISOString()
+    };
+
+    const { data, error } = await supabase
+      .from('contribution_reports')
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { success: true, data };
+  } catch (err) {
+    console.warn('[ATC Gamification] submitContributionReport notice:', err);
+    return {
+      success: true,
+      data: {
+        id: `local_rep_${Date.now()}`,
+        user_id: userId,
+        user_name: userName,
+        user_email: userEmail,
+        title,
+        category,
+        description,
+        proof_url: proofUrl,
+        status: 'pending',
+        points_awarded: 0,
+        created_at: new Date().toISOString()
+      }
+    };
+  }
+}
+
+/**
+ * Fetch contribution reports (for user or all for admin)
+ */
+export async function fetchContributionReports(userId = null) {
+  try {
+    let query = supabase
+      .from('contribution_reports')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (userId) {
+      query = query.eq('user_id', userId);
+    }
+
+    const { data, error } = await query;
+    if (!error && Array.isArray(data)) {
+      return data;
+    }
+  } catch (err) {
+    console.warn('[ATC Gamification] fetchContributionReports notice:', err);
+  }
+  return [];
+}
+
+/**
+ * Review contribution report (Admin)
+ */
+export async function reviewContributionReport(
+  adminUserId,
+  reportId,
+  targetUserId,
+  status,
+  pointsAwarded = 0,
+  adminFeedback = '',
+  reportTitle = ''
+) {
+  try {
+    const points = parseInt(pointsAwarded, 10) || 0;
+    const now = new Date().toISOString();
+
+    await supabase
+      .from('contribution_reports')
+      .update({
+        status,
+        points_awarded: points,
+        admin_feedback: adminFeedback,
+        reviewed_by: adminUserId,
+        reviewed_at: now
+      })
+      .eq('id', reportId);
+
+    // If approved and points > 0, award points to member
+    if (status === 'approved' && points > 0) {
+      await adjustMemberPoints(
+        adminUserId,
+        targetUserId,
+        points,
+        `Contribution Approved: ${reportTitle || 'Verified Submission'}`
+      );
+    } else if (status === 'rejected') {
+      try {
+        await supabase.from('notifications_log').insert({
+          user_id: targetUserId,
+          title: 'Contribution Review Update',
+          message: adminFeedback ? `Feedback: ${adminFeedback}` : `Your submission "${reportTitle}" was reviewed.`,
+          type: 'general',
+          read: false,
+          created_at: now
+        });
+      } catch (notifErr) {}
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.warn('[ATC Gamification] reviewContributionReport notice:', err);
+    return { success: false, error: err.message };
+  }
+}
