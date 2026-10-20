@@ -4,117 +4,21 @@ export const initialProfiles = [
   {
     id: 'user-ritesh-superadmin',
     full_name: 'Ritesh Mishra',
-    email: 'ritesh@techclub.edu',
+    email: 'fluxipher@gmail.com',
     role: 'super_admin',
     department: 'Computer Science & Engineering',
-    student_id: 'CS2023-001',
-    roll_number: 'CS2023-001',
+    student_id: 'ADMIN-001',
+    roll_number: 'ADMIN-001',
     branch: 'CSE',
     year: '2nd Year',
     why_join: 'Co-founding and engineering platforms for Advanced Tech Club.',
     onboarding_complete: true,
-    bio: 'Vice President of Advanced Tech Club. Student software engineer and builder.',
+    bio: 'Software engineer and builder at Advanced Tech Club.',
     avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
     push_token: 'ExponentPushToken[mock-ritesh-token]',
     is_verified: true,
     verification_status: 'verified',
     created_at: '2026-08-01T10:00:00Z'
-  },
-  {
-    id: 'user-sarah-member',
-    full_name: 'Sarah Chen',
-    email: 'sarah@techclub.edu',
-    role: 'member',
-    department: 'Software Engineering',
-    student_id: 'SE2024-042',
-    roll_number: 'SE2024-042',
-    branch: 'IT',
-    year: '3rd Year',
-    why_join: 'Deepen knowledge in distributed systems and cloud architecture.',
-    onboarding_complete: true,
-    bio: 'Software Engineering student. Passionate about distributed systems, Rust, and React Native.',
-    avatar_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80',
-    push_token: 'ExponentPushToken[mock-sarah-token]',
-    is_verified: true,
-    verification_status: 'verified',
-    created_at: '2026-08-15T11:30:00Z'
-  },
-  {
-    id: 'user-alex-member',
-    full_name: 'Alex Rivera',
-    email: 'alex@techclub.edu',
-    role: 'member',
-    department: 'Data Science & AI',
-    student_id: 'DS2024-118',
-    roll_number: 'DS2024-118',
-    branch: 'CSE',
-    year: '3rd Year',
-    why_join: 'Collaborate with fellow campus developers on production AI apps.',
-    onboarding_complete: true,
-    bio: 'Data Science & AI student. Organizing campus developer meetups and workshops.',
-    avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
-    push_token: 'ExponentPushToken[mock-alex-token]',
-    is_verified: true,
-    verification_status: 'verified',
-    created_at: '2026-09-01T09:15:00Z'
-  },
-  {
-    id: 'user-priya-member',
-    full_name: 'Priya Patel',
-    email: 'priya@techclub.edu',
-    role: 'member',
-    department: 'Computer Science & Engineering',
-    student_id: 'CS2025-204',
-    roll_number: 'CS2025-204',
-    branch: 'CSE',
-    year: '2nd Year',
-    why_join: 'Master mobile app engineering and full-stack cloud deployments.',
-    onboarding_complete: true,
-    bio: 'Junior Developer exploring Mobile Development and UI/UX design.',
-    avatar_url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80',
-    push_token: 'ExponentPushToken[mock-priya-token]',
-    is_verified: true,
-    verification_status: 'verified',
-    created_at: '2026-09-10T14:20:00Z'
-  },
-  {
-    id: 'user-jordan-member',
-    full_name: 'Jordan Lee',
-    email: 'jordan@techclub.edu',
-    role: 'member',
-    department: 'Information Technology',
-    student_id: 'IT2025-089',
-    roll_number: 'IT2025-089',
-    branch: 'IT',
-    year: '2nd Year',
-    why_join: 'Contribute to club open-source repos and learn DevOps CI/CD.',
-    onboarding_complete: true,
-    bio: 'Interested in Cloud computing, DevOps pipelines, and open-source contributions.',
-    avatar_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
-    push_token: 'ExponentPushToken[mock-jordan-token]',
-    is_verified: true,
-    verification_status: 'verified',
-    created_at: '2026-09-12T16:45:00Z'
-  },
-  {
-    id: 'user-tyler-pending',
-    full_name: 'Tyler Smith',
-    email: 'tyler.smith@techclub.edu',
-    role: 'member',
-    department: 'Electrical & Computer Engineering',
-    student_id: 'ECE2026-077',
-    roll_number: 'ECE2026-077',
-    branch: 'ECE',
-    year: '1st Year',
-    why_join: 'Freshman eager to build IoT and robotics projects.',
-    onboarding_complete: false,
-    bio: 'Freshman student enthusiastic about robotics and embedded systems. Eager to join ATC!',
-    avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80',
-    push_token: 'ExponentPushToken[mock-tyler-token]',
-    is_verified: false,
-    verification_status: 'pending',
-    applied_at: '2026-10-18T18:00:00Z',
-    created_at: '2026-10-18T18:00:00Z'
   }
 ];
 
@@ -225,10 +129,6 @@ export const initialEvents = [
 
 export const initialRegistrations = [
   { event_id: 'evt-1', user_id: 'user-ritesh-superadmin', registered_at: '2026-10-15T10:05:00Z', status: 'confirmed' },
-  { event_id: 'evt-1', user_id: 'user-sarah-member', registered_at: '2026-10-15T10:10:00Z', status: 'confirmed' },
-  { event_id: 'evt-1', user_id: 'user-priya-member', registered_at: '2026-10-15T11:00:00Z', status: 'confirmed' },
-  { event_id: 'evt-2', user_id: 'user-priya-member', registered_at: '2026-10-16T13:00:00Z', status: 'confirmed' },
-  { event_id: 'evt-2', user_id: 'user-jordan-member', registered_at: '2026-10-16T14:30:00Z', status: 'confirmed' },
   { event_id: 'evt-3', user_id: 'user-ritesh-superadmin', registered_at: '2026-10-17T16:00:00Z', status: 'confirmed' }
 ];
 
@@ -416,69 +316,29 @@ export const initialBadges = [
 export const initialMemberPoints = [
   {
     user_id: 'user-ritesh-superadmin',
-    total_points: 620,
-    checkin_streak: 4,
+    total_points: 1250,
+    checkin_streak: 12,
     last_checkin_date: '2026-10-18',
     updated_at: '2026-10-18T12:00:00Z'
-  },
-  {
-    user_id: 'user-sarah-member',
-    total_points: 480,
-    checkin_streak: 3,
-    last_checkin_date: '2026-10-18',
-    updated_at: '2026-10-18T12:00:00Z'
-  },
-  {
-    user_id: 'user-alex-member',
-    total_points: 340,
-    checkin_streak: 2,
-    last_checkin_date: '2026-10-17',
-    updated_at: '2026-10-17T11:00:00Z'
-  },
-  {
-    user_id: 'user-priya-member',
-    total_points: 210,
-    checkin_streak: 1,
-    last_checkin_date: '2026-10-16',
-    updated_at: '2026-10-16T14:00:00Z'
-  },
-  {
-    user_id: 'user-jordan-member',
-    total_points: 135,
-    checkin_streak: 1,
-    last_checkin_date: '2026-10-15',
-    updated_at: '2026-10-15T10:00:00Z'
   }
 ];
 
 export const initialMemberBadges = [
   { user_id: 'user-ritesh-superadmin', badge_id: 'badge-1', earned_at: '2026-08-10T10:00:00Z' },
-  { user_id: 'user-ritesh-superadmin', badge_id: 'badge-4', earned_at: '2026-08-20T10:00:00Z' },
+  { user_id: 'user-ritesh-superadmin', badge_id: 'badge-2', earned_at: '2026-08-15T10:00:00Z' },
+  { user_id: 'user-ritesh-superadmin', badge_id: 'badge-3', earned_at: '2026-08-20T10:00:00Z' },
+  { user_id: 'user-ritesh-superadmin', badge_id: 'badge-4', earned_at: '2026-08-25T10:00:00Z' },
   { user_id: 'user-ritesh-superadmin', badge_id: 'badge-5', earned_at: '2026-09-01T10:00:00Z' },
-  { user_id: 'user-ritesh-superadmin', badge_id: 'badge-8', earned_at: '2026-09-15T10:00:00Z' },
-  { user_id: 'user-ritesh-superadmin', badge_id: 'badge-10', earned_at: '2026-08-01T10:00:00Z' },
-
-  { user_id: 'user-sarah-member', badge_id: 'badge-1', earned_at: '2026-08-15T10:00:00Z' },
-  { user_id: 'user-sarah-member', badge_id: 'badge-4', earned_at: '2026-09-02T10:00:00Z' },
-  { user_id: 'user-sarah-member', badge_id: 'badge-5', earned_at: '2026-09-20T10:00:00Z' },
-  { user_id: 'user-sarah-member', badge_id: 'badge-8', earned_at: '2026-10-01T10:00:00Z' },
-
-  { user_id: 'user-alex-member', badge_id: 'badge-1', earned_at: '2026-09-05T10:00:00Z' },
-  { user_id: 'user-alex-member', badge_id: 'badge-4', earned_at: '2026-09-25T10:00:00Z' },
-  { user_id: 'user-alex-member', badge_id: 'badge-5', earned_at: '2026-10-10T10:00:00Z' },
-
-  { user_id: 'user-priya-member', badge_id: 'badge-1', earned_at: '2026-09-12T10:00:00Z' },
-  { user_id: 'user-priya-member', badge_id: 'badge-4', earned_at: '2026-10-05T10:00:00Z' },
-
-  { user_id: 'user-jordan-member', badge_id: 'badge-1', earned_at: '2026-09-15T10:00:00Z' },
-  { user_id: 'user-jordan-member', badge_id: 'badge-4', earned_at: '2026-10-08T10:00:00Z' }
+  { user_id: 'user-ritesh-superadmin', badge_id: 'badge-6', earned_at: '2026-09-10T10:00:00Z' },
+  { user_id: 'user-ritesh-superadmin', badge_id: 'badge-7', earned_at: '2026-09-15T10:00:00Z' },
+  { user_id: 'user-ritesh-superadmin', badge_id: 'badge-8', earned_at: '2026-09-20T10:00:00Z' },
+  { user_id: 'user-ritesh-superadmin', badge_id: 'badge-9', earned_at: '2026-09-25T10:00:00Z' },
+  { user_id: 'user-ritesh-superadmin', badge_id: 'badge-10', earned_at: '2026-08-01T10:00:00Z' }
 ];
 
 export const initialPointsLog = [
   { id: 'log-1', user_id: 'user-ritesh-superadmin', points: 50, reason: 'event_checkin', reference_id: 'evt-1', awarded_at: '2026-10-18T10:00:00Z' },
   { id: 'log-2', user_id: 'user-ritesh-superadmin', points: 30, reason: 'event_created', reference_id: 'evt-1', awarded_at: '2026-10-15T10:00:00Z' },
-  { id: 'log-3', user_id: 'user-ritesh-superadmin', points: 20, reason: 'announcement_posted', reference_id: 'ann-1', awarded_at: '2026-10-18T14:00:00Z' },
-  { id: 'log-4', user_id: 'user-sarah-member', points: 50, reason: 'event_checkin', reference_id: 'evt-2', awarded_at: '2026-10-17T11:00:00Z' },
-  { id: 'log-5', user_id: 'user-alex-member', points: 10, reason: 'event_registration', reference_id: 'evt-1', awarded_at: '2026-10-16T12:00:00Z' }
+  { id: 'log-3', user_id: 'user-ritesh-superadmin', points: 20, reason: 'announcement_posted', reference_id: 'ann-1', awarded_at: '2026-10-18T14:00:00Z' }
 ];
 

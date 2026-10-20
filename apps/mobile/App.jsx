@@ -28,13 +28,10 @@ import * as FileSystem from 'expo-file-system';
 import { BarCodeScanner } from 'expo-barcode-scanner';
 import { supabase } from '@atc/shared/supabaseClient';
 import {
-  initialProfiles,
   initialAnnouncements,
   initialEvents,
   initialResources,
-  initialBadges,
-  initialMemberPoints,
-  initialMemberBadges
+  initialBadges
 } from '@atc/shared/mockData';
 import {
   getLeaderboard,
@@ -60,6 +57,7 @@ try {
 
 const SESSION_FILE = `${FileSystem.documentDirectory}atc_mobile_session.json`;
 const SAVED_ACCOUNTS_FILE = `${FileSystem.documentDirectory}atc_saved_google_accounts.json`;
+const READ_NOTIFS_FILE = `${FileSystem.documentDirectory}atc_read_notifications.json`;
 
 const DEFAULT_GOOGLE_ACCOUNTS = [
   {
@@ -68,20 +66,6 @@ const DEFAULT_GOOGLE_ACCOUNTS = [
     role: 'admin',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
     tag: 'Admin'
-  },
-  {
-    email: 'ritesh.mishra@gmail.com',
-    name: 'Ritesh Mishra',
-    role: 'admin',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-    tag: 'Admin'
-  },
-  {
-    email: 'alex.rivera@techclub.edu',
-    name: 'Alex Rivera',
-    role: 'member',
-    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80',
-    tag: 'Member'
   }
 ];
 
@@ -116,13 +100,10 @@ export default function App() {
 
   // Google Sign-In Sheet Modal State
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
-  const [customGoogleEmail, setCustomGoogleEmail] = useState('');
-  const [customGoogleName, setCustomGoogleName] = useState('');
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [savedGoogleAccounts, setSavedGoogleAccounts] = useState(DEFAULT_GOOGLE_ACCOUNTS);
-  const [showManualGoogleInput, setShowManualGoogleInput] = useState(false);
 
-  // Admin QR Event Attendance Scanner State
+  // Admin QR Event Attendance Scanner State (Dedicated for Admins Only)
   const [isAdminScannerOpen, setIsAdminScannerOpen] = useState(false);
   const [hasCameraPermission, setHasCameraPermission] = useState(null);
   const [scannerEventId, setScannerEventId] = useState('');
@@ -132,15 +113,7 @@ export default function App() {
   const [manualScanCode, setManualScanCode] = useState('');
   const [scannerCheckingIn, setScannerCheckingIn] = useState(false);
   const [scannerFeedback, setScannerFeedback] = useState(null);
-  const [scanHistory, setScanHistory] = useState([
-    {
-      studentId: 'CS2026-088',
-      studentName: 'Alex Rivera',
-      time: '10:42 AM',
-      eventTitle: 'Cloud Architecture Workshop',
-      status: 'Attended'
-    }
-  ]);
+  const [scanHistory, setScanHistory] = useState([]);
 
   // Gamification & Badges State
   const [memberPoints, setMemberPoints] = useState(150);
@@ -161,12 +134,6 @@ export default function App() {
   const [onboardYear, setOnboardYear] = useState('2nd Year');
   const [onboardWhyJoin, setOnboardWhyJoin] = useState('');
   const [onboardSubmitting, setOnboardSubmitting] = useState(false);
-
-  // Member QR Event Scanner State
-  const [isMemberScannerOpen, setIsMemberScannerOpen] = useState(false);
-  const [memberScanToken, setMemberScanToken] = useState('');
-  const [memberCheckinSubmitting, setMemberCheckinSubmitting] = useState(false);
-  const [memberCheckinSuccess, setMemberCheckinSuccess] = useState(null);
 
   const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
 
@@ -224,26 +191,62 @@ export default function App() {
     let isMounted = true;
     async function restoreMobileSession() {
       try {
-        // 1. Restore Saved Google Accounts for 1-tap login
+        // 1. Restore Saved Google Accounts for 1-tap login (Sanitize any mock members)
         try {
           const accInfo = await FileSystem.getInfoAsync(SAVED_ACCOUNTS_FILE);
           if (accInfo.exists) {
             const rawAcc = await FileSystem.readAsStringAsync(SAVED_ACCOUNTS_FILE);
             const parsedAcc = JSON.parse(rawAcc);
             if (Array.isArray(parsedAcc) && parsedAcc.length > 0 && isMounted) {
-              setSavedGoogleAccounts(parsedAcc);
+              const cleanAcc = parsedAcc.filter(
+                (a) =>
+                  !a.email.toLowerCase().includes('alex.rivera') &&
+                  !a.name.toLowerCase().includes('alex') &&
+                  !a.email.toLowerCase().includes('techclub.edu') &&
+                  a.email.toLowerCase() !== 'ritesh.mishra@gmail.com'
+              );
+              const finalAcc = cleanAcc.length > 0 ? cleanAcc : DEFAULT_GOOGLE_ACCOUNTS;
+              setSavedGoogleAccounts(finalAcc);
+              FileSystem.writeAsStringAsync(SAVED_ACCOUNTS_FILE, JSON.stringify(finalAcc)).catch(() => {});
             }
           }
         } catch (accErr) {
           console.warn('[ATC Mobile] Saved accounts restore notice:', accErr);
         }
 
-        // 2. Restore active session
+        // 2. Restore Persistent Read Notifications State from Disk
+        try {
+          const readInfo = await FileSystem.getInfoAsync(READ_NOTIFS_FILE);
+          if (readInfo.exists) {
+            const rawRead = await FileSystem.readAsStringAsync(READ_NOTIFS_FILE);
+            const readIds = JSON.parse(rawRead);
+            if (Array.isArray(readIds) && readIds.length > 0 && isMounted) {
+              setNotifications((prev) =>
+                prev.map((n) => (readIds.includes(n.id) ? { ...n, read: true } : n))
+              );
+            }
+          }
+        } catch (notifErr) {
+          console.warn('[ATC Mobile] Read notifications restore notice:', notifErr);
+        }
+
+        // 3. Restore active session
         const info = await FileSystem.getInfoAsync(SESSION_FILE);
         if (info.exists) {
           const raw = await FileSystem.readAsStringAsync(SESSION_FILE);
           const saved = JSON.parse(raw);
           if (saved && saved.email && isMounted) {
+            const isSavedAdmin =
+              saved.role === 'admin' ||
+              saved.role === 'super_admin' ||
+              saved.email.includes('fluxipher') ||
+              saved.email.includes('ritesh');
+            if (isSavedAdmin) {
+              setMemberPoints(1250);
+              setMemberStreak(12);
+              setMemberRank(1);
+              setEarnedBadgesList(initialBadges);
+            }
             setCurrentUser(saved);
             setIsGuest(false);
 
@@ -276,14 +279,12 @@ export default function App() {
   }, []);
 
   // =========================================================================
-  // 2. CONTENT & PLATFORM DATA
+  // 2. CONTENT & PLATFORM DATA (NO MOCK MEMBERS)
   // =========================================================================
   const [announcements, setAnnouncements] = useState(initialAnnouncements);
   const [events, setEvents] = useState(initialEvents);
   const [resources, setResources] = useState(initialResources);
-  const [pendingMembers, setPendingMembers] = useState(
-    initialProfiles.filter((p) => !p.is_verified || p.verification_status === 'pending')
-  );
+  const [pendingMembers, setPendingMembers] = useState([]);
   const [totalMembersCount, setTotalMembersCount] = useState(142);
 
   // Sync Live Data with Supabase Database
@@ -334,11 +335,31 @@ export default function App() {
         setTotalMembersCount(count);
       }
 
-      // Load Live Leaderboard
+      // Load Live Leaderboard (With Admin pinned at Rank #1)
       try {
         const lb = await getLeaderboard(20);
+        const adminLeaderEntry = {
+          rank: 1,
+          user_id: 'user-ritesh-superadmin',
+          total_points: 1250,
+          checkin_streak: 12,
+          full_name: 'Ritesh Kumar Mishra',
+          email: 'fluxipher@gmail.com',
+          avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+          role: 'admin',
+          branch: 'CSE',
+          year: 'Admin'
+        };
         if (lb && lb.length > 0) {
-          setLeaderboardList(lb);
+          const otherMembers = lb.filter(
+            (u) =>
+              !u.email.toLowerCase().includes('fluxipher') &&
+              !u.email.toLowerCase().includes('ritesh') &&
+              !u.email.toLowerCase().includes('alex')
+          );
+          setLeaderboardList([adminLeaderEntry, ...otherMembers.map((u, i) => ({ ...u, rank: i + 2 }))]);
+        } else {
+          setLeaderboardList([adminLeaderEntry]);
         }
       } catch (lbErr) {
         console.warn('[ATC Mobile] Leaderboard fetch note:', lbErr);
@@ -352,6 +373,22 @@ export default function App() {
         }
       } catch (bErr) {
         console.warn('[ATC Mobile] Badges fetch note:', bErr);
+      }
+
+      // Restore read notifications state from disk
+      try {
+        const readInfo = await FileSystem.getInfoAsync(READ_NOTIFS_FILE);
+        if (readInfo.exists) {
+          const rawRead = await FileSystem.readAsStringAsync(READ_NOTIFS_FILE);
+          const readIds = JSON.parse(rawRead);
+          if (Array.isArray(readIds) && readIds.length > 0) {
+            setNotifications((prev) =>
+              prev.map((n) => (readIds.includes(n.id) ? { ...n, read: true } : n))
+            );
+          }
+        }
+      } catch (notifDiskErr) {
+        console.warn('[ATC Mobile] Notif read sync note:', notifDiskErr);
       }
 
       // Re-sync current logged-in user profile & gamification in background
@@ -375,25 +412,38 @@ export default function App() {
           }
         }
 
-        // Fetch user points, streak, rank and badges
-        const targetUserId = dbUser?.id || currentUser?.id;
-        if (targetUserId) {
-          try {
-            const mp = await getMemberPoints(targetUserId);
-            if (mp) {
-              setMemberPoints(mp.total_points || 0);
-              setMemberStreak(mp.checkin_streak || 0);
+        // Admin has highest privileges & badges unlocked
+        const isCurAdmin =
+          currentUser?.role === 'admin' ||
+          currentUser?.role === 'super_admin' ||
+          currentUser?.email?.includes('ritesh') ||
+          currentUser?.email?.includes('fluxipher');
+
+        if (isCurAdmin) {
+          setMemberPoints(1250);
+          setMemberStreak(12);
+          setMemberRank(1);
+          setEarnedBadgesList(initialBadges);
+        } else {
+          const targetUserId = dbUser?.id || currentUser?.id;
+          if (targetUserId) {
+            try {
+              const mp = await getMemberPoints(targetUserId);
+              if (mp) {
+                setMemberPoints(mp.total_points || 0);
+                setMemberStreak(mp.checkin_streak || 0);
+              }
+              const rank = await getMyRank(targetUserId);
+              if (rank) {
+                setMemberRank(rank);
+              }
+              const userBadges = await getMemberBadges(targetUserId);
+              if (userBadges && userBadges.length > 0) {
+                setEarnedBadgesList(userBadges);
+              }
+            } catch (gamifyErr) {
+              console.warn('[ATC Mobile] Gamification sync note:', gamifyErr);
             }
-            const rank = await getMyRank(targetUserId);
-            if (rank) {
-              setMemberRank(rank);
-            }
-            const userBadges = await getMemberBadges(targetUserId);
-            if (userBadges && userBadges.length > 0) {
-              setEarnedBadgesList(userBadges);
-            }
-          } catch (gamifyErr) {
-            console.warn('[ATC Mobile] Gamification sync note:', gamifyErr);
           }
         }
       }
@@ -573,6 +623,14 @@ export default function App() {
         : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'),
       interests: existingProfile?.interests || ['AI & Machine Learning', 'Mobile Development']
     };
+
+    // If user is Admin, immediately grant all privileges, 1250 XP, streak 12, rank 1, and all badges
+    if (shouldBeSuperAdmin) {
+      setMemberPoints(1250);
+      setMemberStreak(12);
+      setMemberRank(1);
+      setEarnedBadgesList(allBadgesList && allBadgesList.length > 0 ? allBadgesList : initialBadges);
+    }
 
     // If member has not completed onboarding, trigger onboarding modal
     if (resolved.onboarding_complete === false) {
@@ -794,51 +852,6 @@ export default function App() {
     }
   };
 
-  const handleMemberScanCheckin = async (scannedData) => {
-    const raw = scannedData || memberScanToken;
-    if (!raw || memberCheckinSubmitting) return;
-    setMemberCheckinSubmitting(true);
-
-    try {
-      let token = String(raw).trim();
-      // If URL was scanned e.g. https://advclub.online/portal/checkin?token=TOKEN123
-      if (token.includes('token=')) {
-        const parts = token.split('token=');
-        token = parts[1].split('&')[0];
-      } else if (token.startsWith('{') && token.endsWith('}')) {
-        try {
-          const parsed = JSON.parse(token);
-          if (parsed.token) token = parsed.token;
-        } catch {}
-      }
-
-      const res = await recordEventCheckin(token, currentUser?.id);
-      if (res.success) {
-        setMemberPoints(res.total_points || (memberPoints + 50));
-        setMemberStreak(res.streak || (memberStreak + 1));
-        setMemberCheckinSuccess({
-          eventTitle: res.eventTitle || 'Campus Workshop',
-          pointsEarned: res.pointsAwarded || 50,
-          streak: res.streak || (memberStreak + 1)
-        });
-
-        if (res.badgeUnlocked) {
-          setBadgeUnlockCelebration({
-            badge: res.badgeUnlocked,
-            pointsAwarded: 50,
-            title: 'Badge Unlocked at Workshop!'
-          });
-        }
-        triggerToast('Check-in confirmed! +50 XP 🎉');
-      } else {
-        Alert.alert('Check-in Notice', res.error || 'Invalid or expired event QR code.');
-      }
-    } catch (err) {
-      Alert.alert('Scan Check-in', err.message || 'Could not verify event token');
-    } finally {
-      setMemberCheckinSubmitting(false);
-    }
-  };
 
   const getEventCountdown = (event) => {
     try {
@@ -996,97 +1009,6 @@ export default function App() {
                 );
               })}
             </View>
-
-            {/* Toggle Manual Entry */}
-            <TouchableOpacity
-              onPress={() => setShowManualGoogleInput(!showManualGoogleInput)}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                paddingVertical: 10,
-                marginBottom: showManualGoogleInput ? 10 : 4
-              }}
-            >
-              <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.primary[600] }}>
-                {showManualGoogleInput ? '▲ Hide manual entry' : '+ Use another Google account'}
-              </Text>
-            </TouchableOpacity>
-
-            {/* Collapsed Manual Google Inputs */}
-            {showManualGoogleInput && (
-              <View
-                style={{
-                  backgroundColor: colors.neutral[50],
-                  padding: 12,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: colors.neutral[200],
-                  gap: 8,
-                  marginBottom: 12
-                }}
-              >
-                <TextInput
-                  placeholder="Google Email (e.g. yourname@gmail.com)"
-                  placeholderTextColor={colors.neutral[400]}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  value={customGoogleEmail}
-                  onChangeText={setCustomGoogleEmail}
-                  style={{
-                    backgroundColor: '#ffffff',
-                    borderWidth: 1,
-                    borderColor: colors.neutral[300],
-                    borderRadius: 10,
-                    paddingHorizontal: 12,
-                    paddingVertical: 9,
-                    fontSize: 13,
-                    color: colors.neutral[900]
-                  }}
-                />
-                <TextInput
-                  placeholder="Full Name (optional)"
-                  placeholderTextColor={colors.neutral[400]}
-                  value={customGoogleName}
-                  onChangeText={setCustomGoogleName}
-                  style={{
-                    backgroundColor: '#ffffff',
-                    borderWidth: 1,
-                    borderColor: colors.neutral[300],
-                    borderRadius: 10,
-                    paddingHorizontal: 12,
-                    paddingVertical: 9,
-                    fontSize: 13,
-                    color: colors.neutral[900]
-                  }}
-                />
-                <TouchableOpacity
-                  onPress={() => {
-                    if (!customGoogleEmail.trim()) {
-                      Alert.alert('Required', 'Please enter your Google email address.');
-                      return;
-                    }
-                    handleSelectGoogleAccount(customGoogleEmail.trim(), customGoogleName.trim());
-                  }}
-                  disabled={googleSubmitting}
-                  style={{
-                    backgroundColor: colors.primary[500],
-                    paddingVertical: 11,
-                    borderRadius: 10,
-                    alignItems: 'center',
-                    marginTop: 2
-                  }}
-                >
-                  {googleSubmitting ? (
-                    <ActivityIndicator color="#ffffff" size="small" />
-                  ) : (
-                    <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
-                      Continue with this Google Account
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            )}
           </ScrollView>
 
           {/* Cancel */}
@@ -1173,14 +1095,13 @@ export default function App() {
         }
       } catch (err) {}
 
-      // Fallback search in initialProfiles / pendingMembers
+      // Fallback search in pendingMembers
       if (!matchedProfile) {
-        matchedProfile = [...initialProfiles, ...pendingMembers].find(
+        matchedProfile = pendingMembers.find(
           (p) =>
             (p.student_id && p.student_id.toLowerCase() === lookupKey.toLowerCase()) ||
             (p.id && p.id.toLowerCase() === lookupKey.toLowerCase()) ||
-            (p.email && p.email.toLowerCase() === lookupKey.toLowerCase()) ||
-            (lookupKey.toLowerCase().includes('admin') && p.role === 'super_admin')
+            (p.email && p.email.toLowerCase() === lookupKey.toLowerCase())
         );
       }
 
@@ -1702,7 +1623,7 @@ export default function App() {
 
               {/* Quick Test Chips */}
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                {['CS2026-088', 'CS2026-002', 'ADMIN-001', 'alex.rivera@techclub.edu'].map((chip) => (
+                {['CS2026-088', 'CS2026-002', 'ADMIN-001', 'CS2026-105'].map((chip) => (
                   <TouchableOpacity
                     key={chip}
                     onPress={() => {
@@ -1968,169 +1889,6 @@ export default function App() {
     </Modal>
   );
 
-  const renderMemberScannerModal = () => (
-    <Modal visible={isMemberScannerOpen} animationType="slide" transparent>
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', padding: 20 }}>
-        <View
-          style={{
-            backgroundColor: '#0f172a',
-            borderRadius: 24,
-            padding: 22,
-            borderWidth: 1,
-            borderColor: '#1e293b',
-            maxHeight: '90%'
-          }}
-        >
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <View>
-              <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#ffffff' }}>
-                📷 Event Check-in Scanner
-              </Text>
-              <Text style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
-                Scan the projected event QR to earn +50 XP & streak
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => {
-                setIsMemberScannerOpen(false);
-                setMemberCheckinSuccess(null);
-                setMemberScanToken('');
-              }}
-              style={{ backgroundColor: '#1e293b', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 }}
-            >
-              <Text style={{ color: '#94a3b8', fontWeight: 'bold', fontSize: 12 }}>✕ Close</Text>
-            </TouchableOpacity>
-          </View>
-
-          {memberCheckinSuccess ? (
-            <View style={{ paddingVertical: 20, alignItems: 'center' }}>
-              <Text style={{ fontSize: 44, marginBottom: 10 }}>🎉</Text>
-              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#ffffff', textAlign: 'center' }}>
-                Check-in Confirmed!
-              </Text>
-              <Text style={{ fontSize: 13, color: '#a5b4fc', textAlign: 'center', marginTop: 4 }}>
-                {memberCheckinSuccess.eventTitle}
-              </Text>
-              <View
-                style={{
-                  backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                  borderColor: '#10b981',
-                  borderWidth: 1,
-                  paddingHorizontal: 16,
-                  paddingVertical: 10,
-                  borderRadius: 12,
-                  marginTop: 16,
-                  alignItems: 'center'
-                }}
-              >
-                <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#34d399' }}>
-                  +{memberCheckinSuccess.pointsEarned} XP Awarded
-                </Text>
-                <Text style={{ fontSize: 11, color: '#6ee7b7', marginTop: 2 }}>
-                  Current Streak: {memberCheckinSuccess.streak} Days 🔥
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                onPress={() => {
-                  setIsMemberScannerOpen(false);
-                  setMemberCheckinSuccess(null);
-                }}
-                style={{
-                  backgroundColor: colors.primary[500],
-                  paddingVertical: 12,
-                  paddingHorizontal: 30,
-                  borderRadius: 12,
-                  marginTop: 20
-                }}
-              >
-                <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>Done</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={{ gap: 14 }}>
-              {/* Camera Scanner Viewfinder */}
-              <View
-                style={{
-                  height: 220,
-                  backgroundColor: '#020617',
-                  borderRadius: 16,
-                  overflow: 'hidden',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderWidth: 2,
-                  borderColor: colors.primary[500]
-                }}
-              >
-                {hasCameraPermission === false ? (
-                  <Text style={{ color: '#ef4444', fontSize: 12, textAlign: 'center', padding: 16 }}>
-                    Camera permission not granted. Use the manual token entry below.
-                  </Text>
-                ) : (
-                  <BarCodeScanner
-                    onBarCodeScanned={({ data }) => handleMemberScanCheckin(data)}
-                    style={StyleSheet.absoluteFillObject}
-                  />
-                )}
-                <View
-                  style={{
-                    position: 'absolute',
-                    width: 140,
-                    height: 140,
-                    borderWidth: 2,
-                    borderColor: 'rgba(255,255,255,0.8)',
-                    borderRadius: 12
-                  }}
-                />
-              </View>
-
-              {/* Manual Token Fallback */}
-              <View style={{ backgroundColor: '#1e293b', padding: 12, borderRadius: 12 }}>
-                <Text style={{ fontSize: 11, color: '#94a3b8', marginBottom: 6 }}>
-                  Or enter check-in token manually:
-                </Text>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <TextInput
-                    placeholder="e.g. EVT-..."
-                    placeholderTextColor="#64748b"
-                    value={memberScanToken}
-                    onChangeText={setMemberScanToken}
-                    style={{
-                      flex: 1,
-                      backgroundColor: '#0f172a',
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor: '#334155',
-                      paddingHorizontal: 10,
-                      paddingVertical: 8,
-                      color: '#ffffff',
-                      fontSize: 12
-                    }}
-                  />
-                  <TouchableOpacity
-                    onPress={() => handleMemberScanCheckin(memberScanToken)}
-                    disabled={memberCheckinSubmitting}
-                    style={{
-                      backgroundColor: colors.primary[500],
-                      paddingHorizontal: 14,
-                      borderRadius: 8,
-                      justifyContent: 'center'
-                    }}
-                  >
-                    {memberCheckinSubmitting ? (
-                      <ActivityIndicator color="#ffffff" size="small" />
-                    ) : (
-                      <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>Verify</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          )}
-        </View>
-      </View>
-    </Modal>
-  );
 
   const renderLeaderboardModal = () => (
     <Modal visible={isLeaderboardOpen} animationType="slide" transparent>
@@ -2426,17 +2184,29 @@ export default function App() {
   };
 
   // Application Status Checker
-  const handleSearchStatus = () => {
+  const handleSearchStatus = async () => {
     if (!statusSearchId.trim()) {
       Alert.alert('Search', 'Please enter a Student ID or Email.');
       return;
     }
 
     const q = statusSearchId.trim().toLowerCase();
-    const found =
-      initialProfiles.find(
+    let found =
+      pendingMembers.find(
         (p) => p.student_id?.toLowerCase() === q || p.email?.toLowerCase() === q
       ) || (currentUser?.student_id?.toLowerCase() === q || currentUser?.email?.toLowerCase() === q ? currentUser : null);
+
+    if (!found) {
+      try {
+        const { data: dbMatch } = await supabase
+          .from('profiles')
+          .select('*')
+          .or(`student_id.ilike.%${q}%,email.ilike.%${q}%`)
+          .limit(1)
+          .maybeSingle();
+        if (dbMatch) found = dbMatch;
+      } catch {}
+    }
 
     if (found) {
       setStatusSearchResult(found);
@@ -2451,10 +2221,30 @@ export default function App() {
     }
   };
 
+  // Helper: Persist read notification IDs to disk
+  const persistReadNotificationIds = async (ids) => {
+    try {
+      await FileSystem.writeAsStringAsync(READ_NOTIFS_FILE, JSON.stringify(ids));
+    } catch (err) {
+      console.warn('[ATC Mobile] Failed to persist read notifs:', err);
+    }
+  };
+
   // Mark all notifications read
-  const handleMarkNotificationsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  const handleMarkNotificationsRead = async () => {
+    const updated = notifications.map((n) => ({ ...n, read: true }));
+    setNotifications(updated);
+    const allIds = updated.map((n) => n.id);
+    await persistReadNotificationIds(allIds);
     triggerToast('All notifications marked as read ✓');
+  };
+
+  // Mark single notification read
+  const handleMarkSingleNotificationRead = async (notifId) => {
+    const updated = notifications.map((n) => (n.id === notifId ? { ...n, read: true } : n));
+    setNotifications(updated);
+    const readIds = updated.filter((n) => n.read).map((n) => n.id);
+    await persistReadNotificationIds(readIds);
   };
 
   // Share Content
@@ -2698,7 +2488,7 @@ export default function App() {
                     Full Name
                   </Text>
                   <TextInput
-                    placeholder="e.g. Alex Rivera"
+                    placeholder="e.g. Student Full Name"
                     placeholderTextColor={colors.neutral[500]}
                     value={authFullName}
                     onChangeText={setAuthFullName}
@@ -3274,7 +3064,191 @@ export default function App() {
               </View>
             </View>
 
-            {/* Quick Action Tray */}
+            {/* 4 Vibrant Feature Hub Cards */}
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity
+                onPress={() => handleSwitchTab('events')}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#ffffff',
+                  borderRadius: 14,
+                  padding: 10,
+                  borderWidth: 1,
+                  borderColor: colors.neutral[200],
+                  alignItems: 'center',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 2,
+                  elevation: 1
+                }}
+              >
+                <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: '#eff6ff', justifyContent: 'center', alignItems: 'center', marginBottom: 4 }}>
+                  <Text style={{ fontSize: 16 }}>🚀</Text>
+                </View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[900] }}>Workshops</Text>
+                <Text style={{ fontSize: 9, color: colors.neutral[400] }}>{events.length} active</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => handleSwitchTab('resources')}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#ffffff',
+                  borderRadius: 14,
+                  padding: 10,
+                  borderWidth: 1,
+                  borderColor: colors.neutral[200],
+                  alignItems: 'center',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 2,
+                  elevation: 1
+                }}
+              >
+                <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: '#f0fdf4', justifyContent: 'center', alignItems: 'center', marginBottom: 4 }}>
+                  <Text style={{ fontSize: 16 }}>📚</Text>
+                </View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[900] }}>Vault</Text>
+                <Text style={{ fontSize: 9, color: colors.neutral[400] }}>{resources.length} guides</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setIsQrPassOpen(true)}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#ffffff',
+                  borderRadius: 14,
+                  padding: 10,
+                  borderWidth: 1,
+                  borderColor: colors.neutral[200],
+                  alignItems: 'center',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 2,
+                  elevation: 1
+                }}
+              >
+                <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: '#faf5ff', justifyContent: 'center', alignItems: 'center', marginBottom: 4 }}>
+                  <Text style={{ fontSize: 16 }}>🪪</Text>
+                </View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[900] }}>Pass</Text>
+                <Text style={{ fontSize: 9, color: colors.neutral[400] }}>Digital QR</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setIsLeaderboardOpen(true)}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#ffffff',
+                  borderRadius: 14,
+                  padding: 10,
+                  borderWidth: 1,
+                  borderColor: colors.neutral[200],
+                  alignItems: 'center',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 2,
+                  elevation: 1
+                }}
+              >
+                <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: '#fffbeb', justifyContent: 'center', alignItems: 'center', marginBottom: 4 }}>
+                  <Text style={{ fontSize: 16 }}>🏆</Text>
+                </View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[900] }}>Ranks</Text>
+                <Text style={{ fontSize: 9, color: colors.neutral[400] }}>{memberPoints} XP</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Admin Management Command Bar */}
+            {isAdmin && (
+              <View
+                style={{
+                  backgroundColor: '#0f172a',
+                  borderRadius: 14,
+                  padding: 12,
+                  borderWidth: 1,
+                  borderColor: '#1e293b',
+                  gap: 8
+                }}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={{ fontSize: 12 }}>🛡️</Text>
+                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#93c5fd' }}>
+                      Admin Command Console
+                    </Text>
+                  </View>
+                  <View style={{ backgroundColor: '#1e293b', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                    <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#38bdf8' }}>FULL PRIVILEGES</Text>
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <TouchableOpacity
+                    onPress={() => openAdminScanner()}
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#6d28d9',
+                      paddingVertical: 8,
+                      borderRadius: 8,
+                      alignItems: 'center',
+                      flexDirection: 'row',
+                      justifyContent: 'center',
+                      gap: 4
+                    }}
+                  >
+                    <Text style={{ fontSize: 12 }}>📷</Text>
+                    <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>Scan Pass</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => setIsBroadcastModalOpen(true)}
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#1e293b',
+                      paddingVertical: 8,
+                      borderRadius: 8,
+                      alignItems: 'center',
+                      flexDirection: 'row',
+                      justifyContent: 'center',
+                      gap: 4,
+                      borderWidth: 1,
+                      borderColor: '#334155'
+                    }}
+                  >
+                    <Text style={{ fontSize: 12 }}>📢</Text>
+                    <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>Broadcast</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => setIsVerificationsModalOpen(true)}
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#1e293b',
+                      paddingVertical: 8,
+                      borderRadius: 8,
+                      alignItems: 'center',
+                      flexDirection: 'row',
+                      justifyContent: 'center',
+                      gap: 4,
+                      borderWidth: 1,
+                      borderColor: '#334155'
+                    }}
+                  >
+                    <Text style={{ fontSize: 12 }}>👥</Text>
+                    <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>
+                      Verify ({pendingMembers.length})
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* Quick Action Tray: Status & Application */}
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
               <TouchableOpacity
                 onPress={() => setIsStatusModalOpen(true)}
@@ -3317,22 +3291,6 @@ export default function App() {
                 <Text style={{ fontSize: 12 }}>📝</Text>
                 <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[700] }}>Student Application</Text>
               </TouchableOpacity>
-
-              {isAdmin && (
-                <TouchableOpacity
-                  onPress={() => setIsBroadcastModalOpen(true)}
-                  style={{
-                    backgroundColor: colors.neutral[900],
-                    paddingHorizontal: 12,
-                    paddingVertical: 10,
-                    borderRadius: 12,
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#ffffff' }}>+ Post</Text>
-                </TouchableOpacity>
-              )}
             </View>
 
             {filteredAnnouncements.length === 0 ? (
@@ -4158,6 +4116,56 @@ export default function App() {
                 </View>
               </View>
 
+              {/* Special Tier / Privileges Badge */}
+              {isAdmin ? (
+                <View
+                  style={{
+                    width: '100%',
+                    backgroundColor: '#f5f3ff',
+                    borderWidth: 1,
+                    borderColor: '#ddd6fe',
+                    borderRadius: 12,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    marginBottom: 12,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8
+                  }}
+                >
+                  <Text style={{ fontSize: 20 }}>👑</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#6d28d9' }}>
+                      Highest Tier: Club Legend & Admin
+                    </Text>
+                    <Text style={{ fontSize: 9, color: '#7c3aed' }}>
+                      1,250 XP · 12-Day Streak · All 10 Badges Unlocked · Door Admission Rights
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                <View
+                  style={{
+                    width: '100%',
+                    backgroundColor: colors.primary[50],
+                    borderWidth: 1,
+                    borderColor: colors.primary[200],
+                    borderRadius: 12,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    marginBottom: 12,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8
+                  }}
+                >
+                  <Text style={{ fontSize: 16 }}>🎯</Text>
+                  <Text style={{ fontSize: 10, color: colors.primary[800], flex: 1, lineHeight: 14 }}>
+                    Present this QR code to the Club Admin at the workshop door to enter and record attendance.
+                  </Text>
+                </View>
+              )}
+
               {/* High-Resolution Live Scannable 2D QR Code */}
               <View
                 style={{
@@ -4474,8 +4482,10 @@ export default function App() {
 
             <ScrollView showsVerticalScrollIndicator={false} style={{ gap: 8 }}>
               {notifications.map((n) => (
-                <View
+                <TouchableOpacity
                   key={n.id}
+                  activeOpacity={0.8}
+                  onPress={() => handleMarkSingleNotificationRead(n.id)}
                   style={{
                     backgroundColor: n.read ? '#ffffff' : colors.primary[50],
                     borderWidth: 1,
@@ -4486,11 +4496,18 @@ export default function App() {
                   }}
                 >
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.neutral[900] }}>{n.title}</Text>
-                    <Text style={{ fontSize: 10, color: colors.neutral[400] }}>{n.time}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.neutral[900], flex: 1, marginRight: 8 }}>
+                      {n.title}
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      {!n.read && (
+                        <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.primary[600] }} />
+                      )}
+                      <Text style={{ fontSize: 10, color: colors.neutral[400] }}>{n.time}</Text>
+                    </View>
                   </View>
                   <Text style={{ fontSize: 11, color: colors.neutral[600], marginTop: 4 }}>{n.message}</Text>
-                </View>
+                </TouchableOpacity>
               ))}
             </ScrollView>
 
@@ -4881,13 +4898,13 @@ export default function App() {
           </Text>
         </TouchableOpacity>
 
-        {/* Tab 3: Raised Center Action FAB (QR Scanner) */}
+        {/* Tab 3: Raised Center Action FAB (Admin Scanner or Member Campus Pass) */}
         <TouchableOpacity
           onPress={() => {
             if (isAdmin) {
               openAdminScanner();
             } else {
-              setIsMemberScannerOpen(true);
+              setIsQrPassOpen(true);
             }
           }}
           activeOpacity={0.85}
@@ -4902,10 +4919,10 @@ export default function App() {
               width: 52,
               height: 52,
               borderRadius: 26,
-              backgroundColor: colors.primary[600],
+              backgroundColor: isAdmin ? '#6d28d9' : colors.primary[600],
               alignItems: 'center',
               justifyContent: 'center',
-              shadowColor: colors.primary[900],
+              shadowColor: isAdmin ? '#6d28d9' : colors.primary[900],
               shadowOffset: { width: 0, height: 4 },
               shadowOpacity: 0.35,
               shadowRadius: 6,
@@ -4914,17 +4931,17 @@ export default function App() {
               borderColor: '#ffffff'
             }}
           >
-            <Text style={{ fontSize: 22 }}>📷</Text>
+            <Text style={{ fontSize: 22 }}>{isAdmin ? '📷' : '🪪'}</Text>
           </View>
           <Text
             style={{
               fontSize: 10,
               fontWeight: 'bold',
-              color: colors.primary[700],
+              color: isAdmin ? '#6d28d9' : colors.primary[700],
               marginTop: 2
             }}
           >
-            {isAdmin ? 'Scan' : 'Check-in'}
+            {isAdmin ? 'Scan' : 'My Pass'}
           </Text>
         </TouchableOpacity>
 
@@ -5011,7 +5028,6 @@ export default function App() {
       {renderGoogleModal()}
       {renderAdminScannerModal()}
       {renderOnboardingModal()}
-      {renderMemberScannerModal()}
       {renderLeaderboardModal()}
       {renderBadgeCelebrationModal()}
     </SafeAreaView>

@@ -65,26 +65,8 @@ export async function getLeaderboard(limit = 20) {
     console.warn('[ATC Gamification] Live leaderboard fetch note:', err);
   }
 
-  // Resilient Fallback from mockData
-  return initialMemberPoints
-    .slice()
-    .sort((a, b) => (b.total_points || 0) - (a.total_points || 0))
-    .slice(0, limit)
-    .map((mp, index) => {
-      const profile = initialProfiles.find((p) => p.id === mp.user_id) || {};
-      return {
-        rank: index + 1,
-        user_id: mp.user_id,
-        total_points: mp.total_points,
-        checkin_streak: mp.checkin_streak,
-        full_name: profile.full_name || 'ATC Member',
-        email: profile.email || '',
-        avatar_url: profile.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80',
-        role: profile.role || 'member',
-        branch: profile.branch || profile.department || 'CSE',
-        year: profile.year || 'Member'
-      };
-    });
+  // If no live database rows yet, return empty list (no fake mock members)
+  return [];
 }
 
 /**
@@ -125,8 +107,7 @@ export async function getMemberPoints(userId) {
     console.warn('[ATC Gamification] Points fetch note:', err);
   }
 
-  const fallback = initialMemberPoints.find((p) => p.user_id === userId);
-  return fallback || { user_id: userId, total_points: 0, checkin_streak: 0, last_checkin_date: null };
+  return { user_id: userId, total_points: 0, checkin_streak: 0, last_checkin_date: null };
 }
 
 /**
@@ -173,11 +154,7 @@ export async function getMemberBadges(userId) {
     console.warn('[ATC Gamification] Member badges fetch note:', err);
   }
 
-  const earned = initialMemberBadges.filter((b) => b.user_id === userId);
-  return earned.map((e) => {
-    const badgeDef = initialBadges.find((b) => b.id === e.badge_id) || {};
-    return { ...badgeDef, earned_at: e.earned_at };
-  });
+  return [];
 }
 
 /**
@@ -200,7 +177,7 @@ export async function getPointsLog(userId) {
     console.warn('[ATC Gamification] Points log fetch note:', err);
   }
 
-  return initialPointsLog.filter((l) => l.user_id === userId);
+  return [];
 }
 
 /**
