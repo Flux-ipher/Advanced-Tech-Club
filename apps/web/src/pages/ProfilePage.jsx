@@ -1,7 +1,14 @@
+import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import QRCode from 'react-qr-code';
-import { Link } from 'react-router-dom';
+import { useAuth } from '@atc/shared/hooks/useAuth';
+import { useEvents } from '@atc/shared/hooks/useEvents';
 import { useMemberGamification } from '@atc/shared/hooks/useGamification';
 import { isPortalSubdomain } from '@atc/shared/utils/domains';
+import { RoleBadge } from '../components/RoleBadge';
+import { Modal } from '../components/Modal';
+import { ImageUploader } from '../components/ImageUploader';
+import { formatDateTime, formatDate } from '@atc/shared/utils/formatters';
 import {
   User,
   Mail,
