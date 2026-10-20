@@ -29,18 +29,31 @@ export async function getAllProfiles() {
 }
 
 export async function updateProfile(userId, updates) {
-  const { data, error } = await supabase
+  const payload = { ...updates, updated_at: new Date().toISOString() };
+  let { data, error } = await supabase
     .from('profiles')
-    .update({ ...updates, updated_at: new Date().toISOString() })
+    .update(payload)
     .eq('id', userId)
-    .select()
-    .single();
+    .select();
+
+  if ((!data || data.length === 0) && userId) {
+    // Fallback: match by student_id or email
+    const fallbackRes = await supabase
+      .from('profiles')
+      .update(payload)
+      .or(`student_id.eq.${userId},email.eq.${userId}`)
+      .select();
+    if (fallbackRes.data && fallbackRes.data.length > 0) {
+      data = fallbackRes.data;
+      error = fallbackRes.error;
+    }
+  }
 
   if (error) {
     console.error('Error updating profile:', error);
     throw error;
   }
-  return data;
+  return data && data.length > 0 ? data[0] : null;
 }
 
 export async function setRole(userId, newRole) {
@@ -73,6 +86,7 @@ export async function verifyMember(userId, verifierId) {
     : null;
 
   return updateProfile(userId, {
+    role: 'member',
     is_verified: true,
     verification_status: 'verified',
     verified_at: new Date().toISOString(),

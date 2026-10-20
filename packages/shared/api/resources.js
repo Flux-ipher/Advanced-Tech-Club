@@ -1,6 +1,20 @@
 import { supabase, mockDb } from '../supabaseClient.js';
 import { initialResources } from '../mockData.js';
 
+export function normalizeResource(res) {
+  if (!res) return res;
+  const url = res.file_url || res.url || '#';
+  return {
+    ...res,
+    file_url: url,
+    url: res.url || url,
+    tags: Array.isArray(res.tags) ? res.tags : (typeof res.tags === 'string' ? [res.tags] : []),
+    category: res.category || 'Documentation',
+    file_size: res.file_size || 'Web Resource',
+    download_count: Number(res.download_count) || 0
+  };
+}
+
 export async function getResources() {
   try {
     const { data, error } = await supabase
@@ -9,12 +23,12 @@ export async function getResources() {
       .order('created_at', { ascending: false });
 
     if (error || !data || data.length === 0) {
-      return initialResources;
+      return initialResources.map(normalizeResource);
     }
-    return data;
+    return data.map(normalizeResource);
   } catch (err) {
     console.warn('Falling back to initial resources:', err);
-    return initialResources;
+    return initialResources.map(normalizeResource);
   }
 }
 

@@ -24,162 +24,109 @@ export const initialProfiles = [
 
 export const initialAnnouncements = [
   {
-    id: 'ann-1',
-    title: '🚀 ATC Annual Hackathon 2026 Announced: $5,000 in Prizes!',
-    body: 'Registration is now officially open for our flagship hackathon of the semester. 36 hours of non-stop building, mentoring from industry engineers, free food, and exclusive swag. Form teams of 2 to 4 members. Check out the Events tab for registration details and rulebooks.',
-    category: 'hackathon',
+    id: 'a0000000-0000-0000-0000-000000000001',
+    title: '👋 Welcome to the Advanced Tech Club Platform',
+    body: 'Welcome to the official Advanced Tech Club portal and mobile application! Access upcoming workshops, technical hackathons, open-source resources, and verify your event attendance with digital campus passes. Earn XP through contributions and GitHub PRs.',
+    category: 'general',
     pinned: true,
-    author_id: 'user-ritesh-superadmin',
+    author_id: 'Zp2JThOUCAbl7aF1TT4DQHUH0Dk2',
     author_name: 'Ritesh Mishra',
     author_role: 'Admin',
-    author_avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-    media_url: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1200&q=80',
-    created_at: '2026-10-18T14:00:00Z'
-  },
-  {
-    id: 'ann-2',
-    title: '⚡ React Native + Supabase Monorepo Masterclass this Friday',
-    body: 'Join us in Innovation Lab Room 304 for a hands-on coding sprint where we build a cross-platform mobile app connected to a live Postgres database with Realtime subscriptions and Auth. Bring your laptops with Node.js and Expo installed!',
-    category: 'workshop',
-    pinned: false,
-    author_id: 'user-ritesh-superadmin',
-    author_name: 'Ritesh Mishra',
-    author_role: 'Admin',
-    author_avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-    media_url: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=1200&q=80',
-    created_at: '2026-10-17T09:30:00Z'
-  },
-  {
-    id: 'ann-3',
-    title: '📦 New Open Source Learning Resources Added to Library',
-    body: 'We have updated our Resources directory with the latest slide decks, system design blueprints, and production-ready React starter boilerplates. All files are downloadable directly from the Resources section.',
-    category: 'opportunity',
-    pinned: false,
-    author_id: 'user-ritesh-superadmin',
-    author_name: 'Ritesh Mishra',
-    author_role: 'Admin',
-    author_avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-    media_url: null,
-    created_at: '2026-10-16T16:15:00Z'
+    author_avatar: 'https://lh3.googleusercontent.com/a/ACg8ocKjbs6-ZocAWk3Qo5-TiXz_EQDbbYVftpiPOSXMPA2dIKx3Ffc=s96-c',
+    media_url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1200&q=80',
+    created_at: '2026-10-20T00:00:00Z'
   }
 ];
 
 export const initialEvents = [
   {
-    id: 'evt-1',
-    title: 'ATC Annual Hackathon 2026: Build with AI',
-    description: '36-hour sprint where student teams build real-world AI applications, mobile tools, and autonomous web platforms. Includes meals, cloud credits, and judging by alumni founders.',
-    start_at: '2026-11-06T18:00:00Z',
-    end_at: '2026-11-08T12:00:00Z',
-    location: 'Student Innovation Center · Main Hall',
-    capacity: 150,
+    id: '3d6d2d58-ef35-4f1e-8027-88a6f0e51399',
+    slug: 'the-cyber-heist',
+    title: 'The Cyber Heist (CTF Event)',
+    description: 'An immersive, team-based Capture The Flag (CTF) cybersecurity event. Form your fireteam, breach the target network, and decrypt the override codes before time runs out.',
+    date: '2026-03-24T16:30:00Z',
+    start_at: '2026-03-24T16:30:00Z',
+    end_at: '2026-03-24T19:30:00Z',
+    location: 'Room 416, Academic Block',
+    capacity: 120,
+    category: 'hackathon',
+    banner_url: 'https://cjmviumwfzxkxtorzyvk.supabase.co/storage/v1/object/public/event-images/1772085185188-jggj8y620bh.jpg',
+    image: 'https://cjmviumwfzxkxtorzyvk.supabase.co/storage/v1/object/public/event-images/1772085185188-jggj8y620bh.jpg',
+    tags: ['Competetion', 'CyberAttack'],
+    registration_link: 'https://forms.gle/ZH4oZNjgLxkxYfoq6',
+    feedback_link: 'https://forms.gle/nPAHQDSWGvnTUSBg9',
+    author_id: 'Zp2JThOUCAbl7aF1TT4DQHUH0Dk2',
+    author_name: 'Ritesh Mishra',
+    registrations_count: 0,
+    created_at: '2026-02-26T04:57:08.162Z'
+  },
+  {
+    id: '7f4edf24-6236-417c-a545-6131576e33f5',
+    slug: 'jugaad-a-thon-the-useless-tech-hackathon',
+    title: 'The "Jugaad-a-thon" (The Useless Tech Hackathon)',
+    description: 'The "Jugaad-a-thon" is a 1.5-hour, stress-free hackathon where the primary objective is to build the most functionally useless, inconvenient, or hilariously pointless technology possible. Eliminates performance anxiety, encourages risk-taking, and builds full-stack skills.',
+    date: '2026-04-17T16:20:00Z',
+    start_at: '2026-04-17T16:20:00Z',
+    end_at: '2026-04-17T18:00:00Z',
+    location: 'Room 416, Academic Block',
+    capacity: 80,
     category: 'hackathon',
     banner_url: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1200&q=80',
-    author_id: 'user-ritesh-superadmin',
+    image: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1200&q=80',
+    tags: ['Hackathon'],
+    registration_link: 'https://forms.gle/fk7mRNvaNdfHbBZd9',
+    feedback_link: 'https://forms.gle/fki7hA555XPDzyL28',
+    author_id: 'Zp2JThOUCAbl7aF1TT4DQHUH0Dk2',
     author_name: 'Ritesh Mishra',
-    registrations_count: 84,
-    created_at: '2026-10-15T10:00:00Z'
-  },
-  {
-    id: 'evt-2',
-    title: 'Cross-Platform React Native & Expo Deep Dive',
-    description: 'Learn how to architect single codebase React + React Native apps, compile standalone APKs, handle native device permissions, and wire real-time WebSockets.',
-    start_at: '2026-10-23T17:30:00Z',
-    end_at: '2026-10-23T20:00:00Z',
-    location: 'Turing Auditorium · Room 302',
-    capacity: 75,
-    category: 'workshop',
-    banner_url: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=1200&q=80',
-    author_id: 'user-ritesh-superadmin',
-    author_name: 'Ritesh Mishra',
-    registrations_count: 52,
-    created_at: '2026-10-16T12:00:00Z'
-  },
-  {
-    id: 'evt-3',
-    title: 'System Design: Scalable Architecture from 10k to 10M Users',
-    description: 'Interactive case studies on database sharding, caching tiers (Redis), asynchronous queues (RabbitMQ/Kafka), and global CDN routing.',
-    start_at: '2026-10-30T18:00:00Z',
-    end_at: '2026-10-30T20:30:00Z',
-    location: 'Engineering Tower · Room 410 & Virtual Zoom',
-    capacity: 100,
-    category: 'technical',
-    banner_url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80',
-    author_id: 'user-ritesh-superadmin',
-    author_name: 'Ritesh Mishra',
-    registrations_count: 67,
-    created_at: '2026-10-17T15:00:00Z'
-  },
-  {
-    id: 'evt-4',
-    title: 'ATC Fall Mixer & Project Pitch Night',
-    description: 'Social networking evening for members to pitch ideas, find project teammates, demo side projects, and connect with club leads.',
-    start_at: '2026-11-14T19:00:00Z',
-    end_at: '2026-11-14T21:30:00Z',
-    location: 'Student Union Lounge · Terrace',
-    capacity: 120,
-    category: 'social',
-    banner_url: 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80',
-    author_id: 'user-ritesh-superadmin',
-    author_name: 'Ritesh Mishra',
-    registrations_count: 39,
-    created_at: '2026-10-18T10:00:00Z'
+    registrations_count: 0,
+    created_at: '2026-04-10T07:22:45.654Z'
   }
 ];
 
-export const initialRegistrations = [
-  { event_id: 'evt-1', user_id: 'user-ritesh-superadmin', registered_at: '2026-10-15T10:05:00Z', status: 'confirmed' },
-  { event_id: 'evt-3', user_id: 'user-ritesh-superadmin', registered_at: '2026-10-17T16:00:00Z', status: 'confirmed' }
-];
+export const initialRegistrations = [];
 
 export const initialResources = [
   {
-    id: 'res-1',
-    title: 'React Native & Expo Architecture Slide Deck',
-    description: 'Complete lecture slides detailing the monorepo structure, NativeWind setup, and APK build process with EAS.',
-    file_url: 'https://github.com/advanced-tech-club/resources/raw/main/react-native-expo-deck.pdf',
-    file_size: '14.2 MB',
-    category: 'Slides',
-    author_id: 'user-ritesh-superadmin',
+    id: '359b698b-12b0-4943-8317-44b235e5622d',
+    title: 'Metaflow (Netflix AI/ML Framework)',
+    description: 'Metaflow is a human-centric framework designed to help scientists and engineers build and manage real-life AI and ML systems. Serving teams of all sizes and scales, Metaflow streamlines the entire development lifecycle.',
+    file_url: 'https://metaflow.org/',
+    url: 'https://metaflow.org/',
+    file_size: 'Web App',
+    category: 'Tools',
+    tags: ['Build', 'Manage', 'Deploy AI/Ml Systems'],
+    author_id: 'Zp2JThOUCAbl7aF1TT4DQHUH0Dk2',
     author_name: 'Ritesh Mishra',
-    download_count: 148,
-    created_at: '2026-10-12T10:00:00Z'
+    download_count: 42,
+    created_at: '2026-04-11T02:02:15.367Z'
   },
   {
-    id: 'res-2',
-    title: 'High-Throughput System Design Cheat Sheet',
-    description: 'Condensed quick-reference guide covering SQL vs NoSQL, CAP theorem, cache eviction policies, and load balancing algorithms.',
-    file_url: 'https://github.com/advanced-tech-club/resources/raw/main/system-design-cheatsheet.pdf',
-    file_size: '4.8 MB',
-    category: 'Cheat Sheets',
-    author_id: 'user-ritesh-superadmin',
-    author_name: 'Ritesh Mishra',
-    download_count: 312,
-    created_at: '2026-10-14T11:20:00Z'
-  },
-  {
-    id: 'res-3',
-    title: 'ATC Full-Stack Starter Template (React + Supabase)',
-    description: 'Clean repository template pre-configured with auth, RLS policies, Tailwind CSS, and Zustand stores.',
-    file_url: 'https://github.com/advanced-tech-club/starter-template.zip',
-    file_size: '2.4 MB',
+    id: '58dbee59-5fe9-4a7d-8281-0b70012a4cd5',
+    title: 'The Open Source AI Engineering Platform for Agents, LLMs & Models',
+    description: 'MLflow is the largest open source AI engineering platform for agents, LLMs, and ML models. Enables teams of all sizes to debug, evaluate, monitor, and optimize production-quality AI applications.',
+    file_url: 'https://mlflow.org/',
+    url: 'https://mlflow.org/',
+    file_size: 'Web Platform',
     category: 'Code Samples',
-    author_id: 'user-ritesh-superadmin',
+    tags: ['LLMs', 'Ai Agents'],
+    author_id: 'Zp2JThOUCAbl7aF1TT4DQHUH0Dk2',
     author_name: 'Ritesh Mishra',
-    download_count: 220,
-    created_at: '2026-10-15T09:00:00Z'
+    download_count: 67,
+    created_at: '2026-04-11T01:59:13.469Z'
   },
   {
-    id: 'res-4',
-    title: 'Campus Developer Career & Internship Roadmap 2026',
-    description: 'Step-by-step roadmap for software engineering interviews, open source contributions, and building stand-out portfolios.',
-    file_url: 'https://github.com/advanced-tech-club/resources/raw/main/career-roadmap.pdf',
-    file_size: '6.1 MB',
-    category: 'Roadmaps',
-    author_id: 'user-ritesh-superadmin',
+    id: '5ea69654-49cc-445e-bc38-7d6d931bb399',
+    title: 'Feast (Feature Store for Machine Learning)',
+    description: 'Feast is an open source feature store for machine learning. Feast is the fastest path to manage existing infrastructure to productionize analytic data for model training and online inference.',
+    file_url: 'https://feast.dev/',
+    url: 'https://feast.dev/',
+    file_size: 'Documentation',
+    category: 'Documentation',
+    tags: ['Machine Learning'],
+    author_id: 'Zp2JThOUCAbl7aF1TT4DQHUH0Dk2',
     author_name: 'Ritesh Mishra',
-    download_count: 185,
-    created_at: '2026-10-16T14:30:00Z'
+    download_count: 38,
+    created_at: '2026-04-11T02:04:37.602Z'
   }
 ];
 

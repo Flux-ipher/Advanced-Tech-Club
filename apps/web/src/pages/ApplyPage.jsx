@@ -115,20 +115,15 @@ export function ApplyPage() {
 
     // Save to database
     try {
-      if (token) {
-        const client = getSupabaseClient(token);
-        if (client) {
-          await client
-            .from('profiles')
-            .update(applicationProfile)
-            .eq('id', user?.id || firebaseUser?.uid);
-        }
-      } else if (mockDb?.storage?.profiles) {
-        mockDb.storage.profiles.push({
-          id: user?.id || `user-${Date.now()}`,
-          ...applicationProfile,
-          created_at: new Date().toISOString()
-        });
+      const client = token ? getSupabaseClient(token) : supabase;
+      const targetUserId = user?.id || firebaseUser?.uid || `usr-${Date.now()}`;
+      if (client) {
+        await client
+          .from('profiles')
+          .upsert({
+            id: targetUserId,
+            ...applicationProfile
+          }, { onConflict: 'id' });
       }
     } catch (err) {
       console.warn('[ATC Apply] Data persist note:', err);

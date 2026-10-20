@@ -162,6 +162,8 @@ export default function App() {
   const [adjustPointsDelta, setAdjustPointsDelta] = useState('100');
   const [adjustPointsReason, setAdjustPointsReason] = useState('');
   const [adjustSubmitting, setAdjustSubmitting] = useState(false);
+  const [adjustSearchQuery, setAdjustSearchQuery] = useState('');
+  const [allProfiles, setAllProfiles] = useState([]);
 
   // Admin Contribution Report Review Modal State
   const [isReviewReportModalOpen, setIsReviewReportModalOpen] = useState(false);
@@ -346,10 +348,16 @@ export default function App() {
       const { data: dbEvents } = await supabase
         .from('events')
         .select('*')
-        .order('date', { ascending: true });
+        .order('start_at', { ascending: true });
 
       if (dbEvents && dbEvents.length > 0) {
-        setEvents(dbEvents);
+        const normalizedEvents = dbEvents.map((evt) => ({
+          ...evt,
+          date: evt.date || evt.start_at,
+          image: evt.image || evt.banner_url,
+          tags: Array.isArray(evt.tags) ? evt.tags : (typeof evt.tags === 'string' ? [evt.tags] : [])
+        }));
+        setEvents(normalizedEvents);
       }
 
       const { data: dbResources } = await supabase
@@ -358,16 +366,43 @@ export default function App() {
         .order('created_at', { ascending: false });
 
       if (dbResources && dbResources.length > 0) {
-        setResources(dbResources);
+        const normalizedRes = dbResources.map((r) => ({
+          ...r,
+          url: r.url || r.file_url,
+          tags: Array.isArray(r.tags) ? r.tags : (typeof r.tags === 'string' ? [r.tags] : [])
+        }));
+        setResources(normalizedRes);
+      }
+
+      // Fetch all registered student & club member profiles for points management
+      const { data: dbAllProfiles } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (dbAllProfiles && dbAllProfiles.length > 0) {
+        setAllProfiles(dbAllProfiles);
       }
 
       const { data: dbPending } = await supabase
         .from('profiles')
         .select('*')
-        .eq('verification_status', 'pending');
+        .or('verification_status.eq.pending,is_verified.is.false')
+        .neq('role', 'super_admin')
+        .neq('role', 'admin')
+        .neq('verification_status', 'rejected')
+        .order('created_at', { ascending: false });
 
       if (dbPending) {
-        setPendingMembers(dbPending);
+        const cleanedPending = dbPending.filter(
+          (p) =>
+            p.role !== 'super_admin' &&
+            p.role !== 'admin' &&
+            p.verification_status !== 'rejected' &&
+            p.verification_status !== 'verified' &&
+            p.is_verified !== true
+        );
+        setPendingMembers(cleanedPending);
       }
 
       const { count } = await supabase
@@ -2523,10 +2558,13 @@ export default function App() {
         setIsAdjustPointsOpen(false);
         setAdjustPointsReason('');
         setAdjustPointsDelta('100');
+        setAdjustTargetUser(null);
+        setAdjustSearchQuery('');
         if (currentUser?.id === adjustTargetUser.id) {
           setMemberPoints(res.newTotal);
         }
         triggerToast(`Points updated (${delta > 0 ? `+${delta}` : delta} XP) ✓`);
+        loadLivePlatformData();
       } else {
         Alert.alert('Adjustment Error', res.error || 'Failed to adjust points');
       }
@@ -3054,45 +3092,157 @@ export default function App() {
                   Target Member *
                 </Text>
                 {adjustTargetUser ? (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.primary[50], borderWidth: 1, borderColor: colors.primary[200], borderRadius: 10, padding: 10 }}>
-                    <View>
-                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.primary[900] }}>
-                        {adjustTargetUser.full_name || adjustTargetUser.email}
-                      </Text>
-                      <Text style={{ fontSize: 11, color: colors.primary[700] }}>
-                        {adjustTargetUser.email}
-                      </Text>
+                  <View style={{ backgroundColor: colors.primary[50], borderWidth: 1, borderColor: colors.primary[200], borderRadius: 12, padding: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        {adjustTargetUser.avatar_url ? (
+                          <Image
+                            source={{ uri: adjustTargetUser.avatar_url }}
+                            style={{ width: 36, height: 36, borderRadius: 18 }}
+                          />
+                        ) : (
+                          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary[200], justifyContent: 'center', alignItems: 'center' }}>
+                            <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.primary[800] }}>
+                              {(adjustTargetUser.full_name || 'U').charAt(0).toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
+                        <View>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.primary[950] }}>
+                              {adjustTargetUser.full_name || adjustTargetUser.email}
+                            </Text>
+                            <View style={{ backgroundColor: colors.primary[200], paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
+                              <Text style={{ fontSize: 9, fontWeight: 'bold', color: colors.primary[800] }}>
+                                {getDisplayRole(adjustTargetUser.role)}
+                              </Text>
+                            </View>
+                          </View>
+                          <Text style={{ fontSize: 11, color: colors.primary[700] }}>
+                            {adjustTargetUser.email} {adjustTargetUser.student_id ? `· ${adjustTargetUser.student_id}` : ''}
+                          </Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => setAdjustTargetUser(null)}
+                        style={{ paddingHorizontal: 10, paddingVertical: 5, backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 1, borderColor: colors.primary[300] }}
+                      >
+                        <Text style={{ fontSize: 11, color: colors.primary[700], fontWeight: 'bold' }}>Change</Text>
+                      </TouchableOpacity>
                     </View>
-                    <TouchableOpacity onPress={() => setAdjustTargetUser(null)}>
-                      <Text style={{ fontSize: 12, color: colors.primary[600], fontWeight: 'bold' }}>Change</Text>
-                    </TouchableOpacity>
                   </View>
                 ) : (
-                  <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 11, color: colors.neutral[500] }}>Select from recent members or self:</Text>
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                      {currentUser && (
-                        <TouchableOpacity
-                          onPress={() => setAdjustTargetUser(currentUser)}
-                          style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.neutral[100] }}
-                        >
-                          <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[800] }}>
-                            Me ({currentUser.full_name})
-                          </Text>
+                  <View style={{ gap: 8 }}>
+                    {/* Live Search Input */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.neutral[100], borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: colors.neutral[200] }}>
+                      <Text style={{ fontSize: 12, marginRight: 6 }}>🔍</Text>
+                      <TextInput
+                        value={adjustSearchQuery}
+                        onChangeText={setAdjustSearchQuery}
+                        placeholder="Search student by name, email, roll number..."
+                        placeholderTextColor={colors.neutral[400]}
+                        style={{ flex: 1, fontSize: 12, color: colors.neutral[900], padding: 0 }}
+                      />
+                      {adjustSearchQuery ? (
+                        <TouchableOpacity onPress={() => setAdjustSearchQuery('')}>
+                          <Text style={{ fontSize: 12, color: colors.neutral[500], paddingHorizontal: 4 }}>✕</Text>
                         </TouchableOpacity>
-                      )}
-                      {pendingMembers.slice(0, 4).map((p) => (
-                        <TouchableOpacity
-                          key={p.id}
-                          onPress={() => setAdjustTargetUser(p)}
-                          style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.neutral[100] }}
-                        >
-                          <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[800] }}>
-                            {p.full_name}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
+                      ) : null}
                     </View>
+
+                    {/* Scrollable Members List */}
+                    <ScrollView
+                      nestedScrollEnabled
+                      style={{ maxHeight: 180, borderRadius: 10, borderWidth: 1, borderColor: colors.neutral[200], backgroundColor: colors.neutral[50] }}
+                      showsVerticalScrollIndicator={true}
+                    >
+                      {(() => {
+                        const sourceList = (allProfiles && allProfiles.length > 0)
+                          ? allProfiles
+                          : [currentUser, ...savedGoogleAccounts].filter(Boolean);
+
+                        const q = adjustSearchQuery.trim().toLowerCase();
+                        const filtered = sourceList.filter((m) => {
+                          if (!m) return false;
+                          if (!q) return true;
+                          const name = (m.full_name || m.name || '').toLowerCase();
+                          const email = (m.email || '').toLowerCase();
+                          const sId = (m.student_id || m.roll_number || '').toLowerCase();
+                          return name.includes(q) || email.includes(q) || sId.includes(q);
+                        });
+
+                        if (filtered.length === 0) {
+                          return (
+                            <View style={{ padding: 16, alignItems: 'center' }}>
+                              <Text style={{ fontSize: 12, color: colors.neutral[500] }}>
+                                No students found matching "{adjustSearchQuery}".
+                              </Text>
+                            </View>
+                          );
+                        }
+
+                        return filtered.map((m) => {
+                          const isSelf = currentUser && (m.id === currentUser.id || m.email === currentUser.email);
+                          const displayName = m.full_name || m.name || m.email?.split('@')[0];
+                          return (
+                            <TouchableOpacity
+                              key={m.id || m.email}
+                              onPress={() => {
+                                setAdjustTargetUser({
+                                  id: m.id || m.student_id || `user-${Date.now()}`,
+                                  full_name: displayName,
+                                  email: m.email,
+                                  role: m.role || 'member',
+                                  student_id: m.student_id || m.roll_number || ''
+                                });
+                                setAdjustSearchQuery('');
+                              }}
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                paddingHorizontal: 12,
+                                paddingVertical: 9,
+                                borderBottomWidth: 1,
+                                borderBottomColor: colors.neutral[200],
+                                backgroundColor: isSelf ? colors.primary[50] : '#ffffff'
+                              }}
+                            >
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                                {m.avatar_url || m.avatar ? (
+                                  <Image
+                                    source={{ uri: m.avatar_url || m.avatar }}
+                                    style={{ width: 28, height: 28, borderRadius: 14 }}
+                                  />
+                                ) : (
+                                  <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.neutral[200], justifyContent: 'center', alignItems: 'center' }}>
+                                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700] }}>
+                                      {(displayName || 'U').charAt(0).toUpperCase()}
+                                    </Text>
+                                  </View>
+                                )}
+                                <View style={{ flex: 1 }}>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.neutral[900] }} numberOfLines={1}>
+                                      {displayName} {isSelf ? '(You)' : ''}
+                                    </Text>
+                                    <Text style={{ fontSize: 9, color: (m.role === 'admin' || m.role === 'super_admin') ? colors.primary[700] : colors.neutral[500], fontWeight: 'bold' }}>
+                                      {getDisplayRole(m.role)}
+                                    </Text>
+                                  </View>
+                                  <Text style={{ fontSize: 10, color: colors.neutral[500] }} numberOfLines={1}>
+                                    {m.email} {m.student_id ? `· ${m.student_id}` : ''}
+                                  </Text>
+                                </View>
+                              </View>
+                              <View style={{ backgroundColor: colors.primary[50], paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: colors.primary[200] }}>
+                                <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary[700] }}>Select</Text>
+                              </View>
+                            </TouchableOpacity>
+                          );
+                        });
+                      })()}
+                    </ScrollView>
                   </View>
                 )}
               </View>
@@ -3470,7 +3620,7 @@ export default function App() {
         const fallbackRes = await supabase
           .from('profiles')
           .update(payload)
-          .eq('student_id', targetId)
+          .or(`student_id.eq.${targetId},email.eq.${targetId}`)
           .select();
         error = fallbackRes.error;
       }
@@ -3490,6 +3640,9 @@ export default function App() {
           created_at: new Date().toISOString()
         });
       } catch (notifErr) {}
+
+      // 4. Synchronize live platform data and members list immediately
+      loadLivePlatformData();
     } catch (err) {
       console.warn('[ATC Mobile] handleApproveMember error:', err);
     }
@@ -3519,7 +3672,7 @@ export default function App() {
         const fallbackRes = await supabase
           .from('profiles')
           .update(payload)
-          .eq('student_id', targetId)
+          .or(`student_id.eq.${targetId},email.eq.${targetId}`)
           .select();
         error = fallbackRes.error;
       }
@@ -3527,6 +3680,9 @@ export default function App() {
       if (error) {
         console.warn('[ATC Mobile] Supabase reject error:', error);
       }
+
+      // Synchronize live platform data and members list immediately
+      loadLivePlatformData();
     } catch (err) {
       console.warn('[ATC Mobile] handleRejectMember error:', err);
     }

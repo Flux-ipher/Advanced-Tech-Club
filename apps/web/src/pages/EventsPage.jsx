@@ -28,7 +28,7 @@ export function EventsPage() {
 
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [timeFilter, setTimeFilter] = useState('upcoming'); // 'upcoming' | 'all'
+  const [timeFilter, setTimeFilter] = useState('all'); // 'upcoming' | 'all'
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   // New Event Form State

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@atc/shared/hooks/useAuth';
+import { useEvents } from '@atc/shared/hooks/useEvents';
 import { initialEvents } from '@atc/shared/mockData';
 import { formatDateTime } from '@atc/shared/utils/formatters';
 import { getPortalSiteUrl } from '@atc/shared/utils/domains';
@@ -31,7 +32,8 @@ import {
 
 export function LandingPage() {
   const { user, isVerified, isSuperAdmin } = useAuth();
-  const publicEvents = initialEvents.slice(0, 3);
+  const { events } = useEvents();
+  const publicEvents = (events && events.length > 0 ? events : initialEvents).slice(0, 3);
   const portalUrl = getPortalSiteUrl('/');
   const isExternalPortal = portalUrl.startsWith('http');
 

@@ -3,6 +3,24 @@ import { initialEvents } from '../mockData.js';
 import { idempotency } from '../utils/idempotency.js';
 import { checkTokenBucket } from '../utils/rateLimiter.js';
 
+export function normalizeEvent(evt) {
+  if (!evt) return evt;
+  const startAt = evt.start_at || evt.date || new Date().toISOString();
+  const banner = evt.banner_url || evt.image || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=1200&q=80';
+  return {
+    ...evt,
+    start_at: startAt,
+    date: evt.date || startAt,
+    banner_url: banner,
+    image: evt.image || banner,
+    tags: Array.isArray(evt.tags) ? evt.tags : (typeof evt.tags === 'string' ? [evt.tags] : []),
+    registration_link: evt.registration_link || '',
+    feedback_link: evt.feedback_link || '',
+    capacity: Number(evt.capacity) || 100,
+    registrations_count: Number(evt.registrations_count) || 0
+  };
+}
+
 export async function getEvents() {
   try {
     const { data, error } = await supabase
@@ -11,12 +29,12 @@ export async function getEvents() {
       .order('start_at', { ascending: true });
 
     if (error || !data || data.length === 0) {
-      return initialEvents;
+      return initialEvents.map(normalizeEvent);
     }
-    return data;
+    return data.map(normalizeEvent);
   } catch (err) {
     console.warn('Falling back to initial events:', err);
-    return initialEvents;
+    return initialEvents.map(normalizeEvent);
   }
 }
 
@@ -29,9 +47,11 @@ export async function getEventById(id) {
 
   if (error) {
     console.error(`Error fetching event ${id}:`, error);
+    const fallback = initialEvents.find((e) => e.id === id);
+    if (fallback) return normalizeEvent(fallback);
     throw error;
   }
-  return data;
+  return normalizeEvent(data);
 }
 
 export async function createEvent({

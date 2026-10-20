@@ -56,8 +56,13 @@ export function useMembers() {
     return updated;
   };
 
-  const pendingMembers = members.filter((m) => !m.is_verified || m.verification_status === 'pending');
-  const verifiedMembers = members.filter((m) => m.is_verified);
+  const pendingMembers = members.filter((m) => {
+    if (m.role === 'super_admin' || m.role === 'admin') return false;
+    if (m.is_verified === true || m.verification_status === 'verified') return false;
+    if (m.verification_status === 'rejected') return false;
+    return !m.is_verified || m.verification_status === 'pending';
+  });
+  const verifiedMembers = members.filter((m) => m.is_verified === true || m.verification_status === 'verified');
 
   return {
     members,
