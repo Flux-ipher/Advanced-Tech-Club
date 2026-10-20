@@ -47,16 +47,20 @@ export function CheckinPage() {
         let eventInfo = qrRecord?.events || { title: 'Campus Developer Workshop', location: 'Turing Hall' };
         setEventData(eventInfo);
 
-        // 2. Perform checkin
+        // 2. Perform checkin with Token Bucket rate limiting & Idempotency Key
         const res = await recordEventCheckin(user.id, eventId, token);
 
-        if (res.success) {
+        if (res.success && !res.alreadyCheckedIn) {
           setStatus('success');
           setMessage(res.message);
           setPointsResult(res);
-        } else if (res.reason === 'already_checked_in') {
+        } else if (res.alreadyCheckedIn || res.reason === 'already_checked_in') {
           setStatus('already');
-          setMessage(res.message);
+          setMessage(res.message || 'You have already checked in to this workshop! 🎟️');
+          setPointsResult(res);
+        } else if (res.reason === 'rate_limited') {
+          setStatus('error');
+          setMessage(res.message || 'Rate limit reached. Please wait a moment before trying again.');
         } else {
           setStatus('error');
           setMessage(res.message || 'Check-in validation failed.');

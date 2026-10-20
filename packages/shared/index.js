@@ -31,4 +31,7 @@ export * from './utils/formatters.js';
 export * from './utils/validators.js';
 export * from './utils/analytics.js';
 export * from './utils/domains.js';
+export * from './utils/idempotency.js';
+export * from './utils/stateMachines.js';
+export * from './utils/rateLimiter.js';
 export * from './firebaseClient.js';

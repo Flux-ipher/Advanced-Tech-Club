@@ -42,6 +42,9 @@ import {
   awardPoints,
   recordEventCheckin
 } from '@atc/shared/api/gamification';
+import { idempotency } from '@atc/shared/utils/idempotency';
+import { canStudentCheckIn, validateAttendanceCheckInTransition } from '@atc/shared/utils/stateMachines';
+import { checkTokenBucket } from '@atc/shared/utils/rateLimiter';
 import { colors } from '@atc/shared/theme';
 import { Analytics } from '@atc/shared/utils/analytics';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
@@ -1052,6 +1055,13 @@ export default function App() {
 
   const handleBarCodeScanned = async ({ type, data }) => {
     if (isScanningPaused || !data) return;
+
+    // Token Bucket rate limit check for camera scanner to debounce rapid camera frames
+    const bucketCheck = checkTokenBucket('ADMIN_SCANNER', user?.id || 'admin');
+    if (!bucketCheck.allowed) {
+      return;
+    }
+
     setIsScanningPaused(true);
     await processStudentScan(data);
   };
@@ -1162,40 +1172,75 @@ export default function App() {
 
   const handleConfirmAttendanceCheckIn = async () => {
     if (!scannedStudent) return;
+
+    // 1. Token Bucket Rate Limit check
+    const bucketCheck = checkTokenBucket('ADMIN_SCANNER', user?.id || 'admin');
+    if (!bucketCheck.allowed) {
+      Alert.alert('Please Wait', `Camera scanner rate limited. Please wait ${bucketCheck.retryAfterSec}s.`);
+      return;
+    }
+
     setScannerCheckingIn(true);
     const curEventId = scannerEventId || events[0]?.id || 'evt-1';
     const curEvent = events.find((e) => e.id === curEventId) || events[0];
 
+    // 2. Student Lifecycle State Machine Check
+    const studentGuard = canStudentCheckIn(scannedStudent);
+    if (!studentGuard.allowed && studentGuard.state === 'SUSPENDED') {
+      Alert.alert('Student Suspended', studentGuard.message);
+      setScannerCheckingIn(false);
+      return;
+    }
+
+    // 3. Event Attendance State Machine Check (Idempotency Guard)
+    const attendanceGuard = validateAttendanceCheckInTransition(scannedRegStatus);
+    if (attendanceGuard.isAlreadyCheckedIn) {
+      setScannerFeedback(`✓ ${scannedStudent.full_name} is already checked in (Idempotent confirmation).`);
+      triggerToast(`✓ Already checked in: ${scannedStudent.full_name}`);
+      setScannerCheckingIn(false);
+      return;
+    }
+
+    // 4. Idempotency Key Execution (Prevents duplicate check-in operations)
+    const idemKey = idempotency.generateKey('mobile_checkin', scannedStudent.id, curEventId);
+
     try {
-      // 1. Record attendance in Supabase
-      try {
-        await supabase.from('event_registrations').upsert(
-          {
-            event_id: curEventId,
-            user_id: scannedStudent.id,
-            status: 'attended',
-            registered_at: new Date().toISOString()
-          },
-          { onConflict: 'event_id,user_id' }
-        );
-      } catch (saveErr) {
-        console.warn('[ATC Mobile] Attendance record warning:', saveErr);
-      }
+      await idempotency.execute(idemKey, async () => {
+        // Record attendance in Supabase
+        try {
+          await supabase.from('event_registrations').upsert(
+            {
+              event_id: curEventId,
+              user_id: scannedStudent.id,
+              status: 'attended',
+              registered_at: new Date().toISOString()
+            },
+            { onConflict: 'event_id,user_id' }
+          );
+        } catch (saveErr) {
+          console.warn('[ATC Mobile] Attendance record warning:', saveErr);
+        }
 
-      // 2. Add to scanHistory
-      const newEntry = {
-        studentId: scannedStudent.student_id || 'ATC-MEMBER',
-        studentName: scannedStudent.full_name,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        eventTitle: curEvent?.title || 'Workshop Check-in',
-        status: 'Attended'
-      };
-      setScanHistory((prev) => [newEntry, ...prev]);
+        // Also record in event_checkins for gamification points
+        try {
+          await recordEventCheckin(scannedStudent.id, curEventId);
+        } catch (chkErr) {}
 
-      // 3. Mark attended locally
-      setScannedRegStatus('attended');
-      setScannerFeedback(`✓ ${scannedStudent.full_name} checked in successfully!`);
-      triggerToast(`✓ Checked in: ${scannedStudent.full_name}`);
+        // Add to scanHistory
+        const newEntry = {
+          studentId: scannedStudent.student_id || 'ATC-MEMBER',
+          studentName: scannedStudent.full_name,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          eventTitle: curEvent?.title || 'Workshop Check-in',
+          status: 'Attended'
+        };
+        setScanHistory((prev) => [newEntry, ...prev]);
+
+        // Mark attended locally
+        setScannedRegStatus('attended');
+        setScannerFeedback(`✓ ${scannedStudent.full_name} checked in successfully!`);
+        triggerToast(`✓ Checked in: ${scannedStudent.full_name}`);
+      });
     } catch (err) {
       Alert.alert('Check-in Error', err.message || 'Could not record attendance');
     } finally {

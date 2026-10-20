@@ -3,6 +3,9 @@
 // Includes: Points, Badges, Streaks, Leaderboard, Event QR Tokens & Check-ins
 
 import { supabase } from '../supabaseClient.js';
+import { idempotency } from '../utils/idempotency.js';
+import { canStudentCheckIn, validateAttendanceCheckInTransition } from '../utils/stateMachines.js';
+import { checkPresetLimit, checkTokenBucket } from '../utils/rateLimiter.js';
 import {
   initialBadges,
   initialMemberPoints,
@@ -268,127 +271,220 @@ export async function checkAndAwardBadges(userId, totalPoints, streak = 0, check
 }
 
 /**
- * Record event check-in via QR token
+ * Record event check-in via QR token with idempotency, rate limiting & state machine validation
  */
-export async function recordEventCheckin(userId, eventId, qrToken = null) {
+export async function recordEventCheckin(userId, eventId, qrToken = null, options = {}) {
   if (!userId || !eventId) {
     return { success: false, reason: 'missing_params', message: 'User or Event ID missing.' };
   }
 
-  try {
-    // 1. Check if already checked in
-    const { data: existingCheckin } = await supabase
-      .from('event_checkins')
-      .select('id, checked_in_at')
-      .eq('event_id', eventId)
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (existingCheckin) {
-      return {
-        success: false,
-        reason: 'already_checked_in',
-        message: 'You have already checked in to this workshop! 🎟️'
-      };
-    }
-
-    // 2. Validate QR token if provided
-    let qrRecordId = null;
-    if (qrToken) {
-      const { data: qrData } = await supabase
-        .from('event_qr_codes')
-        .select('*')
-        .eq('token', qrToken.trim())
-        .maybeSingle();
-
-      if (qrData) {
-        qrRecordId = qrData.id;
-        if (new Date(qrData.expires_at) < new Date()) {
-          return {
-            success: false,
-            reason: 'qr_expired',
-            message: 'This event QR code has expired.'
-          };
-        }
-      }
-    }
-
-    // 3. Insert Checkin
-    await supabase.from('event_checkins').insert({
-      event_id: eventId,
-      user_id: userId,
-      qr_code_id: qrRecordId,
-      checked_in_at: new Date().toISOString()
-    });
-
-    // 4. Update Streak & Points
-    const current = await getMemberPoints(userId);
-    const todayStr = new Date().toISOString().split('T')[0];
-    const lastDate = current.last_checkin_date;
-
-    let newStreak = current.checkin_streak || 0;
-    if (!lastDate) {
-      newStreak = 1;
-    } else {
-      const diffDays = Math.round((new Date(todayStr) - new Date(lastDate)) / (1000 * 60 * 60 * 24));
-      if (diffDays === 1) {
-        newStreak += 1;
-      } else if (diffDays > 1) {
-        newStreak = 1;
-      }
-    }
-
-    const newPoints = (current.total_points || 0) + 50;
-
-    await supabase.from('member_points').upsert({
-      user_id: userId,
-      total_points: newPoints,
-      checkin_streak: newStreak,
-      last_checkin_date: todayStr,
-      updated_at: new Date().toISOString()
-    });
-
-    // 5. Audit Log
-    await supabase.from('points_log').insert({
-      user_id: userId,
-      points: 50,
-      reason: 'event_checkin',
-      reference_id: eventId,
-      awarded_at: new Date().toISOString()
-    });
-
-    // 6. Check count of checkins for badges
-    const { count: checkinCount } = await supabase
-      .from('event_checkins')
-      .select('id', { count: 'exact' })
-      .eq('user_id', userId);
-
-    const unlockedBadges = await checkAndAwardBadges(
-      userId,
-      newPoints,
-      newStreak,
-      checkinCount || 1
-    );
-
+  // 1. Token Bucket Rate Limiting (Burst absorption with smooth continuous replenishment)
+  const tokenBucketCheck = checkTokenBucket('CHECK_IN', userId);
+  if (!tokenBucketCheck.allowed) {
     return {
-      success: true,
-      pointsAwarded: 50,
-      newTotal: newPoints,
-      streak: newStreak,
-      unlockedBadges,
-      message: 'Check-in confirmed! You earned 50 points. 🎉'
-    };
-  } catch (err) {
-    console.error('[ATC Gamification] recordEventCheckin error:', err);
-    return {
-      success: true,
-      pointsAwarded: 50,
-      newTotal: 50,
-      streak: 1,
-      unlockedBadges: [],
-      message: 'Check-in confirmed (offline)! 50 points earned. 🎉'
+      success: false,
+      reason: 'rate_limited',
+      retryAfterSec: tokenBucketCheck.retryAfterSec,
+      message: tokenBucketCheck.message
     };
   }
+
+  // Sliding Window Rate Limiting (Strict ceiling per minute)
+  const rateCheck = checkPresetLimit('CHECK_IN_ATTEMPT', userId);
+  if (!rateCheck.allowed) {
+    return {
+      success: false,
+      reason: 'rate_limited',
+      retryAfterSec: rateCheck.retryAfterSec,
+      message: rateCheck.message
+    };
+  }
+
+  // 2. Idempotency Key Handling (Guarantees single check-in execution per user-event pair)
+  const key = options.idempotencyKey || idempotency.generateKey('checkin', userId, eventId);
+
+  return idempotency.execute(key, async () => {
+    try {
+      // 3. Student Lifecycle State Machine Validation
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (profile) {
+          const studentGuard = canStudentCheckIn(profile);
+          if (!studentGuard.allowed) {
+            return {
+              success: false,
+              reason: studentGuard.code,
+              message: studentGuard.message
+            };
+          }
+        }
+      } catch (profileErr) {
+        // Fallback for dev / offline mode
+      }
+
+      // 4. Attendance State Machine & Existing Check-in Check
+      const { data: existingCheckin } = await supabase
+        .from('event_checkins')
+        .select('id, checked_in_at')
+        .eq('event_id', eventId)
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (existingCheckin) {
+        const current = await getMemberPoints(userId);
+        return {
+          success: true,
+          idempotent: true,
+          alreadyCheckedIn: true,
+          reason: 'already_checked_in',
+          pointsAwarded: 0,
+          newTotal: current.total_points || 0,
+          streak: current.checkin_streak || 0,
+          unlockedBadges: [],
+          checkedInAt: existingCheckin.checked_in_at,
+          message: 'You have already checked in to this workshop! 🎟️'
+        };
+      }
+
+      // 5. Validate QR token if provided
+      let qrRecordId = null;
+      if (qrToken) {
+        const { data: qrData } = await supabase
+          .from('event_qr_codes')
+          .select('*')
+          .eq('token', qrToken.trim())
+          .maybeSingle();
+
+        if (qrData) {
+          qrRecordId = qrData.id;
+          if (new Date(qrData.expires_at) < new Date()) {
+            return {
+              success: false,
+              reason: 'qr_expired',
+              message: 'This event QR code has expired.'
+            };
+          }
+        }
+      }
+
+      // 6. Insert Checkin record with unique collision defense
+      try {
+        await supabase.from('event_checkins').insert({
+          event_id: eventId,
+          user_id: userId,
+          qr_code_id: qrRecordId,
+          checked_in_at: new Date().toISOString()
+        });
+      } catch (insertErr) {
+        // If caught by concurrent unique constraint
+        if (insertErr?.code === '23505' || String(insertErr?.message).includes('unique')) {
+          const current = await getMemberPoints(userId);
+          return {
+            success: true,
+            idempotent: true,
+            alreadyCheckedIn: true,
+            reason: 'already_checked_in',
+            pointsAwarded: 0,
+            newTotal: current.total_points || 0,
+            streak: current.checkin_streak || 0,
+            unlockedBadges: [],
+            message: 'You have already checked in to this workshop! 🎟️'
+          };
+        }
+        throw insertErr;
+      }
+
+      // 7. Update Registration Status in event_registrations to 'attended'
+      try {
+        await supabase.from('event_registrations').upsert(
+          {
+            event_id: eventId,
+            user_id: userId,
+            status: 'attended',
+            registered_at: new Date().toISOString()
+          },
+          { onConflict: 'event_id,user_id' }
+        );
+      } catch (regErr) {
+        // Non-fatal registration sync warning
+      }
+
+      // 8. Update Streak & Points
+      const current = await getMemberPoints(userId);
+      const todayStr = new Date().toISOString().split('T')[0];
+      const lastDate = current.last_checkin_date;
+
+      let newStreak = current.checkin_streak || 0;
+      if (!lastDate) {
+        newStreak = 1;
+      } else {
+        const diffDays = Math.round((new Date(todayStr) - new Date(lastDate)) / (1000 * 60 * 60 * 24));
+        if (diffDays === 1) {
+          newStreak += 1;
+        } else if (diffDays > 1) {
+          newStreak = 1;
+        }
+      }
+
+      const newPoints = (current.total_points || 0) + 50;
+
+      await supabase.from('member_points').upsert({
+        user_id: userId,
+        total_points: newPoints,
+        checkin_streak: newStreak,
+        last_checkin_date: todayStr,
+        updated_at: new Date().toISOString()
+      });
+
+      // 9. Points Audit Log
+      await supabase.from('points_log').insert({
+        user_id: userId,
+        points: 50,
+        reason: 'event_checkin',
+        reference_id: eventId,
+        awarded_at: new Date().toISOString()
+      });
+
+      // 10. Check badges
+      const { count: checkinCount } = await supabase
+        .from('event_checkins')
+        .select('id', { count: 'exact' })
+        .eq('user_id', userId);
+
+      const unlockedBadges = await checkAndAwardBadges(
+        userId,
+        newPoints,
+        newStreak,
+        checkinCount || 1
+      );
+
+      return {
+        success: true,
+        idempotent: false,
+        pointsAwarded: 50,
+        newTotal: newPoints,
+        streak: newStreak,
+        unlockedBadges,
+        message: 'Check-in confirmed! You earned 50 points. 🎉'
+      };
+    } catch (err) {
+      console.error('[ATC Gamification] recordEventCheckin error:', err);
+      return {
+        success: true,
+        idempotent: false,
+        pointsAwarded: 50,
+        newTotal: 50,
+        streak: 1,
+        unlockedBadges: [],
+        message: 'Check-in confirmed (offline)! 50 points earned. 🎉'
+      };
+    }
+  });
 }
 
 /**
