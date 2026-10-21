@@ -45,6 +45,7 @@ export function EventDetailPage() {
   const [qrData, setQrData] = useState(null);
   const [generatingQR, setGeneratingQR] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [attendeeTab, setAttendeeTab] = useState('registered'); // 'registered' | 'checked_in'
 
   useEffect(() => {
     let isMounted = true;
@@ -210,8 +211,6 @@ export function EventDetailPage() {
     link.click();
     document.body.removeChild(link);
   };
-
-  const [attendeeTab, setAttendeeTab] = useState('registered'); // 'registered' | 'checked_in'
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

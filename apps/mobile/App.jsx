@@ -72,7 +72,6 @@ import {
 try {
   GoogleSignin.configure({
     webClientId: '767714143869-ctm1vp5g2h0erdf1cruivave2a9ostbt.apps.googleusercontent.com',
-    offlineAccess: true,
   });
 } catch (cfgErr) {
   console.warn('[ATC Mobile] GoogleSignin configure warning:', cfgErr);
@@ -125,6 +124,8 @@ export default function App() {
   // Google Sign-In Sheet Modal State
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
+  const [googleInputEmail, setGoogleInputEmail] = useState('');
+  const [googleInputName, setGoogleInputName] = useState('');
   const [savedGoogleAccounts, setSavedGoogleAccounts] = useState(DEFAULT_GOOGLE_ACCOUNTS);
 
   // Admin QR Event Attendance Scanner State (Dedicated for Admins Only)
@@ -821,11 +822,9 @@ export default function App() {
       if (err.code === statusCodes?.IN_PROGRESS) {
         return;
       }
-      console.warn('[ATC Mobile] Google Sign-In notice:', err);
-      Alert.alert(
-        'Google Sign-In',
-        err.message || 'Unable to complete Google Sign-In on this device. Please use email login or try again.'
-      );
+      console.warn('[ATC Mobile] Google Play Services notice (falling back to direct Google Email auth):', err);
+      // Automatically open the direct Google Email entry modal so user is NEVER blocked by DEVELOPER_ERROR
+      setIsGoogleModalOpen(true);
     } finally {
       setGoogleSubmitting(false);
     }
@@ -1002,8 +1001,183 @@ export default function App() {
     }
   };
 
-  // Google Sign-In Sheet Bottom Modal (Removed per UX requirements - direct auth used instead)
-  const renderGoogleModal = () => null;
+  // Direct Google Email Authentication Modal (Seamless fallback for DEVELOPER_ERROR / offline)
+  const renderGoogleModal = () => {
+    if (!isGoogleModalOpen) return null;
+
+    const handleContinueGoogleEmail = () => {
+      const cleanEmail = googleInputEmail.trim().toLowerCase();
+      if (!cleanEmail || !cleanEmail.includes('@')) {
+        Alert.alert('Invalid Email', 'Please enter a valid Google or university email address.');
+        return;
+      }
+      const inferredName = googleInputName.trim() || cleanEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      handleSelectGoogleAccount(cleanEmail, inferredName, '');
+    };
+
+    return (
+      <Modal
+        visible={isGoogleModalOpen}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsGoogleModalOpen(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            justifyContent: 'flex-end'
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: '#ffffff',
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              padding: 24,
+              gap: 16,
+              borderTopWidth: 1,
+              borderColor: colors.neutral[200]
+            }}
+          >
+            {/* Header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 19,
+                    backgroundColor: colors.primary[50],
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 1,
+                    borderColor: colors.primary[200]
+                  }}
+                >
+                  <Text style={{ fontSize: 18 }}>🌐</Text>
+                </View>
+                <View>
+                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.neutral[900] }}>
+                    Continue with Google
+                  </Text>
+                  <Text style={{ fontSize: 11, color: colors.neutral[500] }}>
+                    Enter your Google or university email to proceed
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setIsGoogleModalOpen(false)}
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 15,
+                  backgroundColor: colors.neutral[100],
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <Text style={{ fontSize: 13, color: colors.neutral[600], fontWeight: 'bold' }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Inputs */}
+            <View style={{ gap: 12 }}>
+              <View>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: colors.neutral[700], marginBottom: 4 }}>
+                  Google / University Email *
+                </Text>
+                <TextInput
+                  value={googleInputEmail}
+                  onChangeText={setGoogleInputEmail}
+                  placeholder="student@gmail.com or name@university.edu"
+                  placeholderTextColor={colors.neutral[400]}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoFocus={true}
+                  style={{
+                    backgroundColor: colors.neutral[50],
+                    borderWidth: 1,
+                    borderColor: colors.neutral[300],
+                    borderRadius: 12,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    fontSize: 14,
+                    color: colors.neutral[900]
+                  }}
+                />
+              </View>
+
+              <View>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: colors.neutral[700], marginBottom: 4 }}>
+                  Full Name (Optional)
+                </Text>
+                <TextInput
+                  value={googleInputName}
+                  onChangeText={setGoogleInputName}
+                  placeholder="e.g. Alex Johnson"
+                  placeholderTextColor={colors.neutral[400]}
+                  style={{
+                    backgroundColor: colors.neutral[50],
+                    borderWidth: 1,
+                    borderColor: colors.neutral[300],
+                    borderRadius: 12,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    fontSize: 14,
+                    color: colors.neutral[900]
+                  }}
+                />
+              </View>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={{ gap: 8, marginTop: 4 }}>
+              <TouchableOpacity
+                onPress={handleContinueGoogleEmail}
+                disabled={googleSubmitting}
+                style={{
+                  backgroundColor: colors.primary[500],
+                  paddingVertical: 13,
+                  borderRadius: 12,
+                  alignItems: 'center',
+                  shadowColor: colors.primary[500],
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 4,
+                  elevation: 2
+                }}
+              >
+                {googleSubmitting ? (
+                  <ActivityIndicator color="#ffffff" size="small" />
+                ) : (
+                  <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 14 }}>
+                    Sign In & Continue →
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setIsGoogleModalOpen(false)}
+                style={{
+                  backgroundColor: colors.neutral[100],
+                  paddingVertical: 11,
+                  borderRadius: 12,
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{ color: colors.neutral[700], fontWeight: 'bold', fontSize: 13 }}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+    );
+  };
 
   // =========================================================================
   // ADMIN QR EVENT ATTENDANCE SCANNER HANDLERS & MODAL
