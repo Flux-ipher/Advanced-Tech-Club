@@ -6,7 +6,8 @@ import {
   AlertTriangle,
   CheckCircle2,
   Camera,
-  RefreshCw
+  RefreshCw,
+  Link2
 } from 'lucide-react';
 
 const ALLOWED_MIME_TYPES = [
@@ -22,8 +23,8 @@ const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
 /**
  * ImageUploader Component
- * Strict image-only uploader supporting drag-and-drop, client-side preview,
- * and rejection of non-image file types.
+ * Dual-method image uploader supporting direct device files (browse/drag-and-drop),
+ * direct web image URLs, and curated preset banners.
  *
  * @param {string} value - Current image URL / Data URL
  * @param {function} onChange - Callback receiving the new image data URL or empty string
@@ -43,6 +44,8 @@ export function ImageUploader({
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState('');
   const [fileName, setFileName] = useState('');
+  const [uploadMethod, setUploadMethod] = useState('device'); // 'device' | 'url'
+  const [customUrl, setCustomUrl] = useState('');
   const fileInputRef = useRef(null);
 
   const validateFile = (file) => {
@@ -248,32 +251,115 @@ export function ImageUploader({
           </div>
         </div>
       ) : (
-        /* Drag and Drop Upload Zone */
-        <div
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onClick={() => fileInputRef.current?.click()}
-          className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all duration-150 ${
-            dragOver
-              ? 'border-primary-500 bg-primary-50/50'
-              : 'border-neutral-300 hover:border-primary-400 bg-neutral-50/50 hover:bg-neutral-50'
-          }`}
-        >
-          <div className="w-12 h-12 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center mx-auto mb-3">
-            <UploadCloud className="w-6 h-6" />
+        <div className="space-y-3">
+          {/* Method Switcher Tabs */}
+          <div className="flex items-center gap-2 border-b border-neutral-200 pb-2">
+            <button
+              type="button"
+              onClick={() => {
+                setUploadMethod('device');
+                setError('');
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                uploadMethod === 'device'
+                  ? 'bg-primary-50 text-primary-700 border border-primary-200 shadow-sm'
+                  : 'text-neutral-600 hover:bg-neutral-100'
+              }`}
+            >
+              <UploadCloud className="w-3.5 h-3.5" />
+              <span>Upload from Device</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setUploadMethod('url');
+                setError('');
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                uploadMethod === 'url'
+                  ? 'bg-primary-50 text-primary-700 border border-primary-200 shadow-sm'
+                  : 'text-neutral-600 hover:bg-neutral-100'
+              }`}
+            >
+              <Link2 className="w-3.5 h-3.5" />
+              <span>Paste Image URL</span>
+            </button>
           </div>
 
-          <p className="text-sm font-bold text-neutral-800">
-            Click to upload or drag & drop image
-          </p>
-          <p className="text-xs text-neutral-500 mt-1 max-w-sm mx-auto">
-            {helperText}
-          </p>
+          {uploadMethod === 'device' ? (
+            /* Drag and Drop Upload Zone */
+            <div
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onClick={() => fileInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all duration-150 ${
+                dragOver
+                  ? 'border-primary-500 bg-primary-50/50'
+                  : 'border-neutral-300 hover:border-primary-400 bg-neutral-50/50 hover:bg-neutral-50'
+              }`}
+            >
+              <div className="w-12 h-12 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center mx-auto mb-3">
+                <UploadCloud className="w-6 h-6" />
+              </div>
 
-          <span className="inline-block mt-3 px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full bg-neutral-100 text-neutral-600 border border-neutral-200">
-            Images Only (No documents or PDFs)
-          </span>
+              <p className="text-sm font-bold text-neutral-800">
+                Click to browse device files or drag & drop image
+              </p>
+              <p className="text-xs text-neutral-500 mt-1 max-w-sm mx-auto">
+                {helperText}
+              </p>
+
+              <span className="inline-block mt-3 px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full bg-neutral-100 text-neutral-600 border border-neutral-200">
+                Images Only (PNG, JPG, WEBP, GIF up to 5MB)
+              </span>
+            </div>
+          ) : (
+            /* Direct URL Input Zone */
+            <div className="p-4 rounded-2xl border border-neutral-200 bg-neutral-50 space-y-2">
+              <label className="block text-xs font-semibold text-neutral-700">
+                Direct Web Image URL
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="url"
+                  placeholder="https://images.unsplash.com/... or image link"
+                  value={customUrl}
+                  onChange={(e) => setCustomUrl(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (customUrl.trim()) {
+                        setError('');
+                        setFileName('Image from URL');
+                        if (onChange) onChange(customUrl.trim());
+                      }
+                    }
+                  }}
+                  className="flex-1 px-3 py-2 text-xs rounded-xl border border-neutral-300 bg-white focus:outline-none focus:border-primary-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!customUrl.trim()) {
+                      setError('Please enter a valid image URL.');
+                      return;
+                    }
+                    setError('');
+                    setFileName('Image from URL');
+                    if (onChange) onChange(customUrl.trim());
+                  }}
+                  className="btn-primary text-xs py-2 px-4 shrink-0 font-semibold"
+                >
+                  Apply URL
+                </button>
+              </div>
+              <p className="text-[11px] text-neutral-500">
+                Paste any publicly accessible image link (Unsplash, Imgur, Supabase, Cloudinary, etc.)
+              </p>
+            </div>
+          )}
         </div>
       )}
 

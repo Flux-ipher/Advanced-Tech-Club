@@ -28,6 +28,7 @@ import {
 import * as FileSystem from 'expo-file-system';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import * as ImagePicker from 'expo-image-picker';
 import { BarCodeScanner } from 'expo-barcode-scanner';
 import { supabase } from '@atc/shared/supabaseClient';
 
@@ -722,6 +723,7 @@ export default function App() {
   const [selectedResource, setSelectedResource] = useState(null);
   const [isQrPassOpen, setIsQrPassOpen] = useState(false);
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+  const [tempAvatarUrl, setTempAvatarUrl] = useState('');
   const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
   const [isCreateEventModalOpen, setIsCreateEventModalOpen] = useState(false);
   const [isVerificationsModalOpen, setIsVerificationsModalOpen] = useState(false);
@@ -3829,6 +3831,40 @@ export default function App() {
     triggerToast('Broadcast Pushed to Campus Devices 📢');
   };
 
+  // Native Device Image Picker (Dual Support: Device Gallery & Custom URL)
+  const handlePickImageFromDevice = async (onSelected) => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Required',
+          'Permission to access device photos is required to choose an image from your gallery.'
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.7,
+        base64: true
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const imageUri = asset.base64
+          ? `data:image/jpeg;base64,${asset.base64}`
+          : asset.uri;
+        onSelected(imageUri);
+        triggerToast('Photo loaded from device 📸');
+      }
+    } catch (err) {
+      console.error('Image picker error:', err);
+      Alert.alert('Image Picker Error', err.message || 'Could not select photo from device');
+    }
+  };
+
   // Admin Studio Workshop Publisher
   const handleAdminCreateEvent = async () => {
     if (!newEventTitle.trim() || !newEventLocation.trim()) {
@@ -6165,11 +6201,20 @@ export default function App() {
                   }}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <TouchableOpacity onPress={() => setIsAvatarModalOpen(true)}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setTempAvatarUrl(currentUser.avatar_url || '');
+                        setIsAvatarModalOpen(true);
+                      }}
+                      style={{ position: 'relative' }}
+                    >
                       <Image
                         source={{ uri: currentUser.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80' }}
                         style={{ width: 60, height: 60, borderRadius: 30, borderWidth: 2, borderColor: colors.primary[500] }}
                       />
+                      <View style={{ position: 'absolute', bottom: -2, right: -2, backgroundColor: colors.primary[500], borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#ffffff' }}>
+                        <Text style={{ fontSize: 10 }}>📷</Text>
+                      </View>
                     </TouchableOpacity>
 
                     <View style={{ flex: 1 }}>
@@ -8178,16 +8223,88 @@ export default function App() {
                   </View>
                 </View>
 
-                {/* Cover Banner Presets & Custom URL */}
+                {/* Cover Banner (Device Upload & Direct URL with Live Preview) */}
                 <View>
-                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
-                    Cover Banner Image
-                  </Text>
-                  <View style={{ flexDirection: 'row', gap: 6, marginBottom: 6 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700] }}>
+                      Cover Banner Image
+                    </Text>
+                    {newEventBanner ? (
+                      <TouchableOpacity onPress={() => setNewEventBanner('')}>
+                        <Text style={{ fontSize: 10, color: '#ef4444', fontWeight: 'bold' }}>Clear Image</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+
+                  {/* LIVE BANNER PREVIEW IF SELECTED */}
+                  {newEventBanner ? (
+                    <View style={{ width: '100%', height: 110, borderRadius: 12, overflow: 'hidden', marginBottom: 8, borderWidth: 1, borderColor: colors.neutral[300], position: 'relative' }}>
+                      <Image source={{ uri: newEventBanner }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                      <View style={{ position: 'absolute', bottom: 6, left: 6, backgroundColor: 'rgba(15, 23, 42, 0.75)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                        <Text style={{ fontSize: 9, color: '#ffffff', fontWeight: 'bold' }}>
+                          {newEventBanner.startsWith('data:') ? '📷 Device Photo Selected' : '🔗 Image Loaded'}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : null}
+
+                  {/* DUAL ACTION CONTROLS: CHOOSE FROM DEVICE & URL */}
+                  <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8 }}>
+                    <TouchableOpacity
+                      onPress={() => handlePickImageFromDevice(setNewEventBanner)}
+                      style={{
+                        flex: 1,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        backgroundColor: '#eff6ff',
+                        borderWidth: 1.5,
+                        borderColor: '#3b82f6',
+                        paddingVertical: 9,
+                        paddingHorizontal: 8,
+                        borderRadius: 10
+                      }}
+                    >
+                      <Text style={{ fontSize: 14 }}>📁</Text>
+                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#1d4ed8' }}>Choose from Device</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => handlePickImageFromDevice(setNewEventBanner)}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: '#f8fafc',
+                        borderWidth: 1,
+                        borderColor: colors.neutral[300],
+                        paddingVertical: 9,
+                        paddingHorizontal: 12,
+                        borderRadius: 10
+                      }}
+                    >
+                      <Text style={{ fontSize: 13 }}>📸</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* URL INPUT */}
+                  <View style={{ marginBottom: 6 }}>
+                    <TextInput
+                      placeholder="Or paste direct image URL (https://...)"
+                      value={newEventBanner.startsWith('data:') ? 'Uploaded from Device' : newEventBanner}
+                      onChangeText={(val) => setNewEventBanner(val)}
+                      style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 12, color: colors.neutral[900] }}
+                    />
+                  </View>
+
+                  {/* CURATED PRESETS */}
+                  <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
                     {[
                       { label: '🤖 AI / ML', url: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=1200&q=80' },
                       { label: '🛡️ Cybersec', url: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=1200&q=80' },
-                      { label: '☁️ Cloud', url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80' }
+                      { label: '☁️ Cloud', url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80' },
+                      { label: '⚡ Hackathon', url: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1200&q=80' }
                     ].map((preset, idx) => (
                       <TouchableOpacity
                         key={idx}
@@ -8205,12 +8322,6 @@ export default function App() {
                       </TouchableOpacity>
                     ))}
                   </View>
-                  <TextInput
-                    placeholder="https://images.unsplash.com/..."
-                    value={newEventBanner}
-                    onChangeText={setNewEventBanner}
-                    style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 12, color: colors.neutral[900] }}
-                  />
                 </View>
 
                 {/* Description */}
@@ -8341,15 +8452,76 @@ export default function App() {
                   />
                 </View>
 
-                {/* Photo URL */}
+                {/* Photo Image (Device Upload & Direct URL with Live Preview) */}
                 <View>
-                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
-                    Photo Image URL *
-                  </Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700] }}>
+                      Photo / Memory Cover Image *
+                    </Text>
+                    {newMemImage ? (
+                      <TouchableOpacity onPress={() => setNewMemImage('')}>
+                        <Text style={{ fontSize: 10, color: '#ef4444', fontWeight: 'bold' }}>Clear Image</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+
+                  {/* LIVE PREVIEW IF SELECTED */}
+                  {newMemImage ? (
+                    <View style={{ width: '100%', height: 110, borderRadius: 12, overflow: 'hidden', marginBottom: 8, borderWidth: 1, borderColor: colors.neutral[300], position: 'relative' }}>
+                      <Image source={{ uri: newMemImage }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                      <View style={{ position: 'absolute', bottom: 6, left: 6, backgroundColor: 'rgba(15, 23, 42, 0.75)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                        <Text style={{ fontSize: 9, color: '#ffffff', fontWeight: 'bold' }}>
+                          {newMemImage.startsWith('data:') ? '📷 Device Photo Selected' : '🔗 Image Loaded'}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : null}
+
+                  {/* DUAL ACTION CONTROLS: CHOOSE FROM DEVICE & URL */}
+                  <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8 }}>
+                    <TouchableOpacity
+                      onPress={() => handlePickImageFromDevice(setNewMemImage)}
+                      style={{
+                        flex: 1,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        backgroundColor: '#eff6ff',
+                        borderWidth: 1.5,
+                        borderColor: '#3b82f6',
+                        paddingVertical: 9,
+                        paddingHorizontal: 8,
+                        borderRadius: 10
+                      }}
+                    >
+                      <Text style={{ fontSize: 14 }}>📁</Text>
+                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#1d4ed8' }}>Choose from Device</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => handlePickImageFromDevice(setNewMemImage)}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: '#f8fafc',
+                        borderWidth: 1,
+                        borderColor: colors.neutral[300],
+                        paddingVertical: 9,
+                        paddingHorizontal: 12,
+                        borderRadius: 10
+                      }}
+                    >
+                      <Text style={{ fontSize: 13 }}>📸</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* URL INPUT */}
                   <TextInput
-                    placeholder="https://images.unsplash.com/..."
-                    value={newMemImage}
-                    onChangeText={setNewMemImage}
+                    placeholder="Or paste direct image URL (https://...)"
+                    value={newMemImage.startsWith('data:') ? 'Uploaded from Device' : newMemImage}
+                    onChangeText={(val) => setNewMemImage(val)}
                     style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 12, color: colors.neutral[900] }}
                   />
                 </View>
@@ -8461,6 +8633,139 @@ export default function App() {
             </View>
           )}
         </View>
+      </Modal>
+
+      {/* PROFILE AVATAR CUSTOMIZER MODAL */}
+      <Modal visible={isAvatarModalOpen} animationType="fade" transparent>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 20 }}
+        >
+          <View style={{ backgroundColor: '#ffffff', borderRadius: 20, padding: 20, maxHeight: '85%' }}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <View>
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.neutral[900] }}>
+                  Customize Avatar
+                </Text>
+                <Text style={{ fontSize: 12, color: colors.neutral[500] }}>
+                  Upload a photo from your device or paste a URL
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setIsAvatarModalOpen(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, color: colors.neutral[400] }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Avatar Preview */}
+            <View style={{ alignItems: 'center', marginBottom: 16 }}>
+              <Image
+                source={{ uri: tempAvatarUrl || currentUser?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80' }}
+                style={{ width: 90, height: 90, borderRadius: 45, borderWidth: 3, borderColor: colors.primary[500] }}
+              />
+            </View>
+
+            {/* Dual Action Controls: Device & URL */}
+            <View style={{ gap: 10, marginBottom: 14 }}>
+              <TouchableOpacity
+                onPress={() => handlePickImageFromDevice(setTempAvatarUrl)}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  backgroundColor: '#eff6ff',
+                  borderWidth: 1.5,
+                  borderColor: '#3b82f6',
+                  paddingVertical: 10,
+                  borderRadius: 12
+                }}
+              >
+                <Text style={{ fontSize: 16 }}>📁</Text>
+                <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#1d4ed8' }}>
+                  Choose Photo from Device
+                </Text>
+              </TouchableOpacity>
+
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[600], marginBottom: 4 }}>
+                  Or Direct Image URL
+                </Text>
+                <TextInput
+                  placeholder="https://images.unsplash.com/... or paste image URL"
+                  value={tempAvatarUrl.startsWith('data:') ? 'Photo Loaded from Device' : tempAvatarUrl}
+                  onChangeText={(val) => setTempAvatarUrl(val)}
+                  style={{
+                    backgroundColor: colors.neutral[50],
+                    borderWidth: 1,
+                    borderColor: colors.neutral[300],
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    fontSize: 12,
+                    color: colors.neutral[900]
+                  }}
+                />
+              </View>
+            </View>
+
+            {/* Presets */}
+            <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[600], marginBottom: 6 }}>
+              Or Pick an Avatar Preset:
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'center', marginBottom: 18 }}>
+              {[
+                'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+                'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80',
+                'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=300&q=80',
+                'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=300&q=80'
+              ].map((pUrl, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  onPress={() => setTempAvatarUrl(pUrl)}
+                  style={{
+                    borderWidth: 2,
+                    borderColor: tempAvatarUrl === pUrl ? colors.primary[500] : colors.neutral[200],
+                    borderRadius: 22,
+                    padding: 2
+                  }}
+                >
+                  <Image source={{ uri: pUrl }} style={{ width: 40, height: 40, borderRadius: 20 }} />
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Save Buttons */}
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity
+                onPress={() => setIsAvatarModalOpen(false)}
+                style={{ flex: 1, backgroundColor: colors.neutral[100], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+              >
+                <Text style={{ color: colors.neutral[700], fontWeight: 'bold', fontSize: 13 }}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={async () => {
+                  if (!tempAvatarUrl || !currentUser) return;
+                  const updated = { ...currentUser, avatar_url: tempAvatarUrl };
+                  setCurrentUser(updated);
+                  await saveMobileSession(updated);
+                  await persistGoogleAccount(updated.email, updated.full_name, tempAvatarUrl);
+                  try {
+                    await supabase.from('profiles').update({ avatar_url: tempAvatarUrl }).eq('id', currentUser.id);
+                  } catch (e) {
+                    console.warn('[ATC] avatar update Supabase sync note:', e);
+                  }
+                  setIsAvatarModalOpen(false);
+                  triggerToast('Avatar updated successfully! ✨');
+                }}
+                style={{ flex: 1.5, backgroundColor: colors.primary[500], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+              >
+                <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>Save Avatar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ========================================================= */}
