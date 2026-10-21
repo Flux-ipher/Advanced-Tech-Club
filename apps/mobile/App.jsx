@@ -7556,36 +7556,42 @@ export default function App() {
                   <TouchableOpacity
                     onPress={() => setSelectedEvent(null)}
                     style={{
-                      width: 48,
                       height: 48,
+                      paddingHorizontal: 14,
                       borderRadius: 14,
-                      backgroundColor: colors.neutral[100],
-                      borderWidth: 1,
-                      borderColor: colors.neutral[300],
+                      backgroundColor: '#eff6ff',
+                      borderWidth: 1.5,
+                      borderColor: '#3b82f6',
+                      flexDirection: 'row',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
+                      gap: 4
                     }}
                     accessibilityLabel="Back"
                   >
-                    <Text style={{ fontSize: 20, color: colors.neutral[800], fontWeight: 'bold' }}>←</Text>
+                    <Text style={{ fontSize: 16, color: '#1d4ed8', fontWeight: 'bold' }}>←</Text>
+                    <Text style={{ fontSize: 12, color: '#1d4ed8', fontWeight: 'bold' }}>Back</Text>
                   </TouchableOpacity>
 
                   {/* BOTTOM SHARE BUTTON */}
                   <TouchableOpacity
                     onPress={() => handleShare(selectedEvent.title, selectedEvent.description)}
                     style={{
-                      width: 48,
                       height: 48,
+                      paddingHorizontal: 14,
                       borderRadius: 14,
-                      backgroundColor: colors.neutral[100],
-                      borderWidth: 1,
-                      borderColor: colors.neutral[300],
+                      backgroundColor: '#f5f3ff',
+                      borderWidth: 1.5,
+                      borderColor: '#8b5cf6',
+                      flexDirection: 'row',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
+                      gap: 4
                     }}
                     accessibilityLabel="Share"
                   >
-                    <Text style={{ fontSize: 18, color: colors.neutral[800] }}>↗</Text>
+                    <Text style={{ fontSize: 16, color: '#6d28d9', fontWeight: 'bold' }}>↗</Text>
+                    <Text style={{ fontSize: 12, color: '#6d28d9', fontWeight: 'bold' }}>Share</Text>
                   </TouchableOpacity>
 
                   {/* PRIMARY ACTION: RSVP / CONCLUDED */}
@@ -7593,16 +7599,16 @@ export default function App() {
                     <View
                       style={{
                         flex: 1,
-                        backgroundColor: colors.neutral[100],
+                        backgroundColor: '#0f172a',
                         height: 48,
                         borderRadius: 14,
                         alignItems: 'center',
                         justifyContent: 'center',
                         borderWidth: 1,
-                        borderColor: colors.neutral[200]
+                        borderColor: '#334155'
                       }}
                     >
-                      <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.neutral[600] }}>
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#f8fafc' }}>
                         🏁 Concluded
                       </Text>
                     </View>
@@ -7874,18 +7880,21 @@ export default function App() {
                   <TouchableOpacity
                     onPress={() => setSelectedResource(null)}
                     style={{
-                      width: 48,
                       height: 48,
+                      paddingHorizontal: 14,
                       borderRadius: 14,
-                      backgroundColor: '#1e293b',
-                      borderWidth: 1,
-                      borderColor: '#334155',
+                      backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                      borderWidth: 1.5,
+                      borderColor: '#3b82f6',
+                      flexDirection: 'row',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
+                      gap: 4
                     }}
                     accessibilityLabel="Back"
                   >
-                    <Text style={{ fontSize: 20, color: '#ffffff', fontWeight: 'bold' }}>←</Text>
+                    <Text style={{ fontSize: 16, color: '#60a5fa', fontWeight: 'bold' }}>←</Text>
+                    <Text style={{ fontSize: 12, color: '#60a5fa', fontWeight: 'bold' }}>Back</Text>
                   </TouchableOpacity>
 
                   {/* BOTTOM SHARE BUTTON */}
@@ -7897,18 +7906,21 @@ export default function App() {
                       )
                     }
                     style={{
-                      width: 48,
                       height: 48,
+                      paddingHorizontal: 14,
                       borderRadius: 14,
-                      backgroundColor: '#1e293b',
-                      borderWidth: 1,
-                      borderColor: '#334155',
+                      backgroundColor: 'rgba(139, 92, 246, 0.15)',
+                      borderWidth: 1.5,
+                      borderColor: '#8b5cf6',
+                      flexDirection: 'row',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
+                      gap: 4
                     }}
                     accessibilityLabel="Share"
                   >
-                    <Text style={{ fontSize: 18, color: '#ffffff' }}>↗</Text>
+                    <Text style={{ fontSize: 16, color: '#c084fc', fontWeight: 'bold' }}>↗</Text>
+                    <Text style={{ fontSize: 12, color: '#c084fc', fontWeight: 'bold' }}>Share</Text>
                   </TouchableOpacity>
 
                   {/* PRIMARY ACTION (DOWNLOAD / GITHUB / ARTICLE / PLATFORM) */}
