@@ -47,19 +47,30 @@ export async function getEvents() {
 }
 
 export async function getEventById(id) {
-  const { data, error } = await supabase
-    .from('events')
-    .select('*')
-    .eq('id', id)
-    .single();
+  if (!id) return null;
+  try {
+    if (supabase.isMock) {
+      const found = (mockDb.storage.events || []).find((e) => e.id === id || e.slug === id);
+      if (found) return normalizeEvent(found);
+    }
 
-  if (error) {
-    console.error(`Error fetching event ${id}:`, error);
-    const fallback = initialEvents.find((e) => e.id === id);
-    if (fallback) return normalizeEvent(fallback);
-    throw error;
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (!error && data) {
+      return normalizeEvent(data);
+    }
+  } catch (err) {
+    console.warn(`[ATC Events] getEventById Supabase note:`, err);
   }
-  return normalizeEvent(data);
+
+  // Resilient fallback to initialEvents by id or slug
+  const fallback = initialEvents.find((e) => e.id === id || e.slug === id);
+  if (fallback) return normalizeEvent(fallback);
+  return null;
 }
 
 export async function createEvent({
@@ -255,7 +266,7 @@ export async function getEventRegistrations(eventId) {
       .eq('event_id', eventId);
 
     if (error || !data || data.length === 0) {
-      return (initialRegistrations || []).filter((r) => r.event_id === eventId);
+      return [];
     }
 
     return (data || []).map((r) => ({

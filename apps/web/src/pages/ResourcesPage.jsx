@@ -186,7 +186,10 @@ export function ResourcesPage() {
       <div className="voodoo-card p-4 mb-8 space-y-3">
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
           {/* Category Pills & Saved Filter */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+          <div
+            className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
             {categories.map((cat) => (
               <button
                 key={cat}
@@ -194,9 +197,9 @@ export function ResourcesPage() {
                   setCategoryFilter(cat);
                   setShowSavedOnly(false);
                 }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors shrink-0 ${
                   !showSavedOnly && categoryFilter === cat
-                    ? 'bg-primary-500 text-white'
+                    ? 'bg-primary-500 text-white shadow-xs'
                     : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
                 }`}
               >
@@ -206,7 +209,7 @@ export function ResourcesPage() {
 
             <button
               onClick={() => setShowSavedOnly((prev) => !prev)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition-colors ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition-colors shrink-0 ${
                 showSavedOnly
                   ? 'bg-warning-500 text-white shadow-sm'
                   : 'bg-warning-50 text-warning-700 hover:bg-warning-100 border border-warning-200'
@@ -218,8 +221,8 @@ export function ResourcesPage() {
           </div>
 
           {/* Controls: Search and Sort */}
-          <div className="flex items-center gap-3">
-            <div className="relative min-w-[220px] flex-1">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="relative w-full sm:w-64">
               <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" />
               <input
                 type="text"
@@ -230,12 +233,15 @@ export function ResourcesPage() {
               />
             </div>
 
-            <div className="flex items-center gap-1.5 text-xs text-neutral-500">
-              <ArrowUpDown className="w-3.5 h-3.5 text-neutral-400" />
+            <div className="flex items-center justify-between sm:justify-start gap-1.5 text-xs text-neutral-500">
+              <span className="flex items-center gap-1 text-neutral-400">
+                <ArrowUpDown className="w-3.5 h-3.5" />
+                <span className="sm:hidden text-[11px]">Sort:</span>
+              </span>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="px-2 py-1.5 rounded-lg border border-neutral-200 bg-neutral-50 text-xs font-medium text-neutral-700 focus:outline-none focus:border-primary-500"
+                className="flex-1 sm:flex-initial px-2 py-1.5 rounded-lg border border-neutral-200 bg-neutral-50 text-xs font-medium text-neutral-700 focus:outline-none focus:border-primary-500"
               >
                 <option value="popular">Most Popular</option>
                 <option value="newest">Recently Added</option>

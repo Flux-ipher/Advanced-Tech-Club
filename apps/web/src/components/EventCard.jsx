@@ -1,7 +1,8 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Calendar, MapPin, Users, CheckCircle2, ArrowRight, Trash2 } from 'lucide-react';
 import { formatDateTime, formatDate } from '@atc/shared/utils/formatters';
+import { isPortalSubdomain } from '@atc/shared/utils/domains';
 
 export function EventCard({
   event,
@@ -28,6 +29,11 @@ export function EventCard({
   const fillPercentage = Math.min(100, Math.round((registrations_count / capacity) * 100));
   const isPast = new Date(end_at || start_at).getTime() < Date.now();
   const isCompleted = event.is_completed === true || isPast;
+
+  const locationHook = useLocation();
+  const eventPath = isPortalSubdomain()
+    ? `/events/${id}`
+    : (locationHook.pathname.startsWith('/portal') ? `/portal/events/${id}` : `/events/${id}`);
 
   return (
     <div className="voodoo-card-hover flex flex-col h-full overflow-hidden group">
@@ -74,7 +80,7 @@ export function EventCard({
       {/* Content */}
       <div className="p-5 flex-1 flex flex-col justify-between">
         <div>
-          <Link to={`/events/${id}`} className="group-hover:text-primary-600 transition-colors">
+          <Link to={eventPath} className="group-hover:text-primary-600 transition-colors">
             <h3 className="text-lg font-bold text-neutral-900 mb-2 line-clamp-2 leading-snug">
               {title}
             </h3>
@@ -112,7 +118,7 @@ export function EventCard({
         {/* Footer Actions */}
         <div className="pt-3 border-t border-neutral-100 flex items-center justify-between gap-3">
           <Link
-            to={`/events/${id}`}
+            to={eventPath}
             className="text-xs font-semibold text-neutral-600 hover:text-primary-600 flex items-center gap-1 transition-colors"
           >
             Details <ArrowRight className="w-3.5 h-3.5" />

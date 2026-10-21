@@ -170,14 +170,17 @@ export function HomePage() {
           {/* Feed Filter & Search Controls */}
           <div className="voodoo-card p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             {/* Category Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+            <div
+              className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
               {['all', 'pinned', 'hackathon', 'workshop', 'opportunity'].map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize whitespace-nowrap transition-colors ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize whitespace-nowrap transition-colors shrink-0 ${
                     selectedCategory === cat
-                      ? 'bg-primary-500 text-white'
+                      ? 'bg-primary-500 text-white shadow-xs'
                       : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
                   }`}
                 >
@@ -187,7 +190,7 @@ export function HomePage() {
             </div>
 
             {/* Search Input */}
-            <div className="relative min-w-[200px]">
+            <div className="relative w-full sm:w-64">
               <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" />
               <input
                 type="text"

@@ -5044,26 +5044,54 @@ export default function App() {
                       <Text style={{ fontSize: 15, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 4 }}>
                         {evt.title}
                       </Text>
-                      <Text style={{ fontSize: 12, color: colors.neutral[500], marginBottom: 10 }} numberOfLines={2}>
+                      <Text style={{ fontSize: 12, color: colors.neutral[500], marginBottom: 8 }} numberOfLines={2}>
                         {evt.description}
                       </Text>
 
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
+                        <Text style={{ fontSize: 11, color: colors.neutral[600] }}>
+                          📅 {new Date(evt.date || evt.start_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: colors.neutral[300] }}>•</Text>
                         <Text style={{ fontSize: 11, color: colors.neutral[600] }}>
                           📍 {evt.location}
                         </Text>
+                      </View>
+
+                      <Text style={{ fontSize: 11, color: colors.neutral[500], marginBottom: 10 }}>
+                        👥 {evt.registrations_count || (isRSVPed ? 1 : 0)} registered / {evt.capacity || 100} capacity ({spotsLeft > 0 ? `${spotsLeft} spots left` : 'Full'})
+                      </Text>
+
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.neutral[100] }}>
+                        <TouchableOpacity
+                          onPress={() => setSelectedEvent(evt)}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 4,
+                            paddingVertical: 6,
+                            paddingHorizontal: 10,
+                            borderRadius: 8,
+                            backgroundColor: colors.primary[50],
+                            borderWidth: 1,
+                            borderColor: colors.primary[200]
+                          }}
+                        >
+                          <Text style={{ color: colors.primary[700], fontSize: 11, fontWeight: 'bold' }}>
+                            Details →
+                          </Text>
+                        </TouchableOpacity>
+
                         {isCompleted ? (
                           <View
                             style={{
-                              backgroundColor: colors.neutral[100],
-                              borderWidth: 1,
-                              borderColor: colors.neutral[200],
+                              backgroundColor: '#1e293b',
                               paddingHorizontal: 12,
                               paddingVertical: 6,
                               borderRadius: 8
                             }}
                           >
-                            <Text style={{ color: colors.neutral[600], fontSize: 11, fontWeight: 'bold' }}>
+                            <Text style={{ color: '#f8fafc', fontSize: 11, fontWeight: 'bold' }}>
                               🏁 Concluded
                             </Text>
                           </View>
@@ -5072,7 +5100,7 @@ export default function App() {
                             onPress={() => handleToggleEventRSVP(evt.id)}
                             style={{
                               backgroundColor: isRSVPed ? colors.success[500] : colors.primary[500],
-                              paddingHorizontal: 12,
+                              paddingHorizontal: 14,
                               paddingVertical: 6,
                               borderRadius: 8
                             }}
@@ -6439,127 +6467,478 @@ export default function App() {
         </View>
       </Modal>
 
-      {/* EVENT DETAIL MODAL */}
-      <Modal visible={!!selectedEvent} animationType="slide" transparent>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 }}>
-          <View style={{ backgroundColor: '#ffffff', borderRadius: 20, padding: 20 }}>
-            {selectedEvent && (() => {
-              const isPast = (selectedEvent.end_at && new Date(selectedEvent.end_at).getTime() < Date.now()) ||
-                             (!selectedEvent.end_at && selectedEvent.start_at && new Date(selectedEvent.start_at).getTime() < Date.now()) ||
-                             (!selectedEvent.end_at && !selectedEvent.start_at && selectedEvent.date && new Date(selectedEvent.date).getTime() < Date.now());
-              const isCompleted = selectedEvent.is_completed === true || (selectedEvent.is_completed !== false && isPast);
+      {/* DEDICATED SPECIFIC EVENT DETAILS PAGE */}
+      <Modal visible={!!selectedEvent} animationType="slide" presentationStyle="fullScreen">
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#0b0f19' }}>
+          <StatusBar barStyle="light-content" backgroundColor="#0b0f19" />
+          {selectedEvent && (() => {
+            const isRSVPed = registeredEventIds.includes(selectedEvent.id);
+            const spotsLeft = (selectedEvent.capacity || 100) - (selectedEvent.registrations_count || 0);
+            const isPast = (selectedEvent.end_at && new Date(selectedEvent.end_at).getTime() < Date.now()) ||
+                           (!selectedEvent.end_at && selectedEvent.start_at && new Date(selectedEvent.start_at).getTime() < Date.now()) ||
+                           (!selectedEvent.end_at && !selectedEvent.start_at && selectedEvent.date && new Date(selectedEvent.date).getTime() < Date.now());
+            const isCompleted = selectedEvent.is_completed === true || (selectedEvent.is_completed !== false && isPast);
+            const fillRate = Math.min(100, Math.round(((selectedEvent.registrations_count || (isRSVPed ? 1 : 0)) / (selectedEvent.capacity || 100)) * 100));
 
-              return (
-                <>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary[600], textTransform: 'uppercase' }}>
-                      {selectedEvent.category} · In-Person Campus Session
+            return (
+              <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+                {/* TOP NAVIGATION BAR */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    backgroundColor: '#ffffff',
+                    borderBottomWidth: 1,
+                    borderBottomColor: colors.neutral[200]
+                  }}
+                >
+                  <TouchableOpacity
+                    onPress={() => setSelectedEvent(null)}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                      paddingVertical: 6,
+                      paddingHorizontal: 10,
+                      borderRadius: 8,
+                      backgroundColor: colors.neutral[100]
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[800] }}>
+                      ← Back to Workshops
                     </Text>
-                    {isCompleted && (
-                      <View style={{ backgroundColor: '#1e293b', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#f8fafc' }}>
-                          🏁 Concluded
+                  </TouchableOpacity>
+
+                  <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.neutral[900] }}>
+                    Event Overview
+                  </Text>
+
+                  <TouchableOpacity
+                    onPress={() => handleShare(selectedEvent.title, selectedEvent.description)}
+                    style={{
+                      paddingVertical: 6,
+                      paddingHorizontal: 10,
+                      borderRadius: 8,
+                      backgroundColor: colors.neutral[100]
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.neutral[700] }}>
+                      Share ↗
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* SCROLLABLE EVENT DETAILS */}
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{ paddingBottom: 110 }}
+                >
+                  {/* HERO BANNER */}
+                  <View style={{ position: 'relative', height: 210, width: '100%', backgroundColor: '#0f172a' }}>
+                    <Image
+                      source={{
+                        uri: selectedEvent.banner_url || selectedEvent.image || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=1200&q=80'
+                      }}
+                      style={{ width: '100%', height: '100%', opacity: 0.9 }}
+                      resizeMode="cover"
+                    />
+                    <View
+                      style={{
+                        position: 'absolute',
+                        top: 14,
+                        left: 16,
+                        flexDirection: 'row',
+                        gap: 8,
+                        alignItems: 'center'
+                      }}
+                    >
+                      <View style={{ backgroundColor: 'rgba(15, 23, 42, 0.85)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
+                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[400], textTransform: 'uppercase' }}>
+                          {selectedEvent.category}
                         </Text>
+                      </View>
+                      {isCompleted ? (
+                        <View style={{ backgroundColor: '#1e293b', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
+                          <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#f8fafc' }}>
+                            🏁 Concluded
+                          </Text>
+                        </View>
+                      ) : (
+                        <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}>
+                          <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#92400e' }}>
+                            {getEventCountdown(selectedEvent)}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+
+                  {/* BODY CONTAINER */}
+                  <View style={{ padding: 18 }}>
+                    {/* TITLE & ORGANIZER */}
+                    <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.neutral[900], lineHeight: 26, marginBottom: 6 }}>
+                      {selectedEvent.title}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: colors.neutral[500], marginBottom: 14 }}>
+                      Organized by <Text style={{ fontWeight: 'bold', color: colors.neutral[700] }}>{selectedEvent.author_name || 'ATC Engineering Core'}</Text> · Campus In-Person
+                    </Text>
+
+                    {/* TAGS */}
+                    {Array.isArray(selectedEvent.tags) && selectedEvent.tags.length > 0 && (
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+                        {selectedEvent.tags.map((tag, idx) => (
+                          <View
+                            key={idx}
+                            style={{
+                              backgroundColor: colors.primary[50],
+                              paddingHorizontal: 8,
+                              paddingVertical: 3,
+                              borderRadius: 6,
+                              borderWidth: 1,
+                              borderColor: colors.primary[200]
+                            }}
+                          >
+                            <Text style={{ fontSize: 11, color: colors.primary[700], fontWeight: '600' }}>
+                              #{tag}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+
+                    {/* SCHEDULE & VENUE CARD */}
+                    <View
+                      style={{
+                        backgroundColor: '#ffffff',
+                        borderRadius: 16,
+                        padding: 16,
+                        borderWidth: 1,
+                        borderColor: colors.neutral[200],
+                        marginBottom: 16,
+                        gap: 12,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.05,
+                        shadowRadius: 3,
+                        elevation: 1
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: colors.primary[50], justifyContent: 'center', alignItems: 'center' }}>
+                          <Text style={{ fontSize: 18 }}>📅</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 11, color: colors.neutral[500], fontWeight: 'bold', textTransform: 'uppercase' }}>
+                            Date & Schedule
+                          </Text>
+                          <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900], marginTop: 2 }}>
+                            {new Date(selectedEvent.date || selectedEvent.start_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                          </Text>
+                          <Text style={{ fontSize: 12, color: colors.neutral[600] }}>
+                            {new Date(selectedEvent.date || selectedEvent.start_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                            {selectedEvent.end_at ? ` - ${new Date(selectedEvent.end_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}` : ''}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={{ height: 1, backgroundColor: colors.neutral[100] }} />
+
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: '#f0fdf4', justifyContent: 'center', alignItems: 'center' }}>
+                          <Text style={{ fontSize: 18 }}>📍</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 11, color: colors.neutral[500], fontWeight: 'bold', textTransform: 'uppercase' }}>
+                            Campus Venue
+                          </Text>
+                          <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900], marginTop: 2 }}>
+                            {selectedEvent.location}
+                          </Text>
+                          <Text style={{ fontSize: 11, color: colors.neutral[500] }}>
+                            University Campus • Check-in via Digital QR Pass
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* CAPACITY PROGRESS CARD */}
+                    <View
+                      style={{
+                        backgroundColor: '#ffffff',
+                        borderRadius: 16,
+                        padding: 16,
+                        borderWidth: 1,
+                        borderColor: colors.neutral[200],
+                        marginBottom: 16,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.05,
+                        shadowRadius: 3,
+                        elevation: 1
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.neutral[800] }}>
+                          Registration Capacity
+                        </Text>
+                        <Text style={{ fontSize: 12, fontWeight: 'bold', color: isCompleted ? colors.neutral[500] : colors.primary[700] }}>
+                          {selectedEvent.registrations_count || (isRSVPed ? 1 : 0)} / {selectedEvent.capacity || 100} confirmed
+                        </Text>
+                      </View>
+
+                      {/* Progress Bar */}
+                      <View style={{ height: 8, backgroundColor: colors.neutral[100], borderRadius: 4, overflow: 'hidden', marginVertical: 6 }}>
+                        <View style={{ height: '100%', width: `${fillRate}%`, backgroundColor: isCompleted ? colors.neutral[400] : colors.primary[500], borderRadius: 4 }} />
+                      </View>
+
+                      <Text style={{ fontSize: 11, color: colors.neutral[500] }}>
+                        {isCompleted
+                          ? 'This session is finished.'
+                          : spotsLeft > 0
+                          ? `⚡ Only ${spotsLeft} spots remaining out of ${selectedEvent.capacity || 100}. RSVP early.`
+                          : '⚠️ Maximum hall capacity reached.'}
+                      </Text>
+                    </View>
+
+                    {/* EVENT DESCRIPTION */}
+                    <View
+                      style={{
+                        backgroundColor: '#ffffff',
+                        borderRadius: 16,
+                        padding: 16,
+                        borderWidth: 1,
+                        borderColor: colors.neutral[200],
+                        marginBottom: 16,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.05,
+                        shadowRadius: 3,
+                        elevation: 1
+                      }}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 8 }}>
+                        About This Workshop
+                      </Text>
+                      <Text style={{ fontSize: 13, color: colors.neutral[700], lineHeight: 20 }}>
+                        {selectedEvent.description}
+                      </Text>
+                    </View>
+
+                    {/* EXTERNAL LINKS (REGISTRATION OR FEEDBACK) */}
+                    {(selectedEvent.registration_link || selectedEvent.feedback_link) && (
+                      <View style={{ gap: 8, marginBottom: 16 }}>
+                        {selectedEvent.registration_link && (
+                          <TouchableOpacity
+                            onPress={() => Share.share({ message: `Register for ${selectedEvent.title}: ${selectedEvent.registration_link}` })}
+                            style={{
+                              backgroundColor: '#ffffff',
+                              padding: 12,
+                              borderRadius: 12,
+                              borderWidth: 1,
+                              borderColor: colors.primary[300],
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between'
+                            }}
+                          >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                              <Text style={{ fontSize: 16 }}>🔗</Text>
+                              <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.primary[700] }}>External Registration Form</Text>
+                            </View>
+                            <Text style={{ fontSize: 12, color: colors.primary[600] }}>Open ↗</Text>
+                          </TouchableOpacity>
+                        )}
+                        {selectedEvent.feedback_link && (
+                          <TouchableOpacity
+                            onPress={() => Share.share({ message: `Submit feedback for ${selectedEvent.title}: ${selectedEvent.feedback_link}` })}
+                            style={{
+                              backgroundColor: '#ffffff',
+                              padding: 12,
+                              borderRadius: 12,
+                              borderWidth: 1,
+                              borderColor: colors.neutral[300],
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between'
+                            }}
+                          >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                              <Text style={{ fontSize: 16 }}>📋</Text>
+                              <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.neutral[800] }}>Attendee Feedback Form</Text>
+                            </View>
+                            <Text style={{ fontSize: 12, color: colors.neutral[500] }}>Open ↗</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
+
+                    {/* ADMIN CONTROL PANEL CARD (PRESERVED MANUAL CONTROLS) */}
+                    {isAdmin && (
+                      <View
+                        style={{
+                          backgroundColor: '#0f172a',
+                          borderRadius: 16,
+                          padding: 16,
+                          marginBottom: 16,
+                          borderWidth: 1,
+                          borderColor: '#334155'
+                        }}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                          <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#38bdf8', textTransform: 'uppercase' }}>
+                            🛡️ Admin Workshop Controls
+                          </Text>
+                        </View>
+
+                        {/* Lifecycle Toggle */}
+                        <TouchableOpacity
+                          onPress={async () => {
+                            const targetStatus = !selectedEvent.is_completed;
+                            try {
+                              await supabase
+                                .from('events')
+                                .update({ is_completed: targetStatus })
+                                .eq('id', selectedEvent.id);
+                              setSelectedEvent(prev => ({
+                                ...prev,
+                                is_completed: targetStatus,
+                                status: targetStatus ? 'completed' : 'upcoming'
+                              }));
+                              setEvents(prev => prev.map(e => e.id === selectedEvent.id ? {
+                                ...e,
+                                is_completed: targetStatus,
+                                status: targetStatus ? 'completed' : 'upcoming'
+                              } : e));
+                              Alert.alert('Status Updated', targetStatus ? 'Event marked as concluded.' : 'Event re-opened as upcoming.');
+                            } catch (err) {
+                              Alert.alert('Update Failed', err.message);
+                            }
+                          }}
+                          style={{
+                            backgroundColor: selectedEvent.is_completed ? '#334155' : '#059669',
+                            paddingVertical: 10,
+                            borderRadius: 10,
+                            alignItems: 'center',
+                            marginBottom: 8
+                          }}
+                        >
+                          <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>
+                            {selectedEvent.is_completed ? '↺ Re-open Workshop as Upcoming' : '✓ Mark Workshop as Concluded'}
+                          </Text>
+                        </TouchableOpacity>
+
+                        {/* Open Check-in Scanner for this Event */}
+                        <TouchableOpacity
+                          onPress={() => {
+                            const evtId = selectedEvent.id;
+                            setSelectedEvent(null);
+                            openAdminScanner(evtId);
+                          }}
+                          style={{
+                            backgroundColor: '#6d28d9',
+                            paddingVertical: 10,
+                            borderRadius: 10,
+                            alignItems: 'center'
+                          }}
+                        >
+                          <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>
+                            📷 Launch QR Check-in Terminal for this Event
+                          </Text>
+                        </TouchableOpacity>
                       </View>
                     )}
                   </View>
+                </ScrollView>
 
-                  <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 8 }}>
-                    {selectedEvent.title}
-                  </Text>
-                  <Text style={{ fontSize: 13, color: colors.neutral[600], lineHeight: 18, marginBottom: 12 }}>
-                    {selectedEvent.description}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: colors.neutral[700], marginBottom: 4 }}>
-                    📍 {selectedEvent.location}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: colors.neutral[700], marginBottom: 12 }}>
-                    👥 Capacity: {selectedEvent.capacity} engineers ({selectedEvent.registrations_count || 1} confirmed)
-                  </Text>
-
-                  {isCompleted && (
-                    <View style={{ backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, padding: 10, marginBottom: 14 }}>
-                      <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#1e293b' }}>
-                        🏁 Event Concluded
-                      </Text>
-                      <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
-                        This workshop has already taken place. Registrations are closed.
+                {/* STICKY BOTTOM ACTION BAR */}
+                <View
+                  style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    backgroundColor: '#ffffff',
+                    paddingHorizontal: 20,
+                    paddingVertical: 14,
+                    borderTopWidth: 1,
+                    borderTopColor: colors.neutral[200],
+                    flexDirection: 'row',
+                    gap: 10,
+                    alignItems: 'center'
+                  }}
+                >
+                  {isCompleted ? (
+                    <View
+                      style={{
+                        flex: 1,
+                        backgroundColor: colors.neutral[100],
+                        paddingVertical: 14,
+                        borderRadius: 12,
+                        alignItems: 'center',
+                        borderWidth: 1,
+                        borderColor: colors.neutral[200]
+                      }}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[600] }}>
+                        🏁 Event Concluded · Registrations Closed
                       </Text>
                     </View>
-                  )}
-
-                  {/* Admin Lifecycle Toggle in Modal */}
-                  {isAdmin && (
-                    <TouchableOpacity
-                      onPress={async () => {
-                        const targetStatus = !selectedEvent.is_completed;
-                        try {
-                          await supabase
-                            .from('events')
-                            .update({ is_completed: targetStatus })
-                            .eq('id', selectedEvent.id);
-                          setSelectedEvent(prev => ({
-                            ...prev,
-                            is_completed: targetStatus,
-                            status: targetStatus ? 'completed' : 'upcoming'
-                          }));
-                          setEvents(prev => prev.map(e => e.id === selectedEvent.id ? {
-                            ...e,
-                            is_completed: targetStatus,
-                            status: targetStatus ? 'completed' : 'upcoming'
-                          } : e));
-                          Alert.alert('Status Updated', targetStatus ? 'Event marked as concluded.' : 'Event re-opened as upcoming.');
-                        } catch (err) {
-                          Alert.alert('Update Failed', err.message);
-                        }
-                      }}
-                      style={{
-                        backgroundColor: selectedEvent.is_completed ? '#334155' : '#10b981',
-                        paddingVertical: 10,
-                        borderRadius: 10,
-                        alignItems: 'center',
-                        marginBottom: 10
-                      }}
-                    >
-                      <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>
-                        {selectedEvent.is_completed ? '↺ Admin: Re-open as Upcoming' : '✓ Admin: Mark Event Concluded'}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <TouchableOpacity
-                      onPress={() => setSelectedEvent(null)}
-                      style={{ flex: 1, backgroundColor: colors.neutral[100], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
-                    >
-                      <Text style={{ color: colors.neutral[700], fontWeight: 'bold', fontSize: 13 }}>Close</Text>
-                    </TouchableOpacity>
-
-                    {!isCompleted && (
+                  ) : (
+                    <>
                       <TouchableOpacity
                         onPress={() => {
                           handleToggleEventRSVP(selectedEvent.id);
-                          setSelectedEvent(null);
                         }}
                         style={{
                           flex: 1,
-                          backgroundColor: registeredEventIds.includes(selectedEvent.id) ? colors.danger[500] : colors.primary[500],
-                          paddingVertical: 12,
-                          borderRadius: 10,
-                          alignItems: 'center'
+                          backgroundColor: isRSVPed ? colors.danger[500] : colors.primary[500],
+                          paddingVertical: 14,
+                          borderRadius: 12,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          shadowColor: isRSVPed ? colors.danger[500] : colors.primary[500],
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.25,
+                          shadowRadius: 4,
+                          elevation: 3
                         }}
                       >
-                        <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
-                          {registeredEventIds.includes(selectedEvent.id) ? 'Cancel RSVP' : 'Confirm RSVP'}
+                        <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 14 }}>
+                          {isRSVPed ? '✕ Cancel My RSVP' : '✓ Confirm 1-Tap RSVP'}
                         </Text>
                       </TouchableOpacity>
-                    )}
-                  </View>
-                </>
-              );
-            })()}
-          </View>
-        </View>
+
+                      {isRSVPed && (
+                        <TouchableOpacity
+                          onPress={() => {
+                            setSelectedEvent(null);
+                            setIsQrPassOpen(true);
+                          }}
+                          style={{
+                            backgroundColor: colors.primary[50],
+                            borderWidth: 1,
+                            borderColor: colors.primary[300],
+                            paddingVertical: 14,
+                            paddingHorizontal: 16,
+                            borderRadius: 12,
+                            alignItems: 'center'
+                          }}
+                        >
+                          <Text style={{ color: colors.primary[700], fontWeight: 'bold', fontSize: 13 }}>
+                            View Pass 🪪
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </>
+                  )}
+                </View>
+              </View>
+            );
+          })()}
+        </SafeAreaView>
       </Modal>
 
       {/* RESOURCE PREVIEW OUTLINE MODAL */}

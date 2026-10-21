@@ -6,6 +6,7 @@ import { useEvents } from '@atc/shared/hooks/useEvents';
 import { getEventById, getEventRegistrations, toggleEventCompletion } from '@atc/shared/api/events';
 import { generateEventQRToken, getEventCheckinRoster, awardPoints } from '@atc/shared/api/gamification';
 import { formatDateTime, formatDate } from '@atc/shared/utils/formatters';
+import { isPortalSubdomain } from '@atc/shared/utils/domains';
 import {
   Calendar,
   Clock,
@@ -46,24 +47,43 @@ export function EventDetailPage() {
   const [copiedLink, setCopiedLink] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
     async function loadData() {
       try {
         setLoading(true);
-        const [eventData, regsData, checkinData] = await Promise.all([
-          getEventById(id),
-          getEventRegistrations(id),
-          getEventCheckinRoster(id)
+        setError(null);
+
+        // Fetch event data with resilient fallback
+        const eventData = await getEventById(id);
+        const [regsData, checkinData] = await Promise.all([
+          getEventRegistrations(id).catch(() => []),
+          getEventCheckinRoster(id).catch(() => [])
         ]);
-        setEvent(eventData);
-        setRegistrations(regsData);
-        setCheckins(checkinData);
+
+        if (!isMounted) return;
+
+        if (!eventData) {
+          setError('Event not found');
+        } else {
+          setEvent(eventData);
+          setRegistrations(regsData || []);
+          setCheckins(checkinData || []);
+        }
       } catch (err) {
-        setError(err.message || 'Failed to load event details');
+        if (isMounted) {
+          console.error('[ATC EventDetail] loadData error:', err);
+          setError(err.message || 'Failed to load event details');
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
     loadData();
+    return () => {
+      isMounted = false;
+    };
   }, [id]);
 
   const handleToggleCompletion = async () => {
@@ -133,7 +153,10 @@ export function EventDetailPage() {
         <p className="text-sm text-neutral-500 mt-1 mb-6">
           The event you are looking for may have been removed or rescheduled.
         </p>
-        <Link to="/events" className="btn-primary text-sm inline-flex items-center gap-2">
+        <Link
+          to={isPortalSubdomain() ? '/events' : '/portal/events'}
+          className="btn-primary text-sm inline-flex items-center gap-2"
+        >
           <ArrowLeft className="w-4 h-4" /> Back to Events
         </Link>
       </div>
@@ -194,7 +217,7 @@ export function EventDetailPage() {
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Back button */}
       <Link
-        to="/events"
+        to={isPortalSubdomain() ? '/events' : '/portal/events'}
         className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-500 hover:text-neutral-900 transition-colors mb-6"
       >
         <ArrowLeft className="w-4 h-4" /> Back to all events

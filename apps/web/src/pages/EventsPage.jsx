@@ -134,14 +134,17 @@ export function EventsPage() {
       {/* Filter and Search Bar */}
       <div className="voodoo-card p-4 mb-8 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
         {/* Category filters */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+        <div
+          className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
           {['all', 'technical', 'workshop', 'hackathon', 'social'].map((cat) => (
             <button
               key={cat}
               onClick={() => setCategoryFilter(cat)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize whitespace-nowrap transition-colors ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize whitespace-nowrap transition-colors shrink-0 ${
                 categoryFilter === cat
-                  ? 'bg-primary-500 text-white'
+                  ? 'bg-primary-500 text-white shadow-xs'
                   : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
               }`}
             >
@@ -151,11 +154,11 @@ export function EventsPage() {
         </div>
 
         {/* Right Search & Time toggles */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center bg-neutral-100 p-1 rounded-lg border border-neutral-200 text-xs">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="flex items-center justify-between bg-neutral-100 p-1 rounded-lg border border-neutral-200 text-xs w-full sm:w-auto">
             <button
               onClick={() => setTimeFilter('all')}
-              className={`px-3 py-1 rounded-md font-medium transition-colors ${
+              className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-md font-medium text-center transition-colors ${
                 timeFilter === 'all' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'
               }`}
             >
@@ -163,7 +166,7 @@ export function EventsPage() {
             </button>
             <button
               onClick={() => setTimeFilter('upcoming')}
-              className={`px-3 py-1 rounded-md font-medium transition-colors ${
+              className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-md font-medium text-center transition-colors ${
                 timeFilter === 'upcoming' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'
               }`}
             >
@@ -171,7 +174,7 @@ export function EventsPage() {
             </button>
             <button
               onClick={() => setTimeFilter('completed')}
-              className={`px-3 py-1 rounded-md font-medium transition-colors flex items-center gap-1 ${
+              className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-md font-medium text-center transition-colors flex items-center justify-center gap-1 ${
                 timeFilter === 'completed' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-900'
               }`}
             >
@@ -180,7 +183,7 @@ export function EventsPage() {
             </button>
           </div>
 
-          <div className="relative min-w-[220px]">
+          <div className="relative w-full sm:w-64">
             <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" />
             <input
               type="text"

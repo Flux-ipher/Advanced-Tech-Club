@@ -94,10 +94,10 @@ export function Navbar() {
                 ATC
               </div>
               <div className="flex flex-col justify-center">
-                <span className="text-base font-extrabold text-neutral-900 tracking-tight leading-none group-hover:text-primary-600 transition-colors">
+                <span className="text-sm sm:text-base font-extrabold text-neutral-900 tracking-tight leading-none group-hover:text-primary-600 transition-colors whitespace-nowrap">
                   Advanced Tech Club
                 </span>
-                <span className="text-[11px] font-semibold text-neutral-400 tracking-wide mt-1 leading-none">
+                <span className="text-[10px] sm:text-[11px] font-semibold text-neutral-400 tracking-wide mt-1 leading-none hidden sm:block">
                   {isPortalSection ? 'Club Portal' : 'Official Campus Platform'}
                 </span>
               </div>
@@ -234,38 +234,38 @@ export function Navbar() {
               </div>
             ) : (
               /* Logged Out: ONLY Log In and Sign Up buttons */
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 {isExternalPortal ? (
                   <a
                     href={loginUrl}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-neutral-200 text-xs font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 transition-colors"
+                    className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg border border-neutral-200 text-xs font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 transition-colors whitespace-nowrap"
                   >
-                    <LogIn className="w-3.5 h-3.5 text-neutral-500" />
+                    <LogIn className="w-3.5 h-3.5 text-neutral-500 hidden sm:inline" />
                     <span>Log In</span>
                   </a>
                 ) : (
                   <Link
                     to="/login"
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-neutral-200 text-xs font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 transition-colors"
+                    className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg border border-neutral-200 text-xs font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 transition-colors whitespace-nowrap"
                   >
-                    <LogIn className="w-3.5 h-3.5 text-neutral-500" />
+                    <LogIn className="w-3.5 h-3.5 text-neutral-500 hidden sm:inline" />
                     <span>Log In</span>
                   </Link>
                 )}
                 {isExternalPortal ? (
                   <a
                     href={registerUrl}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold shadow-xs transition-colors"
+                    className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold shadow-xs transition-colors whitespace-nowrap"
                   >
-                    <UserPlus className="w-3.5 h-3.5" />
+                    <UserPlus className="w-3.5 h-3.5 hidden sm:inline" />
                     <span>Sign Up</span>
                   </a>
                 ) : (
                   <Link
                     to="/login?mode=register"
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold shadow-xs transition-colors"
+                    className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold shadow-xs transition-colors whitespace-nowrap"
                   >
-                    <UserPlus className="w-3.5 h-3.5" />
+                    <UserPlus className="w-3.5 h-3.5 hidden sm:inline" />
                     <span>Sign Up</span>
                   </Link>
                 )}
