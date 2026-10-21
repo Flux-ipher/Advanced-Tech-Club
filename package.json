@@ -22,5 +22,8 @@
     "supabase"
   ],
   "author": "Ritesh Mishra",
-  "license": "MIT"
+  "license": "MIT",
+  "overrides": {
+    "react-native-svg": "14.1.0"
+  }
 }
