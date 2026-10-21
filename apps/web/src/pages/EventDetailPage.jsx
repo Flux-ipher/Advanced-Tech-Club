@@ -99,9 +99,28 @@ export function EventDetailPage() {
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-16 text-center">
-        <div className="animate-spin w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full mx-auto mb-3" />
-        <p className="text-sm text-neutral-500">Loading event information...</p>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-pulse space-y-6">
+        <div className="h-5 w-32 bg-neutral-200 rounded-lg" />
+        <div className="voodoo-card overflow-hidden rounded-3xl border border-neutral-200/80 bg-white shadow-sm">
+          <div className="h-72 sm:h-96 bg-neutral-200 w-full" />
+          <div className="p-6 sm:p-8 grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="md:col-span-2 space-y-4">
+              <div className="h-6 bg-neutral-200 rounded w-1/3" />
+              <div className="h-3.5 bg-neutral-200 rounded w-full" />
+              <div className="h-3.5 bg-neutral-200 rounded w-5/6" />
+              <div className="h-3.5 bg-neutral-200 rounded w-4/6" />
+              <div className="h-28 bg-neutral-100 rounded-2xl border border-neutral-200 mt-6" />
+            </div>
+            <div className="space-y-4">
+              <div className="h-64 bg-neutral-50 rounded-2xl border border-neutral-200 p-5 space-y-3">
+                <div className="h-4 bg-neutral-200 rounded w-24" />
+                <div className="h-3 bg-neutral-200 rounded w-full" />
+                <div className="h-3 bg-neutral-200 rounded w-3/4" />
+                <div className="h-10 bg-neutral-200 rounded-xl w-full mt-4" />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

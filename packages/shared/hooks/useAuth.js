@@ -69,6 +69,25 @@ export async function resolveRoleAndProfile(client, firebaseUser, existingProfil
   return resolved;
 }
 
+// Helper: Get fresh Firebase ID Token (auto-refreshes if within 5m of expiry)
+export async function getFreshToken(forceRefresh = false) {
+  if (isFirebaseConfigured && firebaseAuth?.currentUser) {
+    try {
+      return await firebaseAuth.currentUser.getIdToken(forceRefresh);
+    } catch (err) {
+      console.warn('[ATC Auth] Could not fetch fresh ID token:', err?.message);
+    }
+  }
+  return useAuthStore.getState().token || null;
+}
+
+// Helper: Run Supabase query with guaranteed fresh Firebase ID token
+export async function secureQuery(queryFn) {
+  const token = await getFreshToken(false);
+  const client = getSupabaseClient(token);
+  return queryFn(client);
+}
+
 // Global Auth State Listener
 // Auto-rehydrates session and profile from Firebase ID Token & Supabase
 export function useAuthListener() {
@@ -120,9 +139,33 @@ export function useAuthListener() {
       }
     });
 
+    // Web Session Hardening: Force refresh token when tab becomes visible
+    const handleVisibilityChange = async () => {
+      if (typeof document !== 'undefined' && !document.hidden && firebaseAuth?.currentUser) {
+        try {
+          const freshToken = await firebaseAuth.currentUser.getIdToken(true);
+          const currentStore = useAuthStore.getState();
+          currentStore.setUser({
+            firebaseUser: currentStore.firebaseUser || firebaseAuth.currentUser,
+            token: freshToken,
+            profile: currentStore.profile
+          });
+        } catch (e) {
+          console.warn('[ATC Auth] Visibility token refresh warning:', e?.message);
+        }
+      }
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+
     return () => {
       isMounted = false;
       unsubscribe();
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
     };
   }, []);
 }
@@ -392,7 +435,9 @@ export function useAuth() {
     signOut,
     switchDemoUser,
     updateUserProfile,
-    logout
+    logout,
+    getFreshToken,
+    secureQuery
   };
 }
 

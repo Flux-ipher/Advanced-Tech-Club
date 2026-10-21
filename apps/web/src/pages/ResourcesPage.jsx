@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '@atc/shared/hooks/useAuth';
 import { useResources } from '@atc/shared/hooks/useResources';
 import { ResourceCard } from '../components/ResourceCard';
+import { SkeletonResourceCard } from '../components/SkeletonCard';
 import { Modal } from '../components/Modal';
 import {
   FolderGit2,
@@ -245,9 +246,10 @@ export function ResourcesPage() {
 
       {/* Resources Grid */}
       {loading ? (
-        <div className="voodoo-card p-12 text-center text-neutral-400">
-          <div className="animate-spin w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full mx-auto mb-3" />
-          <p className="text-sm">Fetching club resources...</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <SkeletonResourceCard key={i} />
+          ))}
         </div>
       ) : filteredResources.length === 0 ? (
         <div className="voodoo-card p-16 text-center text-neutral-400">

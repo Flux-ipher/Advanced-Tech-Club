@@ -7,6 +7,7 @@ import { useMemberGamification } from '@atc/shared/hooks/useGamification';
 import { isPortalSubdomain } from '@atc/shared/utils/domains';
 import { RoleBadge } from '../components/RoleBadge';
 import { Modal } from '../components/Modal';
+import { SkeletonProfile } from '../components/SkeletonCard';
 import { ImageUploader } from '../components/ImageUploader';
 import { formatDateTime, formatDate } from '@atc/shared/utils/formatters';
 import {
@@ -82,6 +83,14 @@ export function ProfilePage() {
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
   };
+
+  if (!user) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <SkeletonProfile />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">

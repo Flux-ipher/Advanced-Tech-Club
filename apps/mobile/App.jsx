@@ -22,7 +22,8 @@ import {
   RefreshControl,
   KeyboardAvoidingView,
   TouchableWithoutFeedback,
-  Keyboard
+  Keyboard,
+  AppState
 } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import { BarCodeScanner } from 'expo-barcode-scanner';
@@ -322,6 +323,23 @@ export default function App() {
       isMounted = false;
     };
   }, []);
+
+  // Session Hardening: Re-sync data on mobile app foreground (Plan Sec 1.4)
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async (nextState) => {
+      if (nextState === 'active' && currentUser) {
+        try {
+          loadLivePlatformData();
+        } catch (e) {
+          console.warn('[ATC Mobile] Foreground resume sync warning:', e?.message);
+        }
+      }
+    });
+
+    return () => {
+      subscription?.remove?.();
+    };
+  }, [currentUser]);
 
   // =========================================================================
   // 2. CONTENT & PLATFORM DATA (NO MOCK MEMBERS)
@@ -818,6 +836,9 @@ export default function App() {
           text: 'Log Out',
           style: 'destructive',
           onPress: async () => {
+            try {
+              await GoogleSignin.signOut();
+            } catch (gErr) {}
             await saveMobileSession(null);
             setCurrentUser(null);
             setIsGuest(false);
@@ -4704,7 +4725,34 @@ export default function App() {
               </TouchableOpacity>
             </View>
 
-            {filteredAnnouncements.length === 0 ? (
+            {isSessionRestoring ? (
+              <View style={{ gap: 12 }}>
+                {[1, 2, 3].map((i) => (
+                  <View
+                    key={i}
+                    style={{
+                      backgroundColor: '#ffffff',
+                      borderRadius: 16,
+                      padding: 16,
+                      borderWidth: 1,
+                      borderColor: colors.neutral[200],
+                      gap: 10
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.neutral[200] }} />
+                      <View style={{ gap: 4, flex: 1 }}>
+                        <View style={{ width: '40%', height: 12, backgroundColor: colors.neutral[200], borderRadius: 4 }} />
+                        <View style={{ width: '25%', height: 10, backgroundColor: colors.neutral[100], borderRadius: 4 }} />
+                      </View>
+                    </View>
+                    <View style={{ width: '80%', height: 16, backgroundColor: colors.neutral[200], borderRadius: 4 }} />
+                    <View style={{ width: '100%', height: 12, backgroundColor: colors.neutral[100], borderRadius: 4 }} />
+                    <View style={{ width: '90%', height: 12, backgroundColor: colors.neutral[100], borderRadius: 4 }} />
+                  </View>
+                ))}
+              </View>
+            ) : filteredAnnouncements.length === 0 ? (
               <View style={{ padding: 32, alignItems: 'center' }}>
                 <Text style={{ fontSize: 24, marginBottom: 8 }}>📭</Text>
                 <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.neutral[700] }}>No announcements found</Text>
@@ -4861,7 +4909,29 @@ export default function App() {
               </TouchableOpacity>
             )}
 
-            {filteredEvents.length === 0 ? (
+            {isSessionRestoring ? (
+              <View style={{ gap: 14 }}>
+                {[1, 2].map((i) => (
+                  <View
+                    key={i}
+                    style={{
+                      backgroundColor: '#ffffff',
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: colors.neutral[200],
+                      overflow: 'hidden'
+                    }}
+                  >
+                    <View style={{ width: '100%', height: 120, backgroundColor: colors.neutral[200] }} />
+                    <View style={{ padding: 14, gap: 8 }}>
+                      <View style={{ width: 60, height: 14, backgroundColor: colors.neutral[200], borderRadius: 4 }} />
+                      <View style={{ width: '70%', height: 18, backgroundColor: colors.neutral[200], borderRadius: 4 }} />
+                      <View style={{ width: '95%', height: 12, backgroundColor: colors.neutral[100], borderRadius: 4 }} />
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : filteredEvents.length === 0 ? (
               <View
                 style={{
                   backgroundColor: '#ffffff',

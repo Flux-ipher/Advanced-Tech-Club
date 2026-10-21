@@ -5,6 +5,7 @@ import { useAnnouncements } from '@atc/shared/hooks/useAnnouncements';
 import { useEvents } from '@atc/shared/hooks/useEvents';
 import { useResources } from '@atc/shared/hooks/useResources';
 import { AnnouncementCard } from '../components/AnnouncementCard';
+import { SkeletonAnnouncementCard } from '../components/SkeletonCard';
 import { Modal } from '../components/Modal';
 import { ImageUploader } from '../components/ImageUploader';
 import {
@@ -198,9 +199,10 @@ export function HomePage() {
 
           {/* Announcements List */}
           {loading ? (
-            <div className="voodoo-card p-12 text-center text-neutral-400">
-              <div className="animate-spin w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full mx-auto mb-3" />
-              <p className="text-sm">Connecting to Supabase Realtime...</p>
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <SkeletonAnnouncementCard key={i} />
+              ))}
             </div>
           ) : filteredAnnouncements.length === 0 ? (
             <div className="voodoo-card p-12 text-center text-neutral-400">

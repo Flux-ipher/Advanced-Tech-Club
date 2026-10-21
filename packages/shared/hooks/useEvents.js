@@ -95,7 +95,11 @@ export function useEvents() {
 
   const handleRegister = async (eventId) => {
     if (!currentUser) throw new Error('Must be logged in to register');
-    await registerForEvent(eventId, currentUser.id);
+
+    // 1. Optimistic UI Update (Instant feedback per Doherty Threshold)
+    const prevRegs = [...userRegistrations];
+    const prevEvents = [...events];
+
     setUserRegistrations((prev) => [
       ...prev,
       { event_id: eventId, user_id: currentUser.id, registered_at: new Date().toISOString() }
@@ -105,11 +109,25 @@ export function useEvents() {
         e.id === eventId ? { ...e, registrations_count: (e.registrations_count || 0) + 1 } : e
       )
     );
+
+    try {
+      // 2. Network verification
+      await registerForEvent(eventId, currentUser.id);
+    } catch (err) {
+      // 3. Rollback on failure
+      setUserRegistrations(prevRegs);
+      setEvents(prevEvents);
+      throw err;
+    }
   };
 
   const handleUnregister = async (eventId) => {
     if (!currentUser) return;
-    await unregisterForEvent(eventId, currentUser.id);
+
+    // 1. Optimistic UI Update
+    const prevRegs = [...userRegistrations];
+    const prevEvents = [...events];
+
     setUserRegistrations((prev) => prev.filter((r) => r.event_id !== eventId));
     setEvents((prev) =>
       prev.map((e) =>
@@ -118,6 +136,14 @@ export function useEvents() {
           : e
       )
     );
+
+    try {
+      await unregisterForEvent(eventId, currentUser.id);
+    } catch (err) {
+      setUserRegistrations(prevRegs);
+      setEvents(prevEvents);
+      throw err;
+    }
   };
 
   const addEvent = async (payload) => {

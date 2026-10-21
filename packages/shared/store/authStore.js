@@ -18,20 +18,22 @@ function loadCachedSession() {
     return {
       user: profile,
       profile: profile,
-      token: parsed?.token || null
+      token: null // Never store or restore raw JWT ID token in localStorage per Plan
     };
   } catch (err) {
     return { user: null, profile: null, token: null };
   }
 }
 
-function saveCachedSession(profile, token) {
+function saveCachedSession(profile) {
   if (typeof window === 'undefined') return;
   try {
     if (profile) {
+      // Only cache profile metadata (id, name, avatar, role, verification_status)
+      // Never store raw JWT tokens in localStorage (Firebase SDK manages tokens securely internally)
       window.localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ user: profile, profile, token })
+        JSON.stringify({ user: profile, profile })
       );
     } else {
       window.localStorage.removeItem(STORAGE_KEY);

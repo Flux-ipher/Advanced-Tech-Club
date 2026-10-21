@@ -4,6 +4,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '@atc/shared/hooks/useAuth';
 import { useLeaderboard, useMemberGamification } from '@atc/shared/hooks/useGamification';
+import { SkeletonLeaderboardRow } from '../components/SkeletonCard';
 import { Trophy, Flame, Award, Sparkles, Shield, ChevronRight, CheckCircle2, Star, Users } from 'lucide-react';
 
 export function LeaderboardPage() {
@@ -135,7 +136,11 @@ export function LeaderboardPage() {
         </div>
 
         <div className="divide-y divide-neutral-100">
-          {rankings.map((member) => {
+          {loading ? (
+            [1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+              <SkeletonLeaderboardRow key={i} />
+            ))
+          ) : rankings.map((member) => {
             const isCurrentUser = user && member.user_id === user.id;
             return (
               <div
