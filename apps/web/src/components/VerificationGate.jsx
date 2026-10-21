@@ -6,7 +6,8 @@ import {
   Clock,
   ArrowLeft,
   LogOut,
-  Search
+  Search,
+  XCircle
 } from 'lucide-react';
 
 export function VerificationGate({ children }) {
@@ -34,7 +35,90 @@ export function VerificationGate({ children }) {
     return <>{children}</>;
   }
 
-  // 4. If logged in but student application is legitimately pending admin verification
+  // 4. If logged in but student application was declined / rejected by Admin
+  if (user?.verification_status === 'rejected') {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 font-voodoo">
+        <div className="max-w-xl w-full voodoo-card p-8 sm:p-10 space-y-6 text-center border-danger-200 bg-white shadow-md">
+          {/* Red X Circle Icon */}
+          <div className="w-16 h-16 bg-danger-50 text-danger-700 rounded-2xl flex items-center justify-center mx-auto border border-danger-200">
+            <XCircle className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-danger-100 text-danger-800 border border-danger-200">
+              <span>🚫 Application Declined</span>
+            </div>
+
+            <h2 className="text-2xl font-bold text-neutral-900 tracking-tight">
+              Membership Application Declined
+            </h2>
+
+            <p className="text-sm text-neutral-600 leading-relaxed max-w-md mx-auto">
+              Your student membership application was declined by Club Admin <strong>Ritesh Mishra</strong>. If you made an error in your Student ID, department, or details, you can update and re-submit your application below.
+            </p>
+          </div>
+
+          {/* Student Details Card */}
+          <div className="p-4 rounded-xl bg-danger-50/50 border border-danger-200 text-left text-xs space-y-2 max-w-md mx-auto">
+            <div className="flex justify-between items-center pb-2 border-b border-danger-100">
+              <span className="text-neutral-500 font-medium">Applicant:</span>
+              <span className="font-bold text-neutral-900">{user?.full_name || 'Registered Applicant'}</span>
+            </div>
+            <div className="flex justify-between items-center pb-2 border-b border-danger-100">
+              <span className="text-neutral-500 font-medium">Student ID:</span>
+              <span className="font-mono font-bold text-neutral-800">{user?.student_id || 'Not specified'}</span>
+            </div>
+            <div className="flex justify-between items-center pb-2 border-b border-danger-100">
+              <span className="text-neutral-500 font-medium">Department:</span>
+              <span className="text-neutral-700">{user?.department || 'Engineering'}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-neutral-500 font-medium">Status:</span>
+              <span className="font-bold text-danger-700">Declined by Club Admin</span>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Link
+              to="/apply"
+              className="w-full sm:w-auto btn-primary text-xs py-2.5 px-6 flex items-center justify-center gap-1.5 font-bold shadow-sm"
+            >
+              📝 Update & Re-Submit Application
+            </Link>
+
+            <Link
+              to="/verification-status"
+              className="w-full sm:w-auto btn-outline text-xs py-2.5 px-5 flex items-center justify-center gap-1.5 font-semibold text-neutral-700 hover:text-neutral-900"
+            >
+              <Search className="w-4 h-4" /> Check Status
+            </Link>
+
+            <a
+              href={getPublicSiteUrl('/')}
+              className="w-full sm:w-auto btn-secondary text-xs py-2.5 px-4 flex items-center justify-center gap-1.5 font-semibold text-neutral-600 hover:text-neutral-800"
+            >
+              <ArrowLeft className="w-4 h-4" /> Public Site
+            </a>
+          </div>
+
+          <div className="pt-2 border-t border-neutral-100">
+            <button
+              type="button"
+              onClick={() => signOut()}
+              className="inline-flex items-center gap-1.5 text-xs text-neutral-500 hover:text-danger-600 transition-colors"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Sign out / Switch account</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 5. If logged in but student application is legitimately pending admin verification
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 font-voodoo">
       <div className="max-w-xl w-full voodoo-card p-8 sm:p-10 space-y-6 text-center border-warning-200 bg-white shadow-md">

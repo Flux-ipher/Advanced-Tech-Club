@@ -530,8 +530,8 @@ export default function App() {
           });
 
           // Check if onboarding is needed
-          if (dbUser.onboarding_complete === false && !isGuest) {
-            setIsOnboardingOpen(true);
+          if (dbUser.onboarding_complete === false && !isGuest && dbUser.role === 'member') {
+            openApplyModal(dbUser);
           }
         }
 
@@ -679,11 +679,27 @@ export default function App() {
   // 4. AUTHENTICATION & SUPABASE DATABASE HANDLERS
   // =========================================================================
 
-  // Resolves user profile from Supabase with Auto-SuperAdmin & verified status
-  const resolveMobileUser = async (email, fullName = '', avatarUrl = '') => {
+  // Helper to open the unified student application & onboarding modal with pre-filled user details
+  const openApplyModal = (user = currentUser) => {
+    if (user) {
+      setApplyFullName(user.full_name || '');
+      setApplyEmail(user.email || '');
+      setApplyStudentId(user.student_id || user.roll_number || '');
+      setApplyDept(user.department || user.branch || 'Computer Science & Engineering');
+      setApplyYear(user.year || '2nd Year');
+      if (Array.isArray(user.interests) && user.interests.length > 0) {
+        setApplyInterests(user.interests);
+      }
+      setApplyGithub(user.github_url || '');
+      setOnboardWhyJoin(user.why_join || '');
+    }
+    setIsApplyModalOpen(true);
+  };
+
+  // Resolves user profile from Supabase with verified status and role checking
+  const resolveMobileUser = async (email, fullName = '', avatarUrl = '', studentId = '') => {
     const cleanEmail = email.trim().toLowerCase();
     let existingProfile = null;
-    let isFirstUser = false;
 
     try {
       const { data: profile } = await supabase
@@ -692,24 +708,15 @@ export default function App() {
         .eq('email', cleanEmail)
         .maybeSingle();
       existingProfile = profile;
-
-      const { count } = await supabase
-        .from('profiles')
-        .select('id', { count: 'exact' })
-        .in('role', ['admin', 'super_admin']);
-
-      if (count === 0 || (count === 1 && existingProfile?.role === 'super_admin')) {
-        isFirstUser = true;
-      }
     } catch (sbErr) {
       console.warn('[ATC Mobile] Supabase check warning:', sbErr);
     }
 
     const isRitesh = cleanEmail.includes('ritesh') || cleanEmail.includes('fluxipher');
-    const shouldBeSuperAdmin = isRitesh || isFirstUser || existingProfile?.role === 'super_admin';
-    const resolvedRole = shouldBeSuperAdmin ? 'super_admin' : (existingProfile?.role || 'member');
-    const isVerified = shouldBeSuperAdmin ? true : (existingProfile?.is_verified ?? false);
-    const verificationStatus = shouldBeSuperAdmin ? 'verified' : (existingProfile?.verification_status || 'pending');
+    const isExistingAdmin = existingProfile?.role === 'super_admin' || existingProfile?.role === 'admin';
+    const resolvedRole = isRitesh ? 'super_admin' : (isExistingAdmin ? existingProfile.role : 'member');
+    const isVerified = isRitesh ? true : (existingProfile?.is_verified ?? false);
+    const verificationStatus = isRitesh ? 'verified' : (existingProfile?.verification_status || 'pending');
 
     const resolved = {
       id: existingProfile?.id || `usr-${Date.now()}`,
@@ -719,22 +726,18 @@ export default function App() {
       is_verified: isVerified,
       verification_status: verificationStatus,
       department: existingProfile?.department || existingProfile?.branch || 'Computer Science & Engineering',
-      student_id: existingProfile?.student_id || existingProfile?.roll_number || (isRitesh ? 'ADMIN-001' : ''),
-      roll_number: existingProfile?.roll_number || existingProfile?.student_id || (isRitesh ? 'ADMIN-001' : ''),
+      student_id: existingProfile?.student_id || existingProfile?.roll_number || studentId || (isRitesh ? 'ADMIN-001' : ''),
+      roll_number: existingProfile?.roll_number || existingProfile?.student_id || studentId || (isRitesh ? 'ADMIN-001' : ''),
       branch: existingProfile?.branch || existingProfile?.department || 'Computer Science & Engineering',
       year: existingProfile?.year || '2nd Year',
       why_join: existingProfile?.why_join || '',
-      onboarding_complete: existingProfile?.onboarding_complete ?? (isRitesh || !!existingProfile?.student_id),
+      onboarding_complete: existingProfile?.onboarding_complete ?? (isRitesh || !!existingProfile?.student_id || !!studentId),
       avatar_url: existingProfile?.avatar_url || avatarUrl || (isRitesh
         ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
         : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'),
-      interests: existingProfile?.interests || ['AI & Machine Learning', 'Mobile Development']
+      interests: existingProfile?.interests || ['AI & Machine Learning', 'Mobile Development'],
+      github_url: existingProfile?.github_url || ''
     };
-
-    // If member has not completed onboarding, trigger onboarding modal
-    if (resolved.onboarding_complete === false) {
-      setTimeout(() => setIsOnboardingOpen(true), 400);
-    }
 
     // Persist profile to Supabase database
     try {
@@ -760,6 +763,12 @@ export default function App() {
       await saveMobileSession(user);
       await persistGoogleAccount(user.email, user.full_name, user.avatar_url);
       triggerToast(`Welcome back, ${user.full_name}! 👋`);
+
+      if (user.role !== 'super_admin' && user.role !== 'admin') {
+        if (!user.student_id || user.onboarding_complete === false) {
+          openApplyModal(user);
+        }
+      }
     } catch (err) {
       Alert.alert('Login Error', err.message || 'Could not log in');
     } finally {
@@ -775,15 +784,15 @@ export default function App() {
 
     setAuthLoading(true);
     try {
-      const newUser = await resolveMobileUser(authEmail.trim(), authFullName.trim());
+      const newUser = await resolveMobileUser(authEmail.trim(), authFullName.trim(), '', onboardRoll.trim());
       setCurrentUser(newUser);
       setIsGuest(false);
       await saveMobileSession(newUser);
       await persistGoogleAccount(newUser.email, newUser.full_name, newUser.avatar_url);
       triggerToast('Account Created! 🚀 Welcome to ATC.');
 
-      if (newUser.role !== 'super_admin' && newUser.role !== 'admin' && !newUser.student_id) {
-        setIsApplyModalOpen(true);
+      if (newUser.role !== 'super_admin' && newUser.role !== 'admin') {
+        openApplyModal(newUser);
       }
     } catch (err) {
       Alert.alert('Signup Error', err.message || 'Could not create account');
@@ -812,9 +821,11 @@ export default function App() {
       if (err.code === statusCodes?.IN_PROGRESS) {
         return;
       }
-      console.warn('[ATC Mobile] Native Google Sign-In notice:', err);
-      // Open Google Account Picker sheet modal so user can choose Admin, Member, or New Account
-      setIsGoogleModalOpen(true);
+      console.warn('[ATC Mobile] Google Sign-In notice:', err);
+      Alert.alert(
+        'Google Sign-In',
+        err.message || 'Unable to complete Google Sign-In on this device. Please use email login or try again.'
+      );
     } finally {
       setGoogleSubmitting(false);
     }
@@ -831,8 +842,10 @@ export default function App() {
       setIsGoogleModalOpen(false);
       triggerToast(`Signed in with Google as ${user.full_name} ✓`);
 
-      if (user.role !== 'super_admin' && user.role !== 'admin' && !user.student_id) {
-        setIsApplyModalOpen(true);
+      if (user.role !== 'super_admin' && user.role !== 'admin') {
+        if (!user.student_id || user.onboarding_complete === false) {
+          openApplyModal(user);
+        }
       }
     } catch (err) {
       Alert.alert('Google Sign-In Error', err.message || 'Failed to authenticate with Google');
@@ -989,244 +1002,8 @@ export default function App() {
     }
   };
 
-  // Google Sign-In Sheet Bottom Modal (1-Tap Saved Account Selection)
-  const renderGoogleModal = () => (
-    <Modal visible={isGoogleModalOpen} animationType="slide" transparent>
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' }}>
-        <View
-          style={{
-            backgroundColor: '#ffffff',
-            borderTopLeftRadius: 24,
-            borderTopRightRadius: 24,
-            padding: 24,
-            maxHeight: '85%'
-          }}
-        >
-          {/* Google Header */}
-          <View style={{ alignItems: 'center', marginBottom: 16 }}>
-            <View
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: 24,
-                backgroundColor: '#ffffff',
-                justifyContent: 'center',
-                alignItems: 'center',
-                borderWidth: 1,
-                borderColor: colors.neutral[200],
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.1,
-                shadowRadius: 4,
-                elevation: 3,
-                marginBottom: 10
-              }}
-            >
-              <Text style={{ fontSize: 22 }}>🌐</Text>
-            </View>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.neutral[900] }}>
-              Sign in with Google
-            </Text>
-            <Text style={{ fontSize: 12, color: colors.neutral[500], textAlign: 'center', marginTop: 4 }}>
-              Tap any saved account to sign in instantly without typing
-            </Text>
-          </View>
-
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
-            {/* 1-Tap Saved Google Accounts */}
-            <View style={{ gap: 8, marginBottom: 12 }}>
-              {savedGoogleAccounts.map((account) => {
-                const isAccAdmin = account.role === 'admin' || account.email.includes('fluxipher') || account.email.includes('ritesh');
-                const initials = account.name
-                  ? account.name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase()
-                  : account.email.substring(0, 2).toUpperCase();
-
-                return (
-                  <TouchableOpacity
-                    key={account.email}
-                    onPress={() =>
-                      handleSelectGoogleAccount(account.email, account.name, account.avatar)
-                    }
-                    disabled={googleSubmitting}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      padding: 13,
-                      borderRadius: 14,
-                      backgroundColor: colors.neutral[50],
-                      borderWidth: 1,
-                      borderColor: colors.neutral[200]
-                    }}
-                  >
-                    {account.avatar ? (
-                      <Image
-                        source={{ uri: account.avatar }}
-                        style={{ width: 42, height: 42, borderRadius: 21, marginRight: 12 }}
-                      />
-                    ) : (
-                      <View
-                        style={{
-                          width: 42,
-                          height: 42,
-                          borderRadius: 21,
-                          backgroundColor: isAccAdmin ? '#6d28d9' : colors.neutral[800],
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          marginRight: 12
-                        }}
-                      >
-                        <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 15 }}>
-                          {initials}
-                        </Text>
-                      </View>
-                    )}
-
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.neutral[900] }}>
-                          {account.name}
-                        </Text>
-                        <View
-                          style={{
-                            backgroundColor: isAccAdmin ? '#f5f3ff' : colors.primary[50],
-                            paddingHorizontal: 6,
-                            paddingVertical: 2,
-                            borderRadius: 6,
-                            borderWidth: 1,
-                            borderColor: isAccAdmin ? '#ddd6fe' : colors.primary[200]
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontSize: 10,
-                              fontWeight: 'bold',
-                              color: isAccAdmin ? '#6d28d9' : colors.primary[700]
-                            }}
-                          >
-                            {isAccAdmin ? 'Admin' : 'Member'}
-                          </Text>
-                        </View>
-                      </View>
-                      <Text style={{ fontSize: 12, color: colors.neutral[500], marginTop: 2 }}>
-                        {account.email}
-                      </Text>
-                    </View>
-
-                    <Text style={{ fontSize: 20, color: colors.neutral[400] }}>›</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* Divider */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 8 }}>
-              <View style={{ flex: 1, height: 1, backgroundColor: colors.neutral[200] }} />
-              <Text style={{ color: colors.neutral[400], fontSize: 10, marginHorizontal: 8, fontWeight: 'bold' }}>
-                OR USE ANOTHER ACCOUNT
-              </Text>
-              <View style={{ flex: 1, height: 1, backgroundColor: colors.neutral[200] }} />
-            </View>
-
-            {/* Custom Google Account Input Toggle */}
-            <TouchableOpacity
-              onPress={() => setShowNewGoogleInput(!showNewGoogleInput)}
-              style={{
-                paddingVertical: 10,
-                alignItems: 'center',
-                backgroundColor: showNewGoogleInput ? colors.neutral[100] : colors.primary[50],
-                borderRadius: 10,
-                borderWidth: 1,
-                borderColor: showNewGoogleInput ? colors.neutral[200] : colors.primary[200],
-                marginBottom: 10
-              }}
-            >
-              <Text style={{ color: colors.primary[700], fontWeight: 'bold', fontSize: 12 }}>
-                {showNewGoogleInput ? 'Hide Account Input' : '+ Sign in with a different Google account'}
-              </Text>
-            </TouchableOpacity>
-
-            {showNewGoogleInput && (
-              <View style={{ gap: 8, marginBottom: 12 }}>
-                <TextInput
-                  placeholder="Google Email (e.g. newstudent@gmail.com)"
-                  placeholderTextColor={colors.neutral[400]}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  value={customGoogleEmail}
-                  onChangeText={setCustomGoogleEmail}
-                  style={{
-                    backgroundColor: colors.neutral[50],
-                    borderWidth: 1,
-                    borderColor: colors.neutral[300],
-                    borderRadius: 10,
-                    paddingHorizontal: 12,
-                    paddingVertical: 10,
-                    fontSize: 13,
-                    color: colors.neutral[900]
-                  }}
-                />
-                <TextInput
-                  placeholder="Full Name (e.g. John Doe)"
-                  placeholderTextColor={colors.neutral[400]}
-                  value={customGoogleName}
-                  onChangeText={setCustomGoogleName}
-                  style={{
-                    backgroundColor: colors.neutral[50],
-                    borderWidth: 1,
-                    borderColor: colors.neutral[300],
-                    borderRadius: 10,
-                    paddingHorizontal: 12,
-                    paddingVertical: 10,
-                    fontSize: 13,
-                    color: colors.neutral[900]
-                  }}
-                />
-                <TouchableOpacity
-                  onPress={() => {
-                    if (!customGoogleEmail.trim()) {
-                      Alert.alert('Required', 'Please enter your Google email address.');
-                      return;
-                    }
-                    handleSelectGoogleAccount(customGoogleEmail.trim(), customGoogleName.trim());
-                  }}
-                  disabled={googleSubmitting}
-                  style={{
-                    backgroundColor: colors.primary[500],
-                    paddingVertical: 12,
-                    borderRadius: 10,
-                    alignItems: 'center',
-                    marginTop: 4
-                  }}
-                >
-                  {googleSubmitting ? (
-                    <ActivityIndicator color="#ffffff" size="small" />
-                  ) : (
-                    <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
-                      Continue with this Account
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            )}
-          </ScrollView>
-
-          {/* Cancel */}
-          <TouchableOpacity
-            onPress={() => setIsGoogleModalOpen(false)}
-            disabled={googleSubmitting}
-            style={{
-              paddingVertical: 12,
-              borderRadius: 10,
-              alignItems: 'center',
-              backgroundColor: colors.neutral[100]
-            }}
-          >
-            <Text style={{ color: colors.neutral[700], fontWeight: 'bold', fontSize: 13 }}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  );
+  // Google Sign-In Sheet Bottom Modal (Removed per UX requirements - direct auth used instead)
+  const renderGoogleModal = () => null;
 
   // =========================================================================
   // ADMIN QR EVENT ATTENDANCE SCANNER HANDLERS & MODAL
@@ -1954,181 +1731,8 @@ export default function App() {
   // ONBOARDING, MEMBER SCANNER, LEADERBOARD & BADGE CELEBRATION MODALS
   // =========================================================================
 
-  const renderOnboardingModal = () => (
-    <Modal visible={isOnboardingOpen} animationType="slide" transparent>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', padding: 20 }}
-      >
-        <View style={{ backgroundColor: '#ffffff', borderRadius: 24, padding: 22, maxHeight: '90%' }}>
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            <View style={{ alignItems: 'center', marginBottom: 14 }}>
-              <View
-                style={{
-                  width: 52,
-                  height: 52,
-                  borderRadius: 26,
-                  backgroundColor: colors.primary[50],
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  marginBottom: 8
-                }}
-              >
-                <Text style={{ fontSize: 26 }}>🚀</Text>
-              </View>
-              <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.neutral[900], textAlign: 'center' }}>
-                Complete Your ATC Member Profile
-              </Text>
-              <Text style={{ fontSize: 12, color: colors.neutral[500], textAlign: 'center', marginTop: 4 }}>
-                Join the official student developer community & earn +25 XP
-              </Text>
-            </View>
-
-            <View style={{ gap: 12 }}>
-              {/* Roll Number */}
-              <View>
-                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
-                  University Roll Number / Student ID *
-                </Text>
-                <TextInput
-                  placeholder="e.g. 23CS041 or CS2026-088"
-                  value={onboardRoll}
-                  onChangeText={setOnboardRoll}
-                  autoCapitalize="characters"
-                  style={{
-                    backgroundColor: colors.neutral[50],
-                    borderWidth: 1,
-                    borderColor: colors.neutral[300],
-                    borderRadius: 10,
-                    paddingHorizontal: 12,
-                    paddingVertical: 10,
-                    fontSize: 13,
-                    color: colors.neutral[900]
-                  }}
-                />
-              </View>
-
-              {/* Branch / Department Selection */}
-              <View>
-                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 6 }}>
-                  Branch / Department
-                </Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                  {[
-                    'Computer Science & Engineering',
-                    'Information Technology',
-                    'Electronics & Comm',
-                    'AI & Data Science',
-                    'Mechanical Eng',
-                    'Electrical Eng'
-                  ].map((b) => (
-                    <TouchableOpacity
-                      key={b}
-                      onPress={() => setOnboardBranch(b)}
-                      style={{
-                        paddingHorizontal: 9,
-                        paddingVertical: 6,
-                        borderRadius: 8,
-                        backgroundColor: onboardBranch === b ? colors.primary[500] : colors.neutral[100]
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 'bold',
-                          color: onboardBranch === b ? '#ffffff' : colors.neutral[700]
-                        }}
-                      >
-                        {b}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* Year of Study */}
-              <View>
-                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 6 }}>
-                  Year of Study
-                </Text>
-                <View style={{ flexDirection: 'row', gap: 6 }}>
-                  {['1st Year', '2nd Year', '3rd Year', '4th Year', 'Postgrad'].map((y) => (
-                    <TouchableOpacity
-                      key={y}
-                      onPress={() => setOnboardYear(y)}
-                      style={{
-                        flex: 1,
-                        paddingVertical: 8,
-                        borderRadius: 8,
-                        backgroundColor: onboardYear === y ? colors.primary[500] : colors.neutral[100],
-                        alignItems: 'center'
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 'bold',
-                          color: onboardYear === y ? '#ffffff' : colors.neutral[700]
-                        }}
-                      >
-                        {y.split(' ')[0]}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* Why Did You Join ATC */}
-              <View>
-                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
-                  Why do you want to join ATC?
-                </Text>
-                <TextInput
-                  placeholder="e.g. Build production systems, participate in hackathons, and learn with peers..."
-                  value={onboardWhyJoin}
-                  onChangeText={setOnboardWhyJoin}
-                  multiline
-                  numberOfLines={3}
-                  style={{
-                    backgroundColor: colors.neutral[50],
-                    borderWidth: 1,
-                    borderColor: colors.neutral[300],
-                    borderRadius: 10,
-                    paddingHorizontal: 12,
-                    paddingVertical: 8,
-                    fontSize: 13,
-                    height: 70,
-                    textAlignVertical: 'top',
-                    color: colors.neutral[900]
-                  }}
-                />
-              </View>
-            </View>
-
-            <TouchableOpacity
-              onPress={handleCompleteOnboarding}
-              disabled={onboardSubmitting}
-              style={{
-                backgroundColor: colors.primary[500],
-                paddingVertical: 14,
-                borderRadius: 12,
-                alignItems: 'center',
-                marginTop: 20
-              }}
-            >
-              {onboardSubmitting ? (
-                <ActivityIndicator color="#ffffff" size="small" />
-              ) : (
-                <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 14 }}>
-                  Complete Profile & Claim 25 XP 🚀
-                </Text>
-              )}
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
-  );
+  // Onboarding Modal (Merged into unified renderApplyModal to eliminate dual-modal conflict)
+  const renderOnboardingModal = () => null;
 
 
   const renderLeaderboardModal = () => (
@@ -2335,6 +1939,30 @@ export default function App() {
   const handleToggleEventRSVP = (eventId) => {
     if (!requireAuth('RSVP for workshops')) return;
 
+    if (currentUser?.verification_status === 'rejected') {
+      Alert.alert(
+        'Application Declined',
+        'Your student application was declined by Club Admin (Ritesh Mishra). Please update your credentials and re-submit your application to RSVP for campus workshops.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Update Application', onPress: () => openApplyModal(currentUser) }
+        ]
+      );
+      return;
+    }
+
+    if (!currentUser?.is_verified) {
+      Alert.alert(
+        'Verification Required',
+        'Workshop RSVP is restricted to verified club members. Your application is currently under review by Club Admin (Ritesh Mishra).',
+        [
+          { text: 'OK', style: 'default' },
+          { text: 'Check Status', onPress: () => setIsStatusModalOpen(true) }
+        ]
+      );
+      return;
+    }
+
     if (registeredEventIds.includes(eventId)) {
       setRegisteredEventIds((prev) => prev.filter((id) => id !== eventId));
       setEvents((prev) =>
@@ -2387,6 +2015,30 @@ export default function App() {
   const handleDownloadResource = (resource) => {
     if (!requireAuth('download vault resources')) return;
 
+    if (currentUser?.verification_status === 'rejected') {
+      Alert.alert(
+        'Application Declined',
+        'Vault resource downloads are restricted to active club members. Your application is currently declined. Tap to update your application.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Update Application', onPress: () => openApplyModal(currentUser) }
+        ]
+      );
+      return;
+    }
+
+    if (!currentUser?.is_verified) {
+      Alert.alert(
+        'Verification Required',
+        'Vault resource downloads unlock once your student membership is verified by Club Admin (Ritesh Mishra).',
+        [
+          { text: 'OK', style: 'default' },
+          { text: 'Check Status', onPress: () => setIsStatusModalOpen(true) }
+        ]
+      );
+      return;
+    }
+
     setDownloadProgress(20);
     const t1 = setTimeout(() => setDownloadProgress(65), 300);
     const t2 = setTimeout(() => setDownloadProgress(100), 700);
@@ -2397,10 +2049,11 @@ export default function App() {
   };
 
   // Submit Student Application
+  // Submit Student Application & Complete Onboarding
   const handleSubmitApplication = async () => {
-    const sId = applyStudentId.trim().toUpperCase();
+    const sId = (applyStudentId || onboardRoll || '').trim().toUpperCase();
     if (!sId) {
-      Alert.alert('Required', 'Please enter your Student ID (e.g. CS2026-088).');
+      Alert.alert('Required', 'Please enter your University Roll Number / Student ID (e.g. 23CS041 or CS2026-088).');
       return;
     }
 
@@ -2412,32 +2065,38 @@ export default function App() {
       return;
     }
 
+    const isReapply = currentUser?.verification_status === 'rejected';
+
     const baseUser = currentUser || {
       id: `usr-${Date.now()}`,
       email: targetEmail,
       full_name: targetName,
       role: 'member',
-      avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80',
-      branch: applyDept,
-      year: applyYear,
-      why_join: 'Campus engineering collaboration and workshops'
+      avatar_url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'
     };
 
     const updatedUser = {
       ...baseUser,
+      full_name: targetName,
+      email: targetEmail,
       student_id: sId,
       roll_number: sId,
       department: applyDept,
+      branch: applyDept,
       interests: applyInterests,
       verification_status: 'pending',
       is_verified: false,
-      year: applyYear
+      year: applyYear,
+      why_join: (onboardWhyJoin || '').trim(),
+      github_url: (applyGithub || '').trim(),
+      onboarding_complete: true
     };
 
     setCurrentUser(updatedUser);
     setIsGuest(false);
     await saveMobileSession(updatedUser);
     await persistGoogleAccount(updatedUser.email, updatedUser.full_name, updatedUser.avatar_url);
+
     const applicationPayload = {
       id: updatedUser.id,
       email: updatedUser.email,
@@ -2445,6 +2104,7 @@ export default function App() {
       student_id: sId,
       roll_number: sId,
       department: applyDept,
+      branch: applyDept,
       interests: applyInterests,
       verification_status: 'pending',
       is_verified: false,
@@ -2453,8 +2113,11 @@ export default function App() {
       role: 'member',
       bio: `${applyYear} student · Interests: ${applyInterests.join(', ')}`,
       github_url: (applyGithub || '').trim(),
+      why_join: (onboardWhyJoin || '').trim(),
+      onboarding_complete: true,
       applied_at: new Date().toISOString()
     };
+
     try {
       const { error } = await supabase.from('profiles').upsert(applicationPayload, { onConflict: 'id' });
       if (error) {
@@ -2464,9 +2127,37 @@ export default function App() {
     } catch (saveErr) {
       console.warn('[ATC Mobile] Application persist warning:', saveErr);
     }
-    setPendingMembers((prev) => [updatedUser, ...prev]);
+
+    // Award +25 XP welcome points & unlock First Step badge
+    try {
+      await awardPoints(updatedUser.id, 25, 'Student Application & Onboarding Complete');
+      setMemberPoints((prev) => prev + 25);
+    } catch {}
+
+    const newBadge = {
+      badge_id: 'bdg-1',
+      name: 'First Step',
+      icon: '🚀',
+      description: 'Completed student onboarding & application on mobile'
+    };
+    setEarnedBadgesList((prev) => {
+      if (prev.some((b) => b.name === 'First Step')) return prev;
+      return [...prev, newBadge];
+    });
+
+    setPendingMembers((prev) => [updatedUser, ...prev.filter((m) => m.id !== updatedUser.id && m.email !== updatedUser.email)]);
     setIsApplyModalOpen(false);
-    triggerToast('Application Submitted! Reviewing by Club Admin (Ritesh Mishra) ⏳');
+
+    if (isReapply) {
+      triggerToast('Application Re-Submitted! Reviewing by Club Admin (Ritesh Mishra) ⏳');
+    } else {
+      setBadgeUnlockCelebration({
+        badge: newBadge,
+        pointsAwarded: 25,
+        title: 'Welcome to ATC!'
+      });
+      triggerToast('Application Submitted! +25 XP Earned & Reviewing by Admin ⏳');
+    }
   };
 
   // Application Status Checker
@@ -2513,6 +2204,18 @@ export default function App() {
 
   // Submit Student Contribution (GitHub PR / Project / Bug Bounty)
   const handleSubmitContribution = async () => {
+    if (currentUser?.verification_status === 'rejected') {
+      Alert.alert(
+        'Application Declined',
+        'Student contribution reports require an active club membership. Please update and re-submit your student application.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Update Application', onPress: () => openApplyModal(currentUser) }
+        ]
+      );
+      return;
+    }
+
     if (!contribTitle.trim()) {
       Alert.alert('Required', 'Please enter a title for your contribution or PR.');
       return;
@@ -2641,75 +2344,193 @@ export default function App() {
     }
   };
 
-  // STUDENT MEMBERSHIP APPLICATION MODAL
+  // UNIFIED STUDENT ONBOARDING & MEMBERSHIP APPLICATION MODAL
   const renderApplyModal = () => (
     <Modal visible={isApplyModalOpen} animationType="slide" transparent>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 20 }}
+        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 20 }}
       >
-        <View style={{ backgroundColor: '#ffffff', borderRadius: 20, padding: 20, maxHeight: '85%' }}>
+        <View style={{ backgroundColor: '#ffffff', borderRadius: 24, padding: 22, maxHeight: '88%' }}>
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            <Text style={{ fontSize: 17, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 4 }}>
-              Student Membership Application
-            </Text>
-            <Text style={{ fontSize: 11, color: colors.neutral[500], marginBottom: 16 }}>
-              Fill in your student credentials. Applications are verified by Club Admin (Ritesh Mishra).
-            </Text>
+            {/* Header */}
+            <View style={{ alignItems: 'center', marginBottom: 16 }}>
+              <View
+                style={{
+                  width: 50,
+                  height: 50,
+                  borderRadius: 25,
+                  backgroundColor: currentUser?.verification_status === 'rejected' ? '#fee2e2' : colors.primary[50],
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginBottom: 8
+                }}
+              >
+                <Text style={{ fontSize: 24 }}>
+                  {currentUser?.verification_status === 'rejected' ? '🚫' : '🚀'}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.neutral[900], textAlign: 'center' }}>
+                {currentUser?.verification_status === 'rejected'
+                  ? 'Update & Re-Submit Application'
+                  : 'Student Membership Application'}
+              </Text>
+              <Text style={{ fontSize: 12, color: colors.neutral[500], textAlign: 'center', marginTop: 4 }}>
+                {currentUser?.verification_status === 'rejected'
+                  ? 'Review your details and submit for re-evaluation by Club Admin (Ritesh Mishra).'
+                  : 'Join the campus developer community, earn +25 XP & unlock member features.'}
+              </Text>
+            </View>
+
+            {/* Declined Warning Banner if Previously Rejected */}
+            {currentUser?.verification_status === 'rejected' && (
+              <View
+                style={{
+                  backgroundColor: '#fef2f2',
+                  borderWidth: 1,
+                  borderColor: '#fecaca',
+                  borderRadius: 12,
+                  padding: 12,
+                  marginBottom: 14
+                }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#b91c1c', marginBottom: 2 }}>
+                  Application Previously Declined
+                </Text>
+                <Text style={{ fontSize: 11, color: '#dc2626', lineHeight: 16 }}>
+                  Your student application was not approved. Please ensure your Student Roll Number, branch, and details accurately reflect your university registration.
+                </Text>
+              </View>
+            )}
 
             <View style={{ gap: 12 }}>
-              {!currentUser && (
-                <>
-                  <View>
-                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>Full Name *</Text>
-                    <TextInput
-                      placeholder="e.g. Student Full Name"
-                      value={applyFullName}
-                      onChangeText={setApplyFullName}
-                      style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 8, padding: 10, fontSize: 13 }}
-                    />
-                  </View>
-                  <View>
-                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>University Email *</Text>
-                    <TextInput
-                      placeholder="name@university.edu"
-                      value={applyEmail}
-                      onChangeText={setApplyEmail}
-                      autoCapitalize="none"
-                      keyboardType="email-address"
-                      style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 8, padding: 10, fontSize: 13 }}
-                    />
-                  </View>
-                </>
-              )}
-
+              {/* Full Name */}
               <View>
-                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>Student ID *</Text>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                  Full Name *
+                </Text>
                 <TextInput
-                  placeholder="e.g. CS2026-088"
-                  value={applyStudentId}
-                  onChangeText={setApplyStudentId}
+                  placeholder="e.g. Student Full Name"
+                  value={applyFullName || currentUser?.full_name || ''}
+                  onChangeText={setApplyFullName}
+                  style={{
+                    backgroundColor: colors.neutral[50],
+                    borderWidth: 1,
+                    borderColor: colors.neutral[300],
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    fontSize: 13,
+                    color: colors.neutral[900]
+                  }}
+                />
+              </View>
+
+              {/* University Email */}
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                  University Email *
+                </Text>
+                <TextInput
+                  placeholder="name@university.edu"
+                  value={applyEmail || currentUser?.email || ''}
+                  onChangeText={setApplyEmail}
+                  editable={!currentUser}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  style={{
+                    backgroundColor: currentUser ? colors.neutral[100] : colors.neutral[50],
+                    borderWidth: 1,
+                    borderColor: colors.neutral[300],
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    fontSize: 13,
+                    color: currentUser ? colors.neutral[600] : colors.neutral[900]
+                  }}
+                />
+              </View>
+
+              {/* Roll Number / Student ID */}
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                  University Roll Number / Student ID *
+                </Text>
+                <TextInput
+                  placeholder="e.g. 23CS041 or CS2026-088"
+                  value={applyStudentId || onboardRoll || ''}
+                  onChangeText={(val) => {
+                    setApplyStudentId(val);
+                    setOnboardRoll(val);
+                  }}
                   autoCapitalize="characters"
-                  style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 8, padding: 10, fontSize: 13 }}
+                  style={{
+                    backgroundColor: colors.neutral[50],
+                    borderWidth: 1,
+                    borderColor: colors.neutral[300],
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    fontSize: 13,
+                    color: colors.neutral[900]
+                  }}
                 />
               </View>
 
+              {/* Branch / Department Selection */}
               <View>
-                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>Department</Text>
-                <TextInput
-                  value={applyDept}
-                  editable={false}
-                  style={{ backgroundColor: colors.neutral[100], borderWidth: 1, borderColor: colors.neutral[200], borderRadius: 8, padding: 10, fontSize: 13, color: colors.neutral[600] }}
-                />
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 6 }}>
+                  Branch / Department
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {[
+                    'Computer Science & Engineering',
+                    'Information Technology',
+                    'AI & Data Science',
+                    'Electronics & Comm',
+                    'Mechanical Eng',
+                    'Electrical Eng'
+                  ].map((b) => (
+                    <TouchableOpacity
+                      key={b}
+                      onPress={() => {
+                        setApplyDept(b);
+                        setOnboardBranch(b);
+                      }}
+                      style={{
+                        paddingHorizontal: 9,
+                        paddingVertical: 6,
+                        borderRadius: 8,
+                        backgroundColor: applyDept === b ? colors.primary[500] : colors.neutral[100]
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 'bold',
+                          color: applyDept === b ? '#ffffff' : colors.neutral[700]
+                        }}
+                      >
+                        {b}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
 
+              {/* Year of Study */}
               <View>
-                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>Year of Study</Text>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 6 }}>
+                  Year of Study
+                </Text>
                 <View style={{ flexDirection: 'row', gap: 6 }}>
-                  {['1st Year', '2nd Year', '3rd Year', '4th Year'].map((y) => (
+                  {['1st Year', '2nd Year', '3rd Year', '4th Year', 'Postgrad'].map((y) => (
                     <TouchableOpacity
                       key={y}
-                      onPress={() => setApplyYear(y)}
+                      onPress={() => {
+                        setApplyYear(y);
+                        setOnboardYear(y);
+                      }}
                       style={{
                         flex: 1,
                         paddingVertical: 8,
@@ -2718,7 +2539,13 @@ export default function App() {
                         alignItems: 'center'
                       }}
                     >
-                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: applyYear === y ? '#ffffff' : colors.neutral[700] }}>
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 'bold',
+                          color: applyYear === y ? '#ffffff' : colors.neutral[700]
+                        }}
+                      >
                         {y.split(' ')[0]}
                       </Text>
                     </TouchableOpacity>
@@ -2726,8 +2553,11 @@ export default function App() {
                 </View>
               </View>
 
+              {/* Technical Interests */}
               <View>
-                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>Technical Interests</Text>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 6 }}>
+                  Technical Interests
+                </Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                   {availableInterests.map((item) => {
                     const selected = applyInterests.includes(item);
@@ -2757,31 +2587,86 @@ export default function App() {
                 </View>
               </View>
 
+              {/* GitHub / Portfolio */}
               <View>
-                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>GitHub / Portfolio Profile</Text>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                  GitHub / Portfolio Profile (Optional)
+                </Text>
                 <TextInput
                   placeholder="https://github.com/username"
                   value={applyGithub}
                   onChangeText={setApplyGithub}
                   autoCapitalize="none"
-                  style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 8, padding: 10, fontSize: 13 }}
+                  style={{
+                    backgroundColor: colors.neutral[50],
+                    borderWidth: 1,
+                    borderColor: colors.neutral[300],
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    fontSize: 13,
+                    color: colors.neutral[900]
+                  }}
+                />
+              </View>
+
+              {/* Why Join ATC / Aspirations */}
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                  Why do you want to join ATC? (Optional)
+                </Text>
+                <TextInput
+                  placeholder="e.g. Build production systems, participate in hackathons, and learn with peers..."
+                  value={onboardWhyJoin}
+                  onChangeText={setOnboardWhyJoin}
+                  multiline
+                  numberOfLines={2}
+                  style={{
+                    backgroundColor: colors.neutral[50],
+                    borderWidth: 1,
+                    borderColor: colors.neutral[300],
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    fontSize: 13,
+                    height: 55,
+                    textAlignVertical: 'top',
+                    color: colors.neutral[900]
+                  }}
                 />
               </View>
             </View>
 
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 20 }}>
+            {/* Modal Actions */}
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 18 }}>
               <TouchableOpacity
                 onPress={() => setIsApplyModalOpen(false)}
-                style={{ flex: 1, backgroundColor: colors.neutral[100], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+                style={{
+                  flex: 1,
+                  backgroundColor: colors.neutral[100],
+                  paddingVertical: 13,
+                  borderRadius: 12,
+                  alignItems: 'center'
+                }}
               >
                 <Text style={{ color: colors.neutral[700], fontWeight: 'bold', fontSize: 13 }}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={handleSubmitApplication}
-                style={{ flex: 1, backgroundColor: colors.primary[500], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+                style={{
+                  flex: 2,
+                  backgroundColor: currentUser?.verification_status === 'rejected' ? '#dc2626' : colors.primary[500],
+                  paddingVertical: 13,
+                  borderRadius: 12,
+                  alignItems: 'center'
+                }}
               >
-                <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>Submit Application</Text>
+                <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
+                  {currentUser?.verification_status === 'rejected'
+                    ? 'Update & Re-Submit ↺'
+                    : 'Submit & Claim 25 XP 🚀'}
+                </Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -4442,7 +4327,55 @@ export default function App() {
       )}
 
       {/* QUICK STATUS BAR BANNER */}
-      {currentUser && !currentUser.is_verified && (
+      {currentUser && currentUser.verification_status === 'rejected' && (
+        <TouchableOpacity
+          onPress={() => openApplyModal(currentUser)}
+          style={{
+            backgroundColor: '#fef2f2',
+            paddingHorizontal: 16,
+            paddingVertical: 9,
+            borderBottomWidth: 1,
+            borderBottomColor: '#fecaca',
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
+            <Text style={{ fontSize: 13 }}>🚫</Text>
+            <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#b91c1c' }} numberOfLines={1}>
+              Application Declined by Club Admin (Ritesh Mishra)
+            </Text>
+          </View>
+          <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#991b1b' }}>Re-Apply ↺</Text>
+        </TouchableOpacity>
+      )}
+
+      {currentUser && !currentUser.is_verified && currentUser.verification_status !== 'rejected' && !currentUser.student_id && (
+        <TouchableOpacity
+          onPress={() => openApplyModal(currentUser)}
+          style={{
+            backgroundColor: colors.primary[50],
+            paddingHorizontal: 16,
+            paddingVertical: 9,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.primary[200],
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
+            <Text style={{ fontSize: 13 }}>📝</Text>
+            <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[800] }} numberOfLines={1}>
+              Complete Student Profile to Unlock Member Features
+            </Text>
+          </View>
+          <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[700] }}>Apply Now →</Text>
+        </TouchableOpacity>
+      )}
+
+      {currentUser && !currentUser.is_verified && currentUser.verification_status !== 'rejected' && !!currentUser.student_id && (
         <TouchableOpacity
           onPress={() => setIsStatusModalOpen(true)}
           style={{
@@ -5677,11 +5610,25 @@ export default function App() {
                             {getDisplayRole(currentUser.role)}
                           </Text>
                         </View>
-                        <View style={{ backgroundColor: currentUser.is_verified ? colors.success[50] : colors.warning[50], paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
-                          <Text style={{ fontSize: 10, fontWeight: 'bold', color: currentUser.is_verified ? colors.success[700] : colors.warning[700] }}>
-                            {currentUser.is_verified ? '✓ Verified' : '⏳ Pending'}
-                          </Text>
-                        </View>
+                        {currentUser.is_verified ? (
+                          <View style={{ backgroundColor: colors.success[50], paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: colors.success[200] }}>
+                            <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.success[700] }}>
+                              ✓ Verified
+                            </Text>
+                          </View>
+                        ) : currentUser.verification_status === 'rejected' ? (
+                          <View style={{ backgroundColor: '#fef2f2', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#fecaca' }}>
+                            <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#dc2626' }}>
+                              🚫 Declined
+                            </Text>
+                          </View>
+                        ) : (
+                          <View style={{ backgroundColor: colors.warning[50], paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: colors.warning[200] }}>
+                            <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.warning[700] }}>
+                              ⏳ Pending
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     </View>
                   </View>
@@ -5695,13 +5642,67 @@ export default function App() {
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      onPress={() => setIsApplyModalOpen(true)}
-                      style={{ flex: 1, backgroundColor: colors.primary[50], paddingVertical: 10, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: colors.primary[200] }}
+                      onPress={() => openApplyModal(currentUser)}
+                      style={{
+                        flex: 1,
+                        backgroundColor: currentUser.verification_status === 'rejected' ? '#fef2f2' : colors.primary[50],
+                        paddingVertical: 10,
+                        borderRadius: 10,
+                        alignItems: 'center',
+                        borderWidth: 1,
+                        borderColor: currentUser.verification_status === 'rejected' ? '#fecaca' : colors.primary[200]
+                      }}
                     >
-                      <Text style={{ color: colors.primary[700], fontWeight: 'bold', fontSize: 12 }}>📝 Edit Application</Text>
+                      <Text
+                        style={{
+                          color: currentUser.verification_status === 'rejected' ? '#dc2626' : colors.primary[700],
+                          fontWeight: 'bold',
+                          fontSize: 12
+                        }}
+                      >
+                        {currentUser.verification_status === 'rejected' ? '📝 Re-Submit App' : '📝 Edit Application'}
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 </View>
+
+                {/* Application Declined Alert Card */}
+                {currentUser.verification_status === 'rejected' && (
+                  <View
+                    style={{
+                      backgroundColor: '#fef2f2',
+                      borderWidth: 1.5,
+                      borderColor: '#fca5a5',
+                      borderRadius: 16,
+                      padding: 16,
+                      gap: 8
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={{ fontSize: 18 }}>🚫</Text>
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#991b1b' }}>
+                        Student Application Declined
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 11, color: '#b91c1c', lineHeight: 17 }}>
+                      Your membership application was reviewed and declined by Club Admin (Ritesh Mishra). If your Student ID, roll number, or department information had an error, tap below to update and re-submit your application for immediate review.
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => openApplyModal(currentUser)}
+                      style={{
+                        backgroundColor: '#dc2626',
+                        paddingVertical: 10,
+                        borderRadius: 10,
+                        alignItems: 'center',
+                        marginTop: 4
+                      }}
+                    >
+                      <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>
+                        📝 Update & Re-Submit Application ↺
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
 
                 {/* Gamification Stats Strip */}
                 <View
@@ -5869,11 +5870,11 @@ export default function App() {
                     <Text style={{ fontSize: 10, color: colors.neutral[500], marginTop: 2 }}>Bookmarks</Text>
                   </View>
                   <View style={{ flex: 1, backgroundColor: '#ffffff', borderWidth: 1, borderColor: colors.neutral[200], borderRadius: 14, padding: 12, alignItems: 'center' }}>
-                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: currentUser.is_verified ? colors.success[700] : colors.warning[700] }}>
-                      {currentUser.is_verified ? '✓' : '⏳'}
+                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: currentUser.is_verified ? colors.success[700] : currentUser.verification_status === 'rejected' ? '#dc2626' : colors.warning[700] }}>
+                      {currentUser.is_verified ? '✓' : currentUser.verification_status === 'rejected' ? '🚫' : '⏳'}
                     </Text>
                     <Text style={{ fontSize: 10, color: colors.neutral[500], marginTop: 2 }}>
-                      {currentUser.is_verified ? 'Verified' : 'Pending'}
+                      {currentUser.is_verified ? 'Verified' : currentUser.verification_status === 'rejected' ? 'Declined' : 'Pending'}
                     </Text>
                   </View>
                 </View>
@@ -6110,11 +6111,19 @@ export default function App() {
                         {getDisplayRole(currentUser?.role)}
                       </Text>
                     </View>
-                    <View style={{ backgroundColor: currentUser?.is_verified ? colors.success[50] : colors.warning[50], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                      <Text style={{ fontSize: 9, fontWeight: 'bold', color: currentUser?.is_verified ? colors.success[700] : colors.warning[700] }}>
-                        {currentUser?.is_verified ? '✓ Verified' : '⏳ Review Pending'}
-                      </Text>
-                    </View>
+                    {currentUser?.is_verified ? (
+                      <View style={{ backgroundColor: colors.success[50], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                        <Text style={{ fontSize: 9, fontWeight: 'bold', color: colors.success[700] }}>✓ Verified</Text>
+                      </View>
+                    ) : currentUser?.verification_status === 'rejected' ? (
+                      <View style={{ backgroundColor: '#fef2f2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#fecaca' }}>
+                        <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#dc2626' }}>🚫 Declined</Text>
+                      </View>
+                    ) : (
+                      <View style={{ backgroundColor: colors.warning[50], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                        <Text style={{ fontSize: 9, fontWeight: 'bold', color: colors.warning[700] }}>⏳ Review Pending</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
               </View>
@@ -6146,6 +6155,27 @@ export default function App() {
                     </Text>
                   </View>
                 </View>
+              ) : currentUser?.verification_status === 'rejected' ? (
+                <View
+                  style={{
+                    width: '100%',
+                    backgroundColor: '#fef2f2',
+                    borderWidth: 1,
+                    borderColor: '#fecaca',
+                    borderRadius: 12,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    marginBottom: 12,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8
+                  }}
+                >
+                  <Text style={{ fontSize: 16 }}>🚫</Text>
+                  <Text style={{ fontSize: 10, color: '#b91c1c', flex: 1, lineHeight: 14 }}>
+                    Application Declined: This Digital Pass is inactive until your student application is verified by Club Admin.
+                  </Text>
+                </View>
               ) : (
                 <View
                   style={{
@@ -6174,7 +6204,7 @@ export default function App() {
                 style={{
                   backgroundColor: '#f8fafc',
                   borderWidth: 1.5,
-                  borderColor: colors.primary[200],
+                  borderColor: currentUser?.verification_status === 'rejected' ? '#fca5a5' : colors.primary[200],
                   borderRadius: 16,
                   padding: 12,
                   alignItems: 'center',
@@ -6183,7 +6213,8 @@ export default function App() {
                   shadowOpacity: 0.08,
                   shadowRadius: 4,
                   elevation: 2,
-                  marginBottom: 12
+                  marginBottom: 12,
+                  position: 'relative'
                 }}
               >
                 <Image
@@ -6192,9 +6223,29 @@ export default function App() {
                       'ATC-' + (currentUser?.student_id || currentUser?.id || 'MEMBER-2026')
                     )}`
                   }}
-                  style={{ width: 180, height: 180, borderRadius: 8, backgroundColor: '#ffffff' }}
+                  style={{
+                    width: 180,
+                    height: 180,
+                    borderRadius: 8,
+                    backgroundColor: '#ffffff',
+                    opacity: currentUser?.verification_status === 'rejected' ? 0.25 : 1
+                  }}
                   resizeMode="contain"
                 />
+                {currentUser?.verification_status === 'rejected' && (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: '42%',
+                      backgroundColor: '#dc2626',
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 8
+                    }}
+                  >
+                    <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 11 }}>PASS INACTIVE</Text>
+                  </View>
+                )}
               </View>
 
               {/* Pass Token Pill with 1-Tap Copy */}
@@ -6312,19 +6363,49 @@ export default function App() {
                   <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900] }}>
                     {statusSearchResult.full_name}
                   </Text>
-                  <Text
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 'bold',
-                      color: statusSearchResult.is_verified ? colors.success[700] : colors.warning[700],
-                      backgroundColor: statusSearchResult.is_verified ? colors.success[100] : colors.warning[100],
-                      paddingHorizontal: 6,
-                      paddingVertical: 2,
-                      borderRadius: 4
-                    }}
-                  >
-                    {statusSearchResult.is_verified ? '✓ Verified' : '⏳ Pending Review'}
-                  </Text>
+                  {statusSearchResult.is_verified ? (
+                    <Text
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 'bold',
+                        color: colors.success[700],
+                        backgroundColor: colors.success[100],
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                        borderRadius: 4
+                      }}
+                    >
+                      ✓ Verified
+                    </Text>
+                  ) : statusSearchResult.verification_status === 'rejected' ? (
+                    <Text
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 'bold',
+                        color: '#dc2626',
+                        backgroundColor: '#fee2e2',
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                        borderRadius: 4
+                      }}
+                    >
+                      🚫 Declined
+                    </Text>
+                  ) : (
+                    <Text
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 'bold',
+                        color: colors.warning[700],
+                        backgroundColor: colors.warning[100],
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                        borderRadius: 4
+                      }}
+                    >
+                      ⏳ Pending Review
+                    </Text>
+                  )}
                 </View>
                 <Text style={{ fontSize: 11, color: colors.neutral[500], marginTop: 4 }}>
                   Department: {statusSearchResult.department || 'Computer Science & Engineering'}
@@ -6332,6 +6413,29 @@ export default function App() {
                 <Text style={{ fontSize: 11, color: colors.neutral[400], marginTop: 2 }}>
                   Verified by: Club Admin (Ritesh Mishra)
                 </Text>
+                {statusSearchResult.verification_status === 'rejected' && (
+                  <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.neutral[200] }}>
+                    <Text style={{ fontSize: 11, color: '#b91c1c', marginBottom: 6 }}>
+                      Application was declined. Tap below to update details and re-submit for review.
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setIsStatusModalOpen(false);
+                        openApplyModal(statusSearchResult);
+                      }}
+                      style={{
+                        backgroundColor: '#dc2626',
+                        paddingVertical: 8,
+                        borderRadius: 8,
+                        alignItems: 'center'
+                      }}
+                    >
+                      <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 11 }}>
+                        📝 Re-Submit Application ↺
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             )}
 
