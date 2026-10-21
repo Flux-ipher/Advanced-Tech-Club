@@ -4,6 +4,7 @@ import QRCode from 'react-qr-code';
 import { useAuth } from '@atc/shared/hooks/useAuth';
 import { useEvents } from '@atc/shared/hooks/useEvents';
 import { useMemberGamification } from '@atc/shared/hooks/useGamification';
+import { useApkMetadata } from '@atc/shared/hooks/useApkMetadata';
 import { isPortalSubdomain } from '@atc/shared/utils/domains';
 import { RoleBadge } from '../components/RoleBadge';
 import { Modal } from '../components/Modal';
@@ -40,6 +41,7 @@ export function ProfilePage() {
   const { user, updateUserProfile, isSuperAdmin, isAdmin, signOut } = useAuth();
   const { events, userRegistrations, unregister } = useEvents();
   const { points, streak, rank, earnedBadges = [], allBadges = [], pointsLog = [] } = useMemberGamification(user?.id);
+  const apk = useApkMetadata();
   const navigate = useNavigate();
   const isPortal = isPortalSubdomain();
   const portalPrefix = isPortal ? '' : '/portal';
@@ -504,19 +506,19 @@ export function ProfilePage() {
             </div>
 
             <h4 className="text-base font-bold text-white mb-1.5">
-              Official Android Release (v1.4.0)
+              Official Android Release (v{apk.version})
             </h4>
             <p className="text-xs text-neutral-300 leading-relaxed mb-4">
               Access workshops offline, flash your digital QR pass at campus check-in, and receive real-time push alerts.
             </p>
 
             <a
-              href="/atc-release.apk"
-              download="atc-mobile-release.apk"
+              href={apk.downloadUrl}
+              download={apk.fileName}
               className="w-full btn-primary text-xs py-2.5 px-3 flex items-center justify-center gap-2 shadow-md font-bold hover:scale-[1.01] active:scale-[0.98] transition-transform"
             >
               <Download className="w-4 h-4" />
-              Download Android APK (64MB)
+              Download Android APK ({apk.sizeShort})
             </a>
             <div className="flex items-center justify-between text-[10px] text-neutral-400 mt-2.5 px-0.5">
               <span>Standalone Gradle Build</span>

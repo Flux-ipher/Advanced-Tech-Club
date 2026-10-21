@@ -4,6 +4,7 @@ import { useAuth } from '@atc/shared/hooks/useAuth';
 import { useAnnouncements } from '@atc/shared/hooks/useAnnouncements';
 import { useEvents } from '@atc/shared/hooks/useEvents';
 import { useResources } from '@atc/shared/hooks/useResources';
+import { useApkMetadata } from '@atc/shared/hooks/useApkMetadata';
 import { AnnouncementCard } from '../components/AnnouncementCard';
 import { SkeletonAnnouncementCard } from '../components/SkeletonCard';
 import { Modal } from '../components/Modal';
@@ -35,6 +36,7 @@ export function HomePage() {
   } = useAnnouncements();
   const { events, isUserRegistered, register, unregister } = useEvents();
   const { resources, downloadResource } = useResources();
+  const apk = useApkMetadata();
 
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -332,9 +334,9 @@ export function HomePage() {
             <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-primary-500/10 to-transparent pointer-events-none" />
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-bold uppercase tracking-wider text-primary-400 bg-primary-500/20 px-2 py-0.5 rounded border border-primary-500/30">
-                Standalone Release v1.2.0
+                Standalone Release v{apk.version}
               </span>
-              <span className="text-[11px] font-mono text-neutral-400">64 MB</span>
+              <span className="text-[11px] font-mono text-neutral-400">{apk.size}</span>
             </div>
             <h4 className="text-base font-bold text-white mb-1.5 flex items-center gap-2">
               Install ATC Android App
@@ -344,16 +346,16 @@ export function HomePage() {
             </p>
             <div className="space-y-2">
               <a
-                href="/atc-release.apk"
-                download="atc-mobile-release.apk"
+                href={apk.downloadUrl}
+                download={apk.fileName}
                 className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-3 rounded-xl bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold transition-all shadow-md shadow-primary-500/20 active:scale-[0.98]"
               >
-                Download Standalone APK (64MB)
+                Download Standalone APK ({apk.sizeShort})
               </a>
               <button
                 type="button"
                 onClick={() => {
-                  navigator.clipboard?.writeText(window.location.origin + '/atc-release.apk');
+                  navigator.clipboard?.writeText(window.location.origin + apk.downloadUrl);
                   alert('Direct APK download link copied to clipboard!');
                 }}
                 className="w-full py-1.5 text-[11px] text-neutral-400 hover:text-white transition-colors text-center"

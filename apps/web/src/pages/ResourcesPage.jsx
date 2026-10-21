@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '@atc/shared/hooks/useAuth';
 import { useResources } from '@atc/shared/hooks/useResources';
+import { useApkMetadata } from '@atc/shared/hooks/useApkMetadata';
 import { ResourceCard } from '../components/ResourceCard';
 import { SkeletonResourceCard } from '../components/SkeletonCard';
 import { Modal } from '../components/Modal';
@@ -33,6 +34,7 @@ export function ResourcesPage() {
     removeResource,
     downloadResource
   } = useResources();
+  const apk = useApkMetadata();
 
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -159,13 +161,13 @@ export function ResourcesPage() {
 
         <div className="flex items-center gap-3">
           <a
-            href="/atc-release.apk"
-            download="atc-release.apk"
+            href={apk.downloadUrl}
+            download={apk.fileName}
             className="btn-secondary text-xs shadow-sm flex items-center gap-1.5"
-            title="Download Mobile App Standalone APK"
+            title={`Download Mobile App Standalone APK (v${apk.version} • ${apk.sizeShort})`}
           >
             <Download className="w-3.5 h-3.5 text-primary-600" />
-            Download Mobile APK (64MB)
+            Download Mobile APK ({apk.sizeShort})
           </a>
 
           {isAdmin && (

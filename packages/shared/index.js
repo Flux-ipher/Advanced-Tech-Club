@@ -21,6 +21,7 @@ export * from './hooks/useResources.js';
 export * from './hooks/useNotifications.js';
 export * from './hooks/useMembers.js';
 export * from './hooks/useGamification.js';
+export * from './hooks/useApkMetadata.js';
 
 // Stores
 export * from './store/authStore.js';
@@ -34,4 +35,5 @@ export * from './utils/domains.js';
 export * from './utils/idempotency.js';
 export * from './utils/stateMachines.js';
 export * from './utils/rateLimiter.js';
+export * from './utils/appConfig.js';
 export * from './firebaseClient.js';

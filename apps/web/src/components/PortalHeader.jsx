@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@atc/shared/hooks/useAuth';
+import { useApkMetadata } from '@atc/shared/hooks/useApkMetadata';
 import { NotificationDropdown } from './NotificationDropdown';
 import { getPublicSiteUrl, isPortalSubdomain } from '@atc/shared/utils/domains';
 import {
@@ -15,6 +16,7 @@ import {
 
 export function PortalHeader({ collapsed, onToggleCollapse, onOpenMobile }) {
   const { user, signOut } = useAuth();
+  const apk = useApkMetadata();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -89,15 +91,15 @@ export function PortalHeader({ collapsed, onToggleCollapse, onOpenMobile }) {
 
         {/* Standalone Android APK Download */}
         <a
-          href="/atc-release.apk"
-          download="atc-mobile-release.apk"
+          href={apk.downloadUrl}
+          download={apk.fileName}
           className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-semibold shadow-sm transition-all group"
-          title="Download Standalone Android APK (v1.2.0 • 64MB)"
+          title={`Download Standalone Android APK (v${apk.version} • ${apk.sizeShort})`}
         >
           <Smartphone className="w-3.5 h-3.5 text-primary-400 group-hover:scale-110 transition-transform" />
           <span>Android APK</span>
           <span className="text-[9px] bg-primary-500/30 text-primary-300 font-bold px-1.5 py-0.2 rounded font-mono">
-            64MB
+            {apk.sizeShort}
           </span>
         </a>
 

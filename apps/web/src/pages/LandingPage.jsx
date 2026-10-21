@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@atc/shared/hooks/useAuth';
 import { useEvents } from '@atc/shared/hooks/useEvents';
+import { useApkMetadata } from '@atc/shared/hooks/useApkMetadata';
 import { initialEvents } from '@atc/shared/mockData';
 import { formatDateTime } from '@atc/shared/utils/formatters';
 import { getPortalSiteUrl } from '@atc/shared/utils/domains';
@@ -33,6 +34,7 @@ import {
 export function LandingPage() {
   const { user, isVerified, isSuperAdmin } = useAuth();
   const { events } = useEvents();
+  const apk = useApkMetadata();
   const publicEvents = (events && events.length > 0 ? events : initialEvents).slice(0, 3);
   const portalUrl = getPortalSiteUrl('/');
   const isExternalPortal = portalUrl.startsWith('http');
@@ -128,7 +130,7 @@ export function LandingPage() {
               </div>
               <div className="flex items-center gap-2 text-primary-300">
                 <CheckCircle2 className="w-3.5 h-3.5 text-success-400" />
-                <span>Standalone Android APK: READY (v1.2.0 · Gradle Release · 64MB)</span>
+                <span>Standalone Android APK: READY (v{apk.version} · Gradle Release · {apk.sizeShort})</span>
               </div>
               <div className="flex items-center gap-2 text-neutral-200">
                 <Zap className="w-3.5 h-3.5 text-warning-400" />
