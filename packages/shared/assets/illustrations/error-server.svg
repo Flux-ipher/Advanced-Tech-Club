@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%" fill="none">
+  <defs>
+    <linearGradient id="bgGradServer" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#eff6ff" />
+      <stop offset="100%" stop-color="#f8fafc" />
+    </linearGradient>
+    <linearGradient id="serverRackGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#334155" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <filter id="serverShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#1e293b" flood-opacity="0.1" />
+    </filter>
+  </defs>
+
+  <!-- Ambient Backdrop -->
+  <circle cx="200" cy="200" r="160" fill="url(#bgGradServer)" />
+  <circle cx="90" cy="110" r="22" fill="#dbeafe" opacity="0.6" />
+  <circle cx="310" cy="120" r="26" fill="#fef2f2" opacity="0.5" />
+
+  <!-- Ground Plane Shadow -->
+  <ellipse cx="200" cy="336" rx="140" ry="12" fill="#cbd5e1" opacity="0.45" />
+
+  <!-- Central Server Tower -->
+  <g transform="translate(130, 90)" filter="url(#serverShadow)">
+    <!-- Main Tower Cabinet -->
+    <rect x="0" y="0" width="140" height="220" rx="14" fill="url(#serverRackGrad)" />
+
+    <!-- Unit Slot 1 -->
+    <rect x="12" y="16" width="116" height="42" rx="8" fill="#1e293b" />
+    <circle cx="26" cy="37" r="4" fill="#38bdf8" />
+    <circle cx="38" cy="37" r="4" fill="#38bdf8" />
+    <circle cx="50" cy="37" r="4" fill="#10b981" />
+    <rect x="70" y="34" width="46" height="6" rx="3" fill="#475569" />
+
+    <!-- Unit Slot 2 (Warning Unit) -->
+    <rect x="12" y="68" width="116" height="42" rx="8" fill="#1e293b" />
+    <circle cx="26" cy="89" r="4" fill="#ef4444" />
+    <circle cx="38" cy="89" r="4" fill="#ef4444" />
+    <circle cx="50" cy="89" r="4" fill="#ef4444" />
+    <rect x="70" y="86" width="46" height="6" rx="3" fill="#ef4444" opacity="0.4" />
+
+    <!-- Unit Slot 3 -->
+    <rect x="12" y="120" width="116" height="42" rx="8" fill="#1e293b" />
+    <circle cx="26" cy="141" r="4" fill="#38bdf8" />
+    <circle cx="38" cy="141" r="4" fill="#cbd5e1" />
+    <circle cx="50" cy="141" r="4" fill="#cbd5e1" />
+    <rect x="70" y="138" width="46" height="6" rx="3" fill="#475569" />
+
+    <!-- Ventilation Grills -->
+    <rect x="20" y="180" width="100" height="4" rx="2" fill="#475569" />
+    <rect x="20" y="190" width="100" height="4" rx="2" fill="#475569" />
+    <rect x="20" y="200" width="100" height="4" rx="2" fill="#475569" />
+  </g>
+
+  <!-- Floating Warning Badge -->
+  <g transform="translate(230, 70)" filter="url(#serverShadow)">
+    <polygon points="40,10 74,68 6,68" fill="#ef4444" />
+    <polygon points="40,18 68,64 12,64" fill="#fee2e2" />
+    <!-- Exclamation mark in triangle -->
+    <rect x="38" y="28" width="5" height="20" rx="2.5" fill="#ef4444" />
+    <circle cx="40.5" cy="54" r="3" fill="#ef4444" />
+  </g>
+
+  <!-- Technical Cloud Icon on left -->
+  <g transform="translate(60, 160)">
+    <path d="M20 30 C10 30 2 38 2 48 C2 58 10 66 20 66 L60 66 C68 66 74 60 74 52 C74 45 69 39 62 38 C60 26 50 18 38 18 C30 18 23 23 20 30 Z" fill="#ffffff" filter="url(#serverShadow)" />
+    <line x1="26" y1="48" x2="50" y2="48" stroke="#3b82f6" stroke-width="4" stroke-linecap="round" />
+  </g>
+</svg>

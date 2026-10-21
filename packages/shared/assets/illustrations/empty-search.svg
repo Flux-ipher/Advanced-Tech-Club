@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%" fill="none">
+  <defs>
+    <linearGradient id="bgGradSearch" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#eff6ff" />
+      <stop offset="100%" stop-color="#f1f5f9" />
+    </linearGradient>
+    <linearGradient id="primaryGradSearch" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+    <filter id="searchShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#1e293b" flood-opacity="0.1" />
+    </filter>
+  </defs>
+
+  <!-- Ambient Backdrop -->
+  <circle cx="200" cy="200" r="160" fill="url(#bgGradSearch)" />
+  <circle cx="290" cy="110" r="22" fill="#dbeafe" opacity="0.6" />
+  <circle cx="100" cy="250" r="16" fill="#bfdbfe" opacity="0.5" />
+
+  <!-- Ground Plane Shadow -->
+  <ellipse cx="200" cy="330" rx="130" ry="12" fill="#cbd5e1" opacity="0.4" />
+
+  <!-- Giant Magnifying Glass Graphics -->
+  <g transform="translate(130, 90)" filter="url(#searchShadow)">
+    <!-- Lens Rim Outer -->
+    <circle cx="70" cy="70" r="64" fill="#3b82f6" />
+    <!-- Glass Lens Surface -->
+    <circle cx="70" cy="70" r="54" fill="#ffffff" />
+    <circle cx="70" cy="70" r="50" fill="#f8fafc" />
+    <!-- Reflection arc -->
+    <path d="M40 40 C60 26 84 26 100 40" stroke="#bfdbfe" stroke-width="6" stroke-linecap="round" fill="none" />
+
+    <!-- Magnifying Glass Handle -->
+    <g transform="rotate(45, 116, 116)">
+      <rect x="110" y="110" width="22" height="74" rx="10" fill="#1e293b" />
+      <rect x="114" y="118" width="14" height="24" rx="6" fill="#3b82f6" />
+    </g>
+
+    <!-- Empty Question Mark Inside Lens -->
+    <text x="70" y="86" font-family="system-ui, sans-serif" font-size="48" font-weight="bold" fill="#93c5fd" text-anchor="middle">?</text>
+  </g>
+
+  <!-- Friendly Student Character searching -->
+  <g transform="translate(80, 160)">
+    <!-- Legs -->
+    <rect x="24" y="112" width="10" height="58" rx="5" fill="#1e293b" />
+    <rect x="38" y="112" width="10" height="58" rx="5" fill="#334155" />
+    <ellipse cx="26" cy="170" rx="9" ry="5" fill="#0f172a" />
+    <ellipse cx="46" cy="170" rx="9" ry="5" fill="#0f172a" />
+
+    <!-- Torso / Jacket -->
+    <path d="M16 56 C16 46 54 46 54 56 L58 116 C58 118 12 118 12 116 Z" fill="url(#primaryGradSearch)" />
+
+    <!-- Arm reaching out to glass -->
+    <path d="M48 68 L76 78 L92 70" stroke="url(#primaryGradSearch)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+    <circle cx="94" cy="68" r="5" fill="#fde68a" />
+
+    <!-- Head & Hair -->
+    <ellipse cx="36" cy="34" rx="14" ry="16" fill="#fde68a" />
+    <path d="M22 28 C22 14 50 14 50 26 C46 24 38 24 30 26 C26 26 24 27 22 28 Z" fill="#0f172a" />
+  </g>
+
+  <!-- Question Marks / Sparkles Floating -->
+  <g transform="translate(290, 160)">
+    <circle cx="14" cy="14" r="14" fill="#ffffff" filter="url(#searchShadow)" />
+    <text x="14" y="20" font-family="system-ui, sans-serif" font-size="16" font-weight="bold" fill="#3b82f6" text-anchor="middle">?</text>
+  </g>
+  <path d="M310 240 L313 234 L319 231 L313 228 L310 222 L307 228 L301 231 L307 234 Z" fill="#fbbf24" />
+</svg>

@@ -31,9 +31,21 @@ export function Footer() {
             </span>
           </div>
 
-          <p className="text-xs text-neutral-400">
-            Built by <span className="font-medium text-neutral-700">Ritesh Mishra</span> & ATC Core Team
-          </p>
+          <div className="flex flex-col items-center md:items-end gap-1 text-xs text-neutral-400">
+            <p>
+              Built by <span className="font-medium text-neutral-700">Ritesh Mishra</span> & ATC Core Team
+            </p>
+            <p>
+              <a
+                href="https://storyset.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-primary-600 underline transition-colors"
+              >
+                Illustrations by Storyset
+              </a>
+            </p>
+          </div>
         </div>
       </div>
     </footer>

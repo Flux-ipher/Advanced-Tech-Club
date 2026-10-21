@@ -21,6 +21,7 @@ import { MembersAdminPage } from './pages/MembersAdminPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
 import { CheckinPage } from './pages/CheckinPage';
+import { NotFound } from './pages/NotFound';
 import { useAuthListener } from '@atc/shared/hooks/useAuth';
 import { isPortalSubdomain } from '@atc/shared/utils/domains';
 
@@ -198,8 +199,15 @@ export function App() {
         <Route path="/portal/leaderboard" element={<Navigate to="/leaderboard" replace />} />
         <Route path="/portal/checkin" element={<Navigate to="/checkin" replace />} />
 
-        {/* Fallback to Portal Home */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* 404 Fallback on Portal */}
+        <Route
+          path="*"
+          element={
+            <PortalLayout>
+              <NotFound />
+            </PortalLayout>
+          }
+        />
       </Routes>
     );
   }
@@ -321,8 +329,15 @@ export function App() {
         element={<PortalRoute component={AnalyticsPage} cleanSubpath="/analytics" />}
       />
 
-      {/* Fallback to Public Landing */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      {/* 404 Fallback on Public Main Domain */}
+      <Route
+        path="*"
+        element={
+          <PublicLayout>
+            <NotFound />
+          </PublicLayout>
+        }
+      />
     </Routes>
   );
 }

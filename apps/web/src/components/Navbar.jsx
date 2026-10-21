@@ -5,24 +5,15 @@ import { NotificationDropdown } from './NotificationDropdown';
 import { RoleBadge } from './RoleBadge';
 import { isPortalSubdomain, getPortalSiteUrl, getPublicSiteUrl } from '@atc/shared/utils/domains';
 import {
-  Sparkles,
-  Calendar,
-  FolderGit2,
-  User,
-  Shield,
-  BarChart3,
-  Menu,
+  ShieldStar,
+  ChartBar,
+  List,
   X,
-  ExternalLink,
-  CheckCircle2,
-  Clock,
   ArrowRight,
-  Globe,
-  LayoutGrid,
-  LogOut,
-  LogIn,
+  SignOut,
+  SignIn,
   UserPlus
-} from 'lucide-react';
+} from '@phosphor-icons/react';
 
 export function Navbar() {
   const { user, isAdmin, isSuperAdmin, isVerified, signOut, signInWithGoogle } = useAuth();
@@ -140,7 +131,7 @@ export function Navbar() {
                   {isAdmin && (
                     <NavLink to="/admin" end className={navLinkClass}>
                       <span className="flex items-center gap-1.5 text-warning-700">
-                        <Shield className="w-3.5 h-3.5" />
+                        <ShieldStar size={14} weight="fill" />
                         Admin
                       </span>
                     </NavLink>
@@ -148,7 +139,7 @@ export function Navbar() {
                   {isSuperAdmin && (
                     <NavLink to="/admin/members" className={navLinkClass}>
                       <span className="flex items-center gap-1.5 text-primary-600">
-                        <Shield className="w-3.5 h-3.5" />
+                        <ShieldStar size={14} weight="fill" />
                         Verifications
                       </span>
                     </NavLink>
@@ -174,20 +165,20 @@ export function Navbar() {
                       to="/"
                       className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary-500 text-white text-xs font-bold hover:bg-primary-600 transition-colors shadow-sm"
                     >
-                      Club Portal <ArrowRight className="w-3.5 h-3.5" />
+                      Club Portal <ArrowRight size={14} weight="bold" />
                     </Link>
                   ) : (
                     <a
                       href={getPortalSiteUrl('/')}
                       className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary-500 text-white text-xs font-bold hover:bg-primary-600 transition-colors shadow-sm"
                     >
-                      Club Portal <ArrowRight className="w-3.5 h-3.5" />
+                      Club Portal <ArrowRight size={14} weight="bold" />
                     </a>
                   )
                 ) : (
                   <a
                     href={getPublicSiteUrl('/')}
-                    className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-100 border border-neutral-200 text-neutral-700 text-xs font-semibold hover:bg-neutral-200 transition-colors"
+                    className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-neutral-100 border border-neutral-200 text-neutral-700 text-xs font-semibold hover:bg-neutral-200 transition-colors"
                   >
                     ← Public Site
                   </a>
@@ -228,7 +219,7 @@ export function Navbar() {
                   className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-neutral-200 text-neutral-600 hover:text-danger-600 hover:border-danger-200 hover:bg-danger-50 text-xs font-semibold transition-colors"
                   title="Sign Out / Log Out"
                 >
-                  <LogOut className="w-3.5 h-3.5" />
+                  <SignOut size={14} weight="regular" />
                   <span className="hidden xl:inline">Log Out</span>
                 </button>
               </div>
@@ -240,7 +231,7 @@ export function Navbar() {
                     href={loginUrl}
                     className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg border border-neutral-200 text-xs font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 transition-colors whitespace-nowrap"
                   >
-                    <LogIn className="w-3.5 h-3.5 text-neutral-500 hidden sm:inline" />
+                    <SignIn size={14} weight="regular" className="text-neutral-500 hidden sm:inline" />
                     <span>Log In</span>
                   </a>
                 ) : (
@@ -248,7 +239,7 @@ export function Navbar() {
                     to="/login"
                     className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg border border-neutral-200 text-xs font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 transition-colors whitespace-nowrap"
                   >
-                    <LogIn className="w-3.5 h-3.5 text-neutral-500 hidden sm:inline" />
+                    <SignIn size={14} weight="regular" className="text-neutral-500 hidden sm:inline" />
                     <span>Log In</span>
                   </Link>
                 )}
@@ -257,7 +248,7 @@ export function Navbar() {
                     href={registerUrl}
                     className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold shadow-xs transition-colors whitespace-nowrap"
                   >
-                    <UserPlus className="w-3.5 h-3.5 hidden sm:inline" />
+                    <UserPlus size={14} weight="fill" className="hidden sm:inline" />
                     <span>Sign Up</span>
                   </a>
                 ) : (
@@ -265,7 +256,7 @@ export function Navbar() {
                     to="/login?mode=register"
                     className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold shadow-xs transition-colors whitespace-nowrap"
                   >
-                    <UserPlus className="w-3.5 h-3.5 hidden sm:inline" />
+                    <UserPlus size={14} weight="fill" className="hidden sm:inline" />
                     <span>Sign Up</span>
                   </Link>
                 )}
@@ -278,7 +269,7 @@ export function Navbar() {
               className="md:hidden p-2 rounded-lg text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-colors"
               aria-label="Toggle menu"
             >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {mobileMenuOpen ? <X size={24} weight="bold" /> : <List size={24} weight="bold" />}
             </button>
           </div>
         </div>
@@ -335,17 +326,17 @@ export function Navbar() {
 
                   {isAdmin && (
                     <NavLink to="/admin" end onClick={() => setMobileMenuOpen(false)} className={mobileLinkClass}>
-                      <Shield className="w-4 h-4 text-warning-600" /> Admin Studio
+                      <ShieldStar size={16} weight="fill" className="text-warning-600" /> Admin Studio
                     </NavLink>
                   )}
                   {isSuperAdmin && (
                     <NavLink to="/admin/members" onClick={() => setMobileMenuOpen(false)} className={mobileLinkClass}>
-                      <Shield className="w-4 h-4 text-primary-600" /> Member Verifications
+                      <ShieldStar size={16} weight="fill" className="text-primary-600" /> Member Verifications
                     </NavLink>
                   )}
                   {isAdmin && (
                     <NavLink to="/analytics" onClick={() => setMobileMenuOpen(false)} className={mobileLinkClass}>
-                      <BarChart3 className="w-4 h-4 text-primary-500" /> Analytics
+                      <ChartBar size={16} weight="fill" className="text-primary-500" /> Analytics
                     </NavLink>
                   )}
 
@@ -386,7 +377,7 @@ export function Navbar() {
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-danger-50 text-danger-700 border border-danger-200 text-xs font-bold hover:bg-danger-100 transition-colors"
                 >
-                  <LogOut className="w-3.5 h-3.5" />
+                  <SignOut size={14} weight="regular" />
                   Log Out
                 </button>
               </div>

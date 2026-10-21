@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 200" width="100%" height="100%" fill="none">
+  <defs>
+    <linearGradient id="bgGradPoints" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#eff6ff" />
+      <stop offset="100%" stop-color="#f8fafc" />
+    </linearGradient>
+    <linearGradient id="trophyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+    <linearGradient id="podiumGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+    <filter id="pointsShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#1e293b" flood-opacity="0.12" />
+    </filter>
+  </defs>
+
+  <!-- Ambient Backdrop -->
+  <circle cx="120" cy="100" r="78" fill="url(#bgGradPoints)" />
+  <circle cx="196" cy="54" r="14" fill="#fef3c7" opacity="0.6" />
+  <ellipse cx="120" cy="178" rx="84" ry="7" fill="#cbd5e1" opacity="0.4" />
+
+  <!-- Leaderboard Podium Pedestal -->
+  <g transform="translate(62, 114)" filter="url(#pointsShadow)">
+    <!-- 2nd Place Step (Left) -->
+    <rect x="0" y="24" width="36" height="38" rx="6" fill="#64748b" />
+    <text x="18" y="46" font-family="sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">2</text>
+
+    <!-- 1st Place Step (Center) -->
+    <rect x="36" y="8" width="44" height="54" rx="6" fill="url(#podiumGrad)" />
+    <text x="58" y="34" font-family="sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
+    <circle cx="58" cy="46" r="3" fill="#fbbf24" />
+
+    <!-- 3rd Place Step (Right) -->
+    <rect x="80" y="32" width="36" height="30" rx="6" fill="#94a3b8" />
+    <text x="98" y="52" font-family="sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="middle">3</text>
+  </g>
+
+  <!-- Golden Trophy Cup above Center Podium -->
+  <g transform="translate(98, 48)" filter="url(#pointsShadow)">
+    <!-- Cup Body -->
+    <path d="M6 6 L38 6 C38 24 32 34 22 36 C12 34 6 24 6 6 Z" fill="url(#trophyGrad)" stroke="#d97706" stroke-width="1.5" />
+    <!-- Handles -->
+    <path d="M6 10 C-3 10 -3 22 6 24" stroke="#d97706" stroke-width="2.5" fill="none" stroke-linecap="round" />
+    <path d="M38 10 C47 10 47 22 38 24" stroke="#d97706" stroke-width="2.5" fill="none" stroke-linecap="round" />
+    <!-- Cup Stem & Base -->
+    <rect x="19" y="36" width="6" height="10" fill="#d97706" />
+    <rect x="12" y="46" width="20" height="6" rx="2" fill="#1e293b" />
+    <!-- Star on Trophy -->
+    <path d="M22 14 L24 19 L29 19 L25 22 L27 27 L22 24 L17 27 L19 22 L15 19 L20 19 Z" fill="#ffffff" />
+  </g>
+
+  <!-- Celebrating Student (Left) -->
+  <g transform="translate(24, 72)">
+    <!-- Head & Hair -->
+    <circle cx="20" cy="18" r="9" fill="#fcd34d" />
+    <path d="M12 16 C12 10 16 8 26 8 C29 8 30 11 29 15 C26 14 24 14 20 16 Z" fill="#1e293b" />
+    <!-- Raised Arms (Cheering) -->
+    <path d="M14 34 L6 20 L10 18 L18 30 Z" fill="#2563eb" />
+    <circle cx="6" cy="18" r="3.5" fill="#fcd34d" />
+    <path d="M26 34 L36 22 L39 25 L28 36 Z" fill="#2563eb" />
+    <circle cx="38" cy="22" r="3.5" fill="#fcd34d" />
+    <!-- Torso -->
+    <path d="M12 34 C12 28 16 28 20 28 C24 28 28 28 28 34 L30 68 L10 68 Z" fill="#2563eb" />
+    <!-- Legs -->
+    <rect x="13" y="68" width="6" height="28" rx="2" fill="#1e293b" />
+    <rect x="21" y="68" width="6" height="28" rx="2" fill="#1e293b" />
+  </g>
+
+  <!-- Level Up XP / Badge Pill (Right) -->
+  <g transform="translate(170, 72)" filter="url(#pointsShadow)">
+    <rect x="0" y="0" width="56" height="26" rx="13" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5" />
+    <circle cx="13" cy="13" r="8" fill="#10b981" />
+    <!-- Lightning bolt inside circle -->
+    <path d="M13 7 L10 13 L13 13 L12 19 L16 12 L13 12 Z" fill="#ffffff" />
+    <text x="26" y="17" font-family="sans-serif" font-size="11" font-weight="bold" fill="#0f172a">+50 XP</text>
+  </g>
+
+  <!-- Floating Achievement Stars -->
+  <!-- Top Right Big Star -->
+  <path d="M182 32 L185 39 L192 40 L187 45 L188 52 L182 48 L176 52 L177 45 L172 40 L179 39 Z" fill="#fbbf24" />
+  <!-- Sparkles -->
+  <path d="M46 44 L48 39 L53 37 L48 35 L46 30 L44 35 L39 37 L44 39 Z" fill="#fbbf24" />
+  <circle cx="160" cy="144" r="3" fill="#3b82f6" />
+  <circle cx="82" cy="38" r="2.5" fill="#10b981" />
+</svg>

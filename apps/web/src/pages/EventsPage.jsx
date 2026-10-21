@@ -4,6 +4,9 @@ import { useEvents } from '@atc/shared/hooks/useEvents';
 import { EventCard } from '../components/EventCard';
 import { SkeletonEventCard } from '../components/SkeletonCard';
 import { Modal } from '../components/Modal';
+import { EmptyState } from '@atc/shared/components/EmptyState';
+import emptyEventsIllustration from '@atc/shared/assets/illustrations/empty-events.svg';
+import emptySearchIllustration from '@atc/shared/assets/illustrations/empty-search.svg';
 import {
   Calendar,
   Plus,
@@ -204,12 +207,24 @@ export function EventsPage() {
           ))}
         </div>
       ) : filteredEvents.length === 0 ? (
-        <div className="voodoo-card p-16 text-center text-neutral-400">
-          <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30 text-primary-500" />
-          <h3 className="text-lg font-bold text-neutral-700">No events matched</h3>
-          <p className="text-xs text-neutral-500 mt-1 max-w-sm mx-auto">
-            There are no events matching your selected filter. Check back soon for announcements on new workshops!
-          </p>
+        <div className="voodoo-card bg-white overflow-hidden p-6">
+          <EmptyState
+            illustration={searchQuery ? emptySearchIllustration : emptyEventsIllustration}
+            title={searchQuery ? 'No matching events found' : 'No upcoming events'}
+            subtitle={
+              searchQuery
+                ? `No events found matching "${searchQuery}". Try a different keyword or category.`
+                : 'Check back soon for new workshops, hackathons, and guest speaker sessions from the club.'
+            }
+            action={
+              isAdmin
+                ? {
+                    label: 'Create First Event',
+                    onClick: () => setIsCreateModalOpen(true)
+                  }
+                : null
+            }
+          />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

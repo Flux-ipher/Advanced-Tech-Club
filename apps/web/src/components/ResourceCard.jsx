@@ -1,5 +1,16 @@
 import React from 'react';
-import { Download, FileText, Code2, BookOpen, Map, Trash2, HardDrive, Star, Eye, ExternalLink } from 'lucide-react';
+import {
+  FilePdf,
+  FileDoc,
+  FilePpt,
+  FileCode,
+  FileText,
+  BookmarkSimple,
+  DownloadSimple,
+  Trash,
+  Eye,
+  HardDrive
+} from '@phosphor-icons/react';
 import { formatRelativeTime } from '@atc/shared/utils/formatters';
 
 export function ResourceCard({
@@ -26,16 +37,16 @@ export function ResourceCard({
   const getCategoryIcon = () => {
     switch (category) {
       case 'Code Samples':
-        return <Code2 className="w-5 h-5 text-primary-600" />;
+        return <FileCode size={20} weight="duotone" className="text-primary-600" />;
       case 'Cheat Sheets':
-        return <FileText className="w-5 h-5 text-warning-600" />;
+        return <FileText size={20} weight="duotone" className="text-warning-600" />;
       case 'Roadmaps':
-        return <Map className="w-5 h-5 text-success-600" />;
+        return <FileDoc size={20} weight="duotone" className="text-success-600" />;
       case 'Documentation':
-        return <BookOpen className="w-5 h-5 text-info-600" />;
+        return <FilePdf size={20} weight="duotone" className="text-info-600" />;
       case 'Slides':
       default:
-        return <FileText className="w-5 h-5 text-primary-500" />;
+        return <FilePpt size={20} weight="duotone" className="text-primary-500" />;
     }
   };
 
@@ -83,11 +94,11 @@ export function ResourceCard({
                 title={isBookmarked ? 'Remove bookmark' : 'Bookmark resource'}
                 className={`p-1.5 rounded-lg border transition-all ${
                   isBookmarked
-                    ? 'bg-warning-50 border-warning-300 text-warning-600'
-                    : 'bg-neutral-50 border-neutral-200 text-neutral-400 hover:text-warning-600 hover:bg-warning-50'
+                    ? 'bg-primary-50 border-primary-300 text-primary-600'
+                    : 'bg-neutral-50 border-neutral-200 text-neutral-400 hover:text-primary-600 hover:bg-primary-50'
                 }`}
               >
-                <Star className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-warning-500' : ''}`} />
+                <BookmarkSimple size={16} weight={isBookmarked ? 'fill' : 'regular'} className={isBookmarked ? 'text-primary-600' : ''} />
               </button>
             )}
 
@@ -101,7 +112,7 @@ export function ResourceCard({
                 title="Delete resource"
                 className="p-1.5 text-neutral-400 hover:text-danger-600 rounded-lg hover:bg-danger-50 transition-colors"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash size={15} weight="regular" />
               </button>
             )}
           </div>
@@ -118,7 +129,7 @@ export function ResourceCard({
       <div className="pt-3 border-t border-neutral-100 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-xs text-neutral-400">
           <span className="flex items-center gap-1 font-medium text-neutral-600">
-            <HardDrive className="w-3.5 h-3.5 text-neutral-400" />
+            <HardDrive size={14} weight="regular" className="text-neutral-400" />
             {file_size}
           </span>
           <span>•</span>
@@ -135,7 +146,7 @@ export function ResourceCard({
             className="p-1.5 text-neutral-500 hover:text-primary-600 rounded-lg hover:bg-primary-50 transition-colors"
             title="Preview resource"
           >
-            <Eye className="w-4 h-4" />
+            <Eye size={16} weight="regular" />
           </button>
 
           <button
@@ -146,7 +157,7 @@ export function ResourceCard({
             }}
             className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5 shadow-sm"
           >
-            <Download className="w-3.5 h-3.5" />
+            <DownloadSimple size={14} weight="bold" />
             Download
           </button>
         </div>

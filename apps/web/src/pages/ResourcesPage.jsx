@@ -5,6 +5,9 @@ import { useApkMetadata } from '@atc/shared/hooks/useApkMetadata';
 import { ResourceCard } from '../components/ResourceCard';
 import { SkeletonResourceCard } from '../components/SkeletonCard';
 import { Modal } from '../components/Modal';
+import { EmptyState } from '@atc/shared/components/EmptyState';
+import emptyResourcesIllustration from '@atc/shared/assets/illustrations/empty-resources.svg';
+import emptySearchIllustration from '@atc/shared/assets/illustrations/empty-search.svg';
 import {
   FolderGit2,
   Plus,
@@ -260,14 +263,26 @@ export function ResourcesPage() {
           ))}
         </div>
       ) : filteredResources.length === 0 ? (
-        <div className="voodoo-card p-16 text-center text-neutral-400">
-          <FolderGit2 className="w-12 h-12 mx-auto mb-3 opacity-30 text-warning-500" />
-          <h3 className="text-lg font-bold text-neutral-700">No resources found</h3>
-          <p className="text-xs text-neutral-500 mt-1 max-w-sm mx-auto">
-            {showSavedOnly
-              ? 'You have not bookmarked any resources yet. Click the star icon on any card to save it.'
-              : 'Try checking another category or clear your search query.'}
-          </p>
+        <div className="voodoo-card bg-white overflow-hidden p-6">
+          <EmptyState
+            illustration={searchQuery ? emptySearchIllustration : emptyResourcesIllustration}
+            title={showSavedOnly ? 'No saved resources' : searchQuery ? 'No matching resources' : 'Vault library is empty'}
+            subtitle={
+              showSavedOnly
+                ? 'You have not bookmarked any resources yet. Click the bookmark icon on any card to save it.'
+                : searchQuery
+                ? `No materials found matching "${searchQuery}". Try a different keyword.`
+                : 'Curated workshop slides, cheat sheets, code templates, and engineering guides will be published here.'
+            }
+            action={
+              isAdmin
+                ? {
+                    label: 'Upload Resource',
+                    onClick: () => setIsUploadModalOpen(true)
+                  }
+                : null
+            }
+          />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -5,24 +5,19 @@ import { useMembers } from '@atc/shared/hooks/useMembers';
 import { RoleBadge } from './RoleBadge';
 import { isPortalSubdomain, getPublicSiteUrl } from '@atc/shared/utils/domains';
 import {
-  Bell,
-  Calendar,
-  FolderGit2,
+  House,
+  CalendarBlank,
+  Folder,
   User,
-  Shield,
-  BarChart3,
-  ChevronLeft,
-  ChevronRight,
+  ShieldStar,
+  ChartBar,
+  CaretLeft,
+  CaretRight,
   Globe,
-  Radio,
   Clock,
-  Sparkles,
-  Smartphone,
-  LogOut,
-  Layers,
-  ChevronDown,
+  SignOut,
   Trophy
-} from 'lucide-react';
+} from '@phosphor-icons/react';
 
 export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile }) {
   const { user, isAdmin, signOut, logout } = useAuth();
@@ -99,7 +94,7 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
               className="hidden lg:flex p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
               title="Collapse sidebar"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <CaretLeft size={16} weight="bold" />
             </button>
           )}
         </div>
@@ -112,7 +107,7 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
               className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
               title="Expand sidebar"
             >
-              <ChevronRight className="w-4 h-4" />
+              <CaretRight size={16} weight="bold" />
             </button>
           </div>
         )}
@@ -134,8 +129,12 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
                 className={navItemClass}
                 title="Announcements"
               >
-                <Radio className="w-4 h-4 shrink-0" />
-                {!collapsed && <span>Announcements</span>}
+                {({ isActive }) => (
+                  <>
+                    <House size={18} weight={isActive ? 'fill' : 'regular'} className="shrink-0" />
+                    {!collapsed && <span>Announcements</span>}
+                  </>
+                )}
               </NavLink>
 
               <NavLink
@@ -144,8 +143,12 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
                 className={navItemClass}
                 title="Workshops & Events"
               >
-                <Calendar className="w-4 h-4 shrink-0" />
-                {!collapsed && <span>Workshops & Sprints</span>}
+                {({ isActive }) => (
+                  <>
+                    <CalendarBlank size={18} weight={isActive ? 'fill' : 'regular'} className="shrink-0" />
+                    {!collapsed && <span>Workshops & Sprints</span>}
+                  </>
+                )}
               </NavLink>
 
               <NavLink
@@ -154,8 +157,12 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
                 className={navItemClass}
                 title="Leaderboard & Badges"
               >
-                <Trophy className="w-4 h-4 shrink-0 text-amber-500" />
-                {!collapsed && <span>Leaderboard & Badges</span>}
+                {({ isActive }) => (
+                  <>
+                    <Trophy size={18} weight={isActive ? 'fill' : 'regular'} className="shrink-0 text-amber-500" />
+                    {!collapsed && <span>Leaderboard & Badges</span>}
+                  </>
+                )}
               </NavLink>
             </div>
           </div>
@@ -174,8 +181,12 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
                 className={navItemClass}
                 title="Vault Resources"
               >
-                <FolderGit2 className="w-4 h-4 shrink-0" />
-                {!collapsed && <span>Vault Library</span>}
+                {({ isActive }) => (
+                  <>
+                    <Folder size={18} weight={isActive ? 'fill' : 'regular'} className="shrink-0" />
+                    {!collapsed && <span>Vault Library</span>}
+                  </>
+                )}
               </NavLink>
 
               <NavLink
@@ -184,8 +195,12 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
                 className={navItemClass}
                 title="My Profile"
               >
-                <User className="w-4 h-4 shrink-0" />
-                {!collapsed && <span>My Profile</span>}
+                {({ isActive }) => (
+                  <>
+                    <User size={18} weight={isActive ? 'fill' : 'regular'} className="shrink-0" />
+                    {!collapsed && <span>My Profile</span>}
+                  </>
+                )}
               </NavLink>
             </div>
           </div>
@@ -209,8 +224,12 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
                   className={navItemClass}
                   title="Admin Studio"
                 >
-                  <Shield className="w-4 h-4 text-warning-600 shrink-0" />
-                  {!collapsed && <span>Admin Studio</span>}
+                  {({ isActive }) => (
+                    <>
+                      <ShieldStar size={18} weight={isActive ? 'fill' : 'regular'} className="text-warning-600 shrink-0" />
+                      {!collapsed && <span>Admin Studio</span>}
+                    </>
+                  )}
                 </NavLink>
 
                 <NavLink
@@ -219,16 +238,20 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
                   className={navItemClass}
                   title="Student Verifications"
                 >
-                  <Clock className="w-4 h-4 text-primary-500 shrink-0" />
-                  {!collapsed && (
-                    <span className="flex-1 flex items-center justify-between">
-                      <span>Verifications</span>
-                      {pendingCount > 0 && (
-                        <span className="px-1.5 py-0.2 text-[10px] font-bold bg-warning-500 text-white rounded-full">
-                          {pendingCount}
+                  {({ isActive }) => (
+                    <>
+                      <Clock size={18} weight={isActive ? 'fill' : 'regular'} className="text-primary-500 shrink-0" />
+                      {!collapsed && (
+                        <span className="flex-1 flex items-center justify-between">
+                          <span>Verifications</span>
+                          {pendingCount > 0 && (
+                            <span className="px-1.5 py-0.2 text-[10px] font-bold bg-warning-500 text-white rounded-full">
+                              {pendingCount}
+                            </span>
+                          )}
                         </span>
                       )}
-                    </span>
+                    </>
                   )}
                 </NavLink>
 
@@ -238,8 +261,12 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
                   className={navItemClass}
                   title="Growth Analytics"
                 >
-                  <BarChart3 className="w-4 h-4 text-primary-500 shrink-0" />
-                  {!collapsed && <span>Analytics</span>}
+                  {({ isActive }) => (
+                    <>
+                      <ChartBar size={18} weight={isActive ? 'fill' : 'regular'} className="text-primary-500 shrink-0" />
+                      {!collapsed && <span>Analytics</span>}
+                    </>
+                  )}
                 </NavLink>
               </div>
             </div>
@@ -257,7 +284,7 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
               }`}
               title="Return to Public Website (advclub.online)"
             >
-              <Globe className="w-4 h-4 text-neutral-500 shrink-0" />
+              <Globe size={18} weight="regular" className="text-neutral-500 shrink-0" />
               {!collapsed && <span>Exit to Public Site</span>}
             </a>
           ) : (
@@ -269,7 +296,7 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
               }`}
               title="Return to Public Website"
             >
-              <Globe className="w-4 h-4 text-neutral-500 shrink-0" />
+              <Globe size={18} weight="regular" className="text-neutral-500 shrink-0" />
               {!collapsed && <span>Exit to Public Site</span>}
             </Link>
           )}
@@ -302,7 +329,7 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
                 className="p-1.5 rounded-lg text-neutral-400 hover:text-danger-600 hover:bg-danger-50 transition-colors"
                 title="Log Out / Sign Out"
               >
-                <LogOut className="w-4 h-4" />
+                <SignOut size={18} weight="regular" />
               </button>
             )}
           </div>
@@ -314,7 +341,7 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
               className="w-full flex items-center justify-center p-2 rounded-xl text-neutral-500 hover:text-danger-600 hover:bg-danger-50 transition-colors"
               title="Log Out / Sign Out"
             >
-              <LogOut className="w-4 h-4" />
+              <SignOut size={18} weight="regular" />
             </button>
           )}
         </div>

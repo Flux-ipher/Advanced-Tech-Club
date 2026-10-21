@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%" fill="none">
+  <defs>
+    <linearGradient id="bgGradWelc" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#eff6ff" />
+      <stop offset="100%" stop-color="#f8fafc" />
+    </linearGradient>
+    <linearGradient id="blueWelc" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+    <linearGradient id="greenWelc" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+    <filter id="welcShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#1e293b" flood-opacity="0.1" />
+    </filter>
+  </defs>
+
+  <!-- Ambient Backdrop -->
+  <circle cx="200" cy="200" r="160" fill="url(#bgGradWelc)" />
+  <circle cx="80" cy="110" r="24" fill="#dbeafe" opacity="0.6" />
+  <circle cx="320" cy="110" r="20" fill="#fef08a" opacity="0.6" />
+
+  <!-- Ground Plane Shadow -->
+  <ellipse cx="200" cy="340" rx="150" ry="14" fill="#cbd5e1" opacity="0.45" />
+
+  <!-- Center Waving Student (Leader) -->
+  <g transform="translate(160, 120)">
+    <!-- Legs -->
+    <rect x="28" y="128" width="10" height="74" rx="5" fill="#1e293b" />
+    <rect x="44" y="128" width="10" height="74" rx="5" fill="#334155" />
+    <ellipse cx="30" cy="204" rx="9" ry="5" fill="#0f172a" />
+    <ellipse cx="52" cy="204" rx="9" ry="5" fill="#0f172a" />
+
+    <!-- Body / Blue Hoodie -->
+    <path d="M18 64 C18 52 64 52 64 64 L68 132 C68 134 14 134 14 132 Z" fill="url(#blueWelc)" />
+
+    <!-- Head & Hair -->
+    <ellipse cx="41" cy="36" rx="16" ry="18" fill="#fde68a" />
+    <path d="M25 32 C25 14 57 14 57 28 C53 24 45 24 41 26 C35 24 29 26 25 32 Z" fill="#0f172a" />
+
+    <!-- Left Arm Waving High (Warm Greeting) -->
+    <!-- Arm raising up -->
+    <path d="M18 70 L-2 44 L0 26" stroke="url(#blueWelc)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+    <!-- Waving Hand -->
+    <circle cx="2" cy="22" r="7" fill="#fde68a" />
+
+    <!-- Right Arm at side holding tablet/laptop -->
+    <path d="M64 70 L76 96 L68 108" stroke="url(#blueWelc)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+    <rect x="62" y="100" width="18" height="24" rx="3" fill="#1e293b" />
+    <circle cx="68" cy="112" r="5" fill="#fde68a" />
+  </g>
+
+  <!-- Left Student (Developer with laptop) -->
+  <g transform="translate(90, 150)">
+    <!-- Legs -->
+    <rect x="20" y="110" width="9" height="66" rx="4" fill="#334155" />
+    <rect x="34" y="110" width="9" height="66" rx="4" fill="#475569" />
+    <ellipse cx="22" cy="178" rx="8" ry="4" fill="#0f172a" />
+    <ellipse cx="40" cy="178" rx="8" ry="4" fill="#0f172a" />
+
+    <!-- Body / Emerald shirt -->
+    <path d="M12 56 C12 46 50 46 50 56 L54 114 C54 116 8 116 8 114 Z" fill="url(#greenWelc)" />
+
+    <!-- Head & Ponytail/Hair -->
+    <ellipse cx="31" cy="32" rx="14" ry="16" fill="#fcd34d" />
+    <path d="M17 28 C17 12 45 12 45 26 Z" fill="#854d0e" />
+    <path d="M16 28 C10 32 8 44 14 50" stroke="#854d0e" stroke-width="6" stroke-linecap="round" fill="none" />
+
+    <!-- Arms holding laptop -->
+    <path d="M12 66 L26 84 L38 84" stroke="url(#greenWelc)" stroke-width="7" stroke-linecap="round" />
+    <rect x="22" y="80" width="28" height="18" rx="2" fill="#0f172a" />
+    <rect x="24" y="82" width="24" height="12" rx="2" fill="#38bdf8" />
+  </g>
+
+  <!-- Right Student (Engineer with Badge) -->
+  <g transform="translate(250, 150)">
+    <!-- Legs -->
+    <rect x="20" y="110" width="9" height="66" rx="4" fill="#1e293b" />
+    <rect x="34" y="110" width="9" height="66" rx="4" fill="#334155" />
+    <ellipse cx="22" cy="178" rx="8" ry="4" fill="#0f172a" />
+    <ellipse cx="40" cy="178" rx="8" ry="4" fill="#0f172a" />
+
+    <!-- Body -->
+    <path d="M12 56 C12 46 50 46 50 56 L54 114 C54 116 8 116 8 114 Z" fill="#6366f1" />
+
+    <!-- Head & Short Curls -->
+    <ellipse cx="31" cy="32" rx="14" ry="16" fill="#fed7aa" />
+    <path d="M16 26 C16 12 46 12 46 24 Z" fill="#172554" />
+
+    <!-- Thumbs up arm -->
+    <path d="M50 66 L68 56 L64 46" stroke="#6366f1" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" />
+    <circle cx="64" cy="44" r="5" fill="#fed7aa" />
+  </g>
+
+  <!-- Decorative Welcome Confetti / Sparkles -->
+  <g transform="translate(190, 70)">
+    <path d="M0 6 L6 0 L12 6 L6 12 Z" fill="#fbbf24" />
+  </g>
+  <g transform="translate(280, 80)">
+    <circle cx="6" cy="6" r="4" fill="#38bdf8" />
+  </g>
+  <g transform="translate(110, 80)">
+    <circle cx="6" cy="6" r="4" fill="#10b981" />
+  </g>
+  <path d="M60 190 Q65 180 75 185" stroke="#f59e0b" stroke-width="3" stroke-linecap="round" fill="none" />
+</svg>

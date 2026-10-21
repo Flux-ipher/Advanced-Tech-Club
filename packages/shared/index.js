@@ -37,3 +37,6 @@ export * from './utils/stateMachines.js';
 export * from './utils/rateLimiter.js';
 export * from './utils/appConfig.js';
 export * from './firebaseClient.js';
+
+// Components
+export * from './components/EmptyState.jsx';

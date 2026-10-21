@@ -13,7 +13,8 @@
     "./api/*": "./api/*.js",
     "./hooks/*": "./hooks/*.js",
     "./store/*": "./store/*.js",
-    "./utils/*": "./utils/*.js"
+    "./utils/*": "./utils/*.js",
+    "./components/*": "./components/*"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.8",

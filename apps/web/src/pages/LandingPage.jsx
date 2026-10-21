@@ -6,6 +6,10 @@ import { useApkMetadata } from '@atc/shared/hooks/useApkMetadata';
 import { initialEvents } from '@atc/shared/mockData';
 import { formatDateTime } from '@atc/shared/utils/formatters';
 import { getPortalSiteUrl } from '@atc/shared/utils/domains';
+import heroIllustration from '@atc/shared/assets/illustrations/landing-hero.svg';
+import qrIllustration from '@atc/shared/assets/illustrations/feature-qr.svg';
+import eventsIllustration from '@atc/shared/assets/illustrations/feature-events.svg';
+import pointsIllustration from '@atc/shared/assets/illustrations/feature-points.svg';
 import {
   Sparkles,
   ArrowRight,
@@ -48,63 +52,80 @@ export function LandingPage() {
         <div className="absolute top-1/4 -right-24 w-96 h-96 bg-primary-300/10 blur-3xl pointer-events-none rounded-full" />
         <div className="absolute inset-0 bg-grid-pattern opacity-60 pointer-events-none" />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
-          {/* Top Status Capsule */}
-          <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full voodoo-glass border-primary-200/80 shadow-sm text-primary-700 text-xs font-semibold mb-8 animate-in fade-in duration-300">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary-500"></span>
-            </span>
-            <span>Official Student Innovation Platform</span>
-            <span className="text-neutral-300">·</span>
-            <span className="text-primary-800 font-bold">Spring 2026</span>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="flex flex-col lg:flex-row items-center gap-10 lg:gap-14 text-center lg:text-left">
+            {/* Copy — Left */}
+            <div className="flex-1 space-y-6">
+              {/* Top Status Capsule */}
+              <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full voodoo-glass border-primary-200/80 shadow-sm text-primary-700 text-xs font-semibold animate-in fade-in duration-300">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary-500"></span>
+                </span>
+                <span>Official Student Innovation Platform</span>
+                <span className="text-neutral-300">·</span>
+                <span className="text-primary-800 font-bold">Spring 2026</span>
+              </div>
+
+              {/* Headline with Rich Typography */}
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-neutral-900 tracking-tight leading-[1.15]">
+                Where Campus Engineers Build the{' '}
+                <span className="text-gradient-primary">Next Generation</span> of Tech.
+              </h1>
+
+              {/* Subtitle */}
+              <p className="text-base sm:text-lg text-neutral-600 max-w-xl leading-relaxed">
+                The premier university developer organization. Build production-grade software, compete in annual hackathons, and learn directly from top industry mentors.
+              </p>
+
+              {/* Main Action Trays */}
+              <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
+                <Link
+                  to="/apply"
+                  className="w-full sm:w-auto btn-primary px-8 py-3.5 text-sm font-bold shadow-md hover:shadow-lg flex items-center justify-center gap-2 group"
+                >
+                  Apply for Membership
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </Link>
+
+                {isExternalPortal ? (
+                  <a
+                    href={user ? portalUrl : getPortalSiteUrl('/login?mode=register')}
+                    className="w-full sm:w-auto btn-outline px-7 py-3.5 text-sm font-bold flex items-center justify-center gap-2 shadow-sm hover:border-neutral-300"
+                  >
+                    {user ? 'Open Club Portal' : 'Sign Up for Portal'}
+                    <ArrowUpRight className="w-4 h-4 text-neutral-400" />
+                  </a>
+                ) : (
+                  <Link
+                    to={user ? '/portal' : '/login?mode=register'}
+                    className="w-full sm:w-auto btn-outline px-7 py-3.5 text-sm font-bold flex items-center justify-center gap-2 shadow-sm hover:border-neutral-300"
+                  >
+                    {user ? 'Open Club Portal' : 'Sign Up for Portal'}
+                    <ArrowUpRight className="w-4 h-4 text-neutral-400" />
+                  </Link>
+                )}
+              </div>
+
+              {/* Security & Access Guard Note */}
+              <p className="text-xs text-neutral-500 pt-1 flex items-center justify-center lg:justify-start gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-warning-600" />
+                Portal access is role-gated & verified by Club Admin (Ritesh Mishra)
+              </p>
+            </div>
+
+            {/* Illustration — Right */}
+            <div className="flex-1 flex justify-center w-full max-w-md lg:max-w-lg">
+              <div className="relative w-full">
+                <div className="absolute inset-0 bg-primary-400/10 rounded-3xl blur-2xl transform rotate-1 scale-95" />
+                <img
+                  src={heroIllustration}
+                  alt="ATC Student Engineering Community"
+                  className="relative z-10 w-full h-auto max-h-[380px] object-contain drop-shadow-md"
+                />
+              </div>
+            </div>
           </div>
-
-          {/* Headline with Rich Typography */}
-          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold text-neutral-900 tracking-tight max-w-4xl mx-auto leading-[1.12] mb-6">
-            Where Campus Engineers Build the{' '}
-            <span className="text-gradient-primary">Next Generation</span> of Tech.
-          </h1>
-
-          {/* Subtitle */}
-          <p className="text-base sm:text-xl text-neutral-600 max-w-2xl mx-auto leading-relaxed mb-10">
-            The premier university developer organization. Build production-grade software, compete in annual hackathons, and learn directly from top industry mentors.
-          </p>
-
-          {/* Main Action Trays */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 max-w-md mx-auto">
-            <Link
-              to="/apply"
-              className="w-full sm:w-auto btn-primary px-8 py-3.5 text-sm font-bold shadow-md hover:shadow-lg flex items-center justify-center gap-2 group"
-            >
-              Apply for Membership
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </Link>
-
-            {isExternalPortal ? (
-              <a
-                href={user ? portalUrl : getPortalSiteUrl('/login?mode=register')}
-                className="w-full sm:w-auto btn-outline px-7 py-3.5 text-sm font-bold flex items-center justify-center gap-2 shadow-sm hover:border-neutral-300"
-              >
-                {user ? 'Open Club Portal' : 'Sign Up for Portal'}
-                <ArrowUpRight className="w-4 h-4 text-neutral-400" />
-              </a>
-            ) : (
-              <Link
-                to={user ? '/portal' : '/login?mode=register'}
-                className="w-full sm:w-auto btn-outline px-7 py-3.5 text-sm font-bold flex items-center justify-center gap-2 shadow-sm hover:border-neutral-300"
-              >
-                {user ? 'Open Club Portal' : 'Sign Up for Portal'}
-                <ArrowUpRight className="w-4 h-4 text-neutral-400" />
-              </Link>
-            )}
-          </div>
-
-          {/* Security & Access Guard Note */}
-          <p className="text-xs text-neutral-500 mt-5 flex items-center justify-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 text-warning-600" />
-            Portal access is role-gated & verified by Club Admin (Ritesh Mishra)
-          </p>
 
           {/* Interactive Live Telemetry / Terminal Widget */}
           <div className="mt-12 max-w-2xl mx-auto rounded-2xl bg-neutral-900 border border-neutral-800/90 shadow-2xl overflow-hidden text-left font-mono text-xs text-neutral-300">
@@ -176,6 +197,47 @@ export function LandingPage() {
               <p className="text-2xl sm:text-3xl font-extrabold text-success-600 tracking-tight">100%</p>
               <p className="text-xs font-semibold text-neutral-500 mt-1 uppercase tracking-wider">Student Driven</p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 1.5 CORE FEATURES (STORYSET ILLUSTRATIONS) */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center max-w-2xl mx-auto mb-12">
+          <span className="text-xs font-bold uppercase tracking-wider text-primary-600 bg-primary-50 px-3 py-1 rounded-full border border-primary-200/80 inline-block mb-3">
+            Platform Capabilities
+          </span>
+          <h2 className="text-3xl sm:text-4xl font-bold text-neutral-900 tracking-tight">
+            Built for Campus Tech Leaders
+          </h2>
+          <p className="text-sm text-neutral-500 mt-2">
+            A unified digital ecosystem for attendance, workshops, and student developer growth.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="voodoo-card-hover p-8 flex flex-col items-center text-center gap-4 bg-white">
+            <img src={qrIllustration} alt="QR Check-In" className="w-48 h-40 object-contain" />
+            <h3 className="text-lg font-bold text-neutral-900">QR Check-In</h3>
+            <p className="text-xs text-neutral-500 leading-relaxed max-w-xs">
+              Scan in at workshops & hackathons with your personalized QR code and log verified attendance automatically.
+            </p>
+          </div>
+
+          <div className="voodoo-card-hover p-8 flex flex-col items-center text-center gap-4 bg-white">
+            <img src={eventsIllustration} alt="Club Events" className="w-48 h-40 object-contain" />
+            <h3 className="text-lg font-bold text-neutral-900">Club Events & Sprints</h3>
+            <p className="text-xs text-neutral-500 leading-relaxed max-w-xs">
+              Workshops, hands-on hackathons, guest tech talks, and project sprints — all curated in one place.
+            </p>
+          </div>
+
+          <div className="voodoo-card-hover p-8 flex flex-col items-center text-center gap-4 bg-white">
+            <img src={pointsIllustration} alt="Earn & Rank" className="w-48 h-40 object-contain" />
+            <h3 className="text-lg font-bold text-neutral-900">Earn & Rank</h3>
+            <p className="text-xs text-neutral-500 leading-relaxed max-w-xs">
+              Collect XP, unlock specialty technical badges, and climb the seasonal campus leaderboard.
+            </p>
           </div>
         </div>
       </section>

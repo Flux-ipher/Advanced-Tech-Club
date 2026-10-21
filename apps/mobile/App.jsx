@@ -53,6 +53,21 @@ import { checkTokenBucket } from '@atc/shared/utils/rateLimiter';
 import { colors } from '@atc/shared/theme';
 import { Analytics } from '@atc/shared/utils/analytics';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+import {
+  House,
+  CalendarBlank,
+  Plus,
+  Folder,
+  User,
+  QrCode,
+  Trophy,
+  CheckCircle,
+  Clock,
+  Sparkle,
+  PushPin,
+  MagnifyingGlass,
+  ArrowRight
+} from 'phosphor-react-native';
 
 try {
   GoogleSignin.configure({
@@ -4753,9 +4768,16 @@ export default function App() {
                 ))}
               </View>
             ) : filteredAnnouncements.length === 0 ? (
-              <View style={{ padding: 32, alignItems: 'center' }}>
-                <Text style={{ fontSize: 24, marginBottom: 8 }}>📭</Text>
-                <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.neutral[700] }}>No announcements found</Text>
+              <View style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 32, alignItems: 'center', borderWidth: 1, borderColor: colors.neutral[200], marginVertical: 8 }}>
+                <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primary[50], justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
+                  <House size={28} color={colors.primary[500]} weight="fill" />
+                </View>
+                <Text style={{ fontSize: 15, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 4 }}>
+                  No Announcements Yet
+                </Text>
+                <Text style={{ fontSize: 12, color: colors.neutral[500], textAlign: 'center', lineHeight: 18, maxWidth: 260 }}>
+                  Important club announcements, workshop releases, and hackathon notices will appear here.
+                </Text>
               </View>
             ) : (
               filteredAnnouncements.map((ann) => (
@@ -4954,7 +4976,7 @@ export default function App() {
                     marginBottom: 12
                   }}
                 >
-                  <Text style={{ fontSize: 24 }}>📅</Text>
+                  <CalendarBlank size={28} color={colors.primary[500]} weight="fill" />
                 </View>
                 <Text style={{ fontSize: 15, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 4 }}>
                   No Workshops Found
@@ -5244,7 +5266,7 @@ export default function App() {
                         marginBottom: 12
                       }}
                     >
-                      <Text style={{ fontSize: 24 }}>▤</Text>
+                      <Folder size={28} color={colors.primary[500]} weight="fill" />
                     </View>
                     <Text style={{ fontSize: 15, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 4 }}>
                       No Vault Resources Found
@@ -7118,15 +7140,17 @@ export default function App() {
           onPress={() => handleSwitchTab('home')}
           style={{ alignItems: 'center', justifyContent: 'center', minWidth: 54 }}
         >
-          <Text style={{ fontSize: 18, color: currentTab === 'home' ? '#111827' : '#9ca3af' }}>
-            ⊞
-          </Text>
+          <House
+            size={20}
+            color={currentTab === 'home' ? '#3b82f6' : '#9ca3af'}
+            weight={currentTab === 'home' ? 'fill' : 'regular'}
+          />
           <Text
             style={{
               fontSize: 10,
               fontWeight: currentTab === 'home' ? 'bold' : '600',
-              color: currentTab === 'home' ? '#111827' : '#9ca3af',
-              marginTop: 1
+              color: currentTab === 'home' ? '#3b82f6' : '#9ca3af',
+              marginTop: 2
             }}
           >
             Home
@@ -7136,36 +7160,38 @@ export default function App() {
               width: 4,
               height: 4,
               borderRadius: 2,
-              backgroundColor: currentTab === 'home' ? '#111827' : 'transparent',
+              backgroundColor: currentTab === 'home' ? '#3b82f6' : 'transparent',
               marginTop: 2
             }}
           />
         </TouchableOpacity>
 
-        {/* Tab 2: Calendar */}
+        {/* Tab 2: Calendar / Events */}
         <TouchableOpacity
           onPress={() => handleSwitchTab('events')}
           style={{ alignItems: 'center', justifyContent: 'center', minWidth: 54 }}
         >
-          <Text style={{ fontSize: 17, color: currentTab === 'events' ? '#111827' : '#9ca3af' }}>
-            📅
-          </Text>
+          <CalendarBlank
+            size={20}
+            color={currentTab === 'events' ? '#3b82f6' : '#9ca3af'}
+            weight={currentTab === 'events' ? 'fill' : 'regular'}
+          />
           <Text
             style={{
               fontSize: 10,
               fontWeight: currentTab === 'events' ? 'bold' : '600',
-              color: currentTab === 'events' ? '#111827' : '#9ca3af',
-              marginTop: 1
+              color: currentTab === 'events' ? '#3b82f6' : '#9ca3af',
+              marginTop: 2
             }}
           >
-            Calendar
+            Events
           </Text>
           <View
             style={{
               width: 4,
               height: 4,
               borderRadius: 2,
-              backgroundColor: currentTab === 'events' ? '#111827' : 'transparent',
+              backgroundColor: currentTab === 'events' ? '#3b82f6' : 'transparent',
               marginTop: 2
             }}
           />
@@ -7198,65 +7224,67 @@ export default function App() {
               elevation: 14
             }}
           >
-            <Text style={{ fontSize: 28, color: '#ffffff', fontWeight: 'bold', lineHeight: 30, textAlign: 'center' }}>
-              +
-            </Text>
+            <Plus size={26} color="#ffffff" weight="bold" />
           </View>
         </TouchableOpacity>
 
-        {/* Tab 3: Tasks */}
+        {/* Tab 3: Vault / Resources */}
         <TouchableOpacity
           onPress={() => handleSwitchTab('resources')}
           style={{ alignItems: 'center', justifyContent: 'center', minWidth: 54 }}
         >
-          <Text style={{ fontSize: 18, color: currentTab === 'resources' ? '#111827' : '#9ca3af' }}>
-            ☑
-          </Text>
+          <Folder
+            size={20}
+            color={currentTab === 'resources' ? '#3b82f6' : '#9ca3af'}
+            weight={currentTab === 'resources' ? 'fill' : 'regular'}
+          />
           <Text
             style={{
               fontSize: 10,
               fontWeight: currentTab === 'resources' ? 'bold' : '600',
-              color: currentTab === 'resources' ? '#111827' : '#9ca3af',
-              marginTop: 1
+              color: currentTab === 'resources' ? '#3b82f6' : '#9ca3af',
+              marginTop: 2
             }}
           >
-            Tasks
+            Vault
           </Text>
           <View
             style={{
               width: 4,
               height: 4,
               borderRadius: 2,
-              backgroundColor: currentTab === 'resources' ? '#111827' : 'transparent',
+              backgroundColor: currentTab === 'resources' ? '#3b82f6' : 'transparent',
               marginTop: 2
             }}
           />
         </TouchableOpacity>
 
-        {/* Tab 4: Menu */}
+        {/* Tab 4: Profile / Menu */}
         <TouchableOpacity
           onPress={() => handleSwitchTab('profile')}
           style={{ alignItems: 'center', justifyContent: 'center', minWidth: 54 }}
         >
-          <Text style={{ fontSize: 18, color: currentTab === 'profile' ? '#111827' : '#9ca3af' }}>
-            ▦
-          </Text>
+          <User
+            size={20}
+            color={currentTab === 'profile' ? '#3b82f6' : '#9ca3af'}
+            weight={currentTab === 'profile' ? 'fill' : 'regular'}
+          />
           <Text
             style={{
               fontSize: 10,
               fontWeight: currentTab === 'profile' ? 'bold' : '600',
-              color: currentTab === 'profile' ? '#111827' : '#9ca3af',
-              marginTop: 1
+              color: currentTab === 'profile' ? '#3b82f6' : '#9ca3af',
+              marginTop: 2
             }}
           >
-            Menu
+            Profile
           </Text>
           <View
             style={{
               width: 4,
               height: 4,
               borderRadius: 2,
-              backgroundColor: currentTab === 'profile' ? '#111827' : 'transparent',
+              backgroundColor: currentTab === 'profile' ? '#3b82f6' : 'transparent',
               marginTop: 2
             }}
           />

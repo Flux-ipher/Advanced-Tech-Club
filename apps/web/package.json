@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@atc/shared": "*",
+    "@phosphor-icons/react": "^2.1.10",
     "@supabase/supabase-js": "^2.39.8",
     "clsx": "^2.1.0",
     "firebase": "^13.0.0",

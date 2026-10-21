@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%" fill="none">
+  <defs>
+    <linearGradient id="bgGradReg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#eff6ff" />
+      <stop offset="100%" stop-color="#f8fafc" />
+    </linearGradient>
+    <linearGradient id="clipBoardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+    <filter id="regShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#1e293b" flood-opacity="0.1" />
+    </filter>
+  </defs>
+
+  <!-- Ambient Backdrop -->
+  <circle cx="200" cy="200" r="160" fill="url(#bgGradReg)" />
+  <circle cx="310" cy="120" r="24" fill="#dbeafe" opacity="0.6" />
+  <circle cx="90" cy="240" r="18" fill="#bfdbfe" opacity="0.4" />
+
+  <!-- Floor Shadow -->
+  <ellipse cx="200" cy="336" rx="130" ry="12" fill="#cbd5e1" opacity="0.4" />
+
+  <!-- Clipboard -->
+  <g transform="translate(120, 80)" filter="url(#regShadow)">
+    <!-- Clipboard Board -->
+    <rect x="0" y="20" width="160" height="220" rx="16" fill="url(#clipBoardGrad)" />
+    <!-- White Paper Sheet -->
+    <rect x="12" y="36" width="136" height="192" rx="10" fill="#ffffff" />
+
+    <!-- Top Metal Clip -->
+    <path d="M50 12 C50 6 56 0 64 0 L96 0 C104 0 110 6 110 12 L116 32 L44 32 Z" fill="#64748b" />
+    <rect x="66" y="8" width="28" height="8" rx="4" fill="#cbd5e1" />
+
+    <!-- Roster Item Rows (Blank placeholders) -->
+    <g transform="translate(26, 60)">
+      <!-- Row 1 -->
+      <circle cx="12" cy="12" r="8" fill="#eff6ff" stroke="#3b82f6" stroke-width="2" stroke-dasharray="2 2" />
+      <rect x="30" y="8" width="70" height="8" rx="4" fill="#f1f5f9" />
+
+      <!-- Row 2 -->
+      <circle cx="12" cy="42" r="8" fill="#eff6ff" stroke="#3b82f6" stroke-width="2" stroke-dasharray="2 2" />
+      <rect x="30" y="38" width="80" height="8" rx="4" fill="#f1f5f9" />
+
+      <!-- Row 3 -->
+      <circle cx="12" cy="72" r="8" fill="#eff6ff" stroke="#3b82f6" stroke-width="2" stroke-dasharray="2 2" />
+      <rect x="30" y="68" width="60" height="8" rx="4" fill="#f1f5f9" />
+
+      <!-- Row 4 -->
+      <circle cx="12" cy="102" r="8" fill="#eff6ff" stroke="#3b82f6" stroke-width="2" stroke-dasharray="2 2" />
+      <rect x="30" y="98" width="74" height="8" rx="4" fill="#f1f5f9" />
+
+      <!-- Row 5 -->
+      <circle cx="12" cy="132" r="8" fill="#eff6ff" stroke="#3b82f6" stroke-width="2" stroke-dasharray="2 2" />
+      <rect x="30" y="128" width="50" height="8" rx="4" fill="#f1f5f9" />
+    </g>
+
+    <!-- Floating Clean Check Badge -->
+    <circle cx="140" cy="200" r="22" fill="#10b981" />
+    <path d="M132 200 L138 206 L149 194" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+  </g>
+
+  <!-- Pen Floating Beside Clipboard -->
+  <g transform="translate(290, 180) rotate(25)">
+    <rect x="0" y="0" width="10" height="70" rx="3" fill="#1e293b" />
+    <path d="M0 70 L5 82 L10 70 Z" fill="#fde68a" />
+    <path d="M4 80 L5 83 L6 80 Z" fill="#0f172a" />
+    <rect x="0" y="8" width="10" height="12" fill="#3b82f6" />
+  </g>
+
+  <!-- Sparkles -->
+  <circle cx="100" cy="140" r="4" fill="#60a5fa" />
+  <circle cx="310" cy="100" r="3" fill="#fbbf24" />
+</svg>

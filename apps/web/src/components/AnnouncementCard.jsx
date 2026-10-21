@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pin, Trash2, Calendar, Tag, Clock, Share2 } from 'lucide-react';
+import { PushPin, Trash, Clock, Tag, ShareNetwork } from '@phosphor-icons/react';
 import { formatRelativeTime } from '@atc/shared/utils/formatters';
 import { RoleBadge } from './RoleBadge';
 
@@ -58,7 +58,7 @@ export function AnnouncementCard({
       {pinned && (
         <div className="bg-primary-500 text-white px-5 py-1.5 text-xs font-semibold flex items-center justify-between">
           <span className="flex items-center gap-1.5 tracking-wide uppercase">
-            <Pin className="w-3.5 h-3.5 fill-current" />
+            <PushPin size={14} weight="fill" />
             Pinned Announcement
           </span>
           <span className="text-[11px] opacity-90 font-normal">Priority broadcast</span>
@@ -83,7 +83,7 @@ export function AnnouncementCard({
                 <RoleBadge role={author_role === 'Admin' || author_role === 'President' || author_role === 'super_admin' ? 'admin' : 'member'} size="xs" />
               </div>
               <div className="flex items-center gap-2 text-xs text-neutral-400 mt-0.5">
-                <Clock className="w-3.5 h-3.5" />
+                <Clock size={14} weight="regular" />
                 <span>{formatRelativeTime(created_at)}</span>
               </div>
             </div>
@@ -107,7 +107,7 @@ export function AnnouncementCard({
                       pinned ? 'text-primary-600 font-bold' : ''
                     }`}
                   >
-                    <Pin className={`w-3.5 h-3.5 ${pinned ? 'fill-primary-600' : ''}`} />
+                    <PushPin size={14} weight={pinned ? 'fill' : 'regular'} className={pinned ? 'text-primary-600' : ''} />
                   </button>
                 )}
                 {onDelete && (
@@ -116,7 +116,7 @@ export function AnnouncementCard({
                     title="Delete announcement"
                     className="p-1.5 rounded hover:bg-danger-50 text-neutral-500 hover:text-danger-600 transition-colors"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash size={14} weight="regular" />
                   </button>
                 )}
               </div>
@@ -147,7 +147,7 @@ export function AnnouncementCard({
         {/* Footer actions */}
         <div className="flex items-center justify-between pt-3 border-t border-neutral-100 text-xs text-neutral-500">
           <span className="flex items-center gap-1">
-            <Tag className="w-3 h-3 text-neutral-400" />
+            <Tag size={12} weight="regular" className="text-neutral-400" />
             Category: <strong className="text-neutral-700 capitalize">{category}</strong>
           </span>
 
@@ -155,7 +155,7 @@ export function AnnouncementCard({
             onClick={handleShare}
             className="flex items-center gap-1 text-neutral-500 hover:text-neutral-800 transition-colors"
           >
-            <Share2 className="w-3.5 h-3.5" />
+            <ShareNetwork size={14} weight="regular" />
             Share
           </button>
         </div>

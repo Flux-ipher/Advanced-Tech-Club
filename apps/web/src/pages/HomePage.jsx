@@ -9,6 +9,9 @@ import { AnnouncementCard } from '../components/AnnouncementCard';
 import { SkeletonAnnouncementCard } from '../components/SkeletonCard';
 import { Modal } from '../components/Modal';
 import { ImageUploader } from '../components/ImageUploader';
+import { EmptyState } from '@atc/shared/components/EmptyState';
+import emptyAnnouncementsIllustration from '@atc/shared/assets/illustrations/empty-announcements.svg';
+import emptySearchIllustration from '@atc/shared/assets/illustrations/empty-search.svg';
 import {
   Sparkles,
   Pin,
@@ -210,12 +213,24 @@ export function HomePage() {
               ))}
             </div>
           ) : filteredAnnouncements.length === 0 ? (
-            <div className="voodoo-card p-12 text-center text-neutral-400">
-              <Sparkles className="w-10 h-10 mx-auto mb-3 opacity-30 text-primary-500" />
-              <h3 className="text-base font-semibold text-neutral-700">No announcements found</h3>
-              <p className="text-xs text-neutral-500 mt-1">
-                Try adjusting your search query or category filter.
-              </p>
+            <div className="voodoo-card bg-white overflow-hidden p-6">
+              <EmptyState
+                illustration={searchQuery ? emptySearchIllustration : emptyAnnouncementsIllustration}
+                title={searchQuery ? 'No matching announcements' : 'No announcements yet'}
+                subtitle={
+                  searchQuery
+                    ? `No broadcasts found matching "${searchQuery}". Try a different keyword.`
+                    : 'Important club announcements, workshop releases, and hackathon notices will appear here.'
+                }
+                action={
+                  isAdmin
+                    ? {
+                        label: 'Post First Announcement',
+                        onClick: () => setIsPostModalOpen(true)
+                      }
+                    : null
+                }
+              />
             </div>
           ) : (
             <div className="space-y-6">

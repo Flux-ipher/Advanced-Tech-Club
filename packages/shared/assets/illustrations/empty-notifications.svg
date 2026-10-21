@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%" fill="none">
+  <defs>
+    <linearGradient id="bgGradNotifs" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#eff6ff" />
+      <stop offset="100%" stop-color="#f8fafc" />
+    </linearGradient>
+    <linearGradient id="bellGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+    <filter id="bellShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#1e293b" flood-opacity="0.1" />
+    </filter>
+  </defs>
+
+  <!-- Ambient Backdrop -->
+  <circle cx="200" cy="200" r="160" fill="url(#bgGradNotifs)" />
+  <circle cx="90" cy="140" r="20" fill="#dbeafe" opacity="0.6" />
+  <circle cx="310" cy="110" r="26" fill="#bfdbfe" opacity="0.4" />
+
+  <!-- Floor Shadow -->
+  <ellipse cx="200" cy="330" rx="130" ry="12" fill="#cbd5e1" opacity="0.4" />
+
+  <!-- Peaceful Bell Graphics -->
+  <g transform="translate(130, 90)" filter="url(#bellShadow)">
+    <!-- Bell Top Ring -->
+    <path d="M70 20 C70 12 66 6 60 6 C54 6 50 12 50 20 Z" fill="#2563eb" />
+    <circle cx="60" cy="12" r="8" fill="#ffffff" />
+
+    <!-- Bell Body -->
+    <path d="M60 26 C36 26 26 60 22 96 C18 132 8 144 2 150 C0 152 4 156 12 156 L108 156 C116 156 120 152 118 150 C112 144 102 132 98 96 C94 60 84 26 60 26 Z" fill="url(#bellGrad)" />
+
+    <!-- Bell Clapper -->
+    <ellipse cx="60" cy="164" rx="16" ry="12" fill="#1e293b" />
+    <path d="M60 156 L60 166" stroke="#64748b" stroke-width="4" stroke-linecap="round" />
+
+    <!-- Bell Reflection Highlight -->
+    <path d="M42 50 C46 40 56 36 64 36" stroke="#93c5fd" stroke-width="4" stroke-linecap="round" fill="none" />
+  </g>
+
+  <!-- Gentle "Zzz" Floating (Clean & Caught Up) -->
+  <g transform="translate(250, 90)">
+    <!-- Small Z -->
+    <text x="0" y="50" font-family="system-ui, sans-serif" font-size="22" font-weight="bold" fill="#60a5fa" opacity="0.7">Z</text>
+    <!-- Medium Z -->
+    <text x="18" y="30" font-family="system-ui, sans-serif" font-size="28" font-weight="bold" fill="#3b82f6" opacity="0.85">Z</text>
+    <!-- Large Z -->
+    <text x="40" y="8" font-family="system-ui, sans-serif" font-size="36" font-weight="bold" fill="#2563eb">Z</text>
+  </g>
+
+  <!-- Sparkles -->
+  <path d="M90 200 L93 193 L100 190 L93 187 L90 180 L87 187 L80 190 L87 193 Z" fill="#38bdf8" />
+  <circle cx="310" cy="220" r="4" fill="#fbbf24" />
+</svg>

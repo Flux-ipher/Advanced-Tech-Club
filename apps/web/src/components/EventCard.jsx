@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Calendar, MapPin, Users, CheckCircle2, ArrowRight, Trash2 } from 'lucide-react';
+import { MapPin, Users, CheckCircle, ArrowRight, Trash } from '@phosphor-icons/react';
 import { formatDateTime, formatDate } from '@atc/shared/utils/formatters';
 import { isPortalSubdomain } from '@atc/shared/utils/domains';
 
@@ -65,7 +65,7 @@ export function EventCard({
         {/* Registered status indicator overlay */}
         {isRegistered && (
           <div className="absolute top-3 right-3 bg-success-500 text-white px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1 shadow-sm">
-            <CheckCircle2 className="w-3.5 h-3.5" />
+            <CheckCircle size={14} weight="fill" />
             Registered
           </div>
         )}
@@ -92,11 +92,11 @@ export function EventCard({
           {/* Details list */}
           <div className="space-y-2 mb-4 text-xs text-neutral-600">
             <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-neutral-400 shrink-0" />
+              <MapPin size={16} weight="fill" className="text-neutral-400 shrink-0" />
               <span className="truncate">{location}</span>
             </div>
             <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-neutral-400 shrink-0" />
+              <Users size={16} weight="regular" className="text-neutral-400 shrink-0" />
               <span>
                 <strong className="text-neutral-900">{registrations_count}</strong> registered
                 <span className="text-neutral-400"> / {capacity} capacity ({spotsLeft} spots left)</span>
@@ -121,7 +121,7 @@ export function EventCard({
             to={eventPath}
             className="text-xs font-semibold text-neutral-600 hover:text-primary-600 flex items-center gap-1 transition-colors"
           >
-            Details <ArrowRight className="w-3.5 h-3.5" />
+            Details <ArrowRight size={14} weight="bold" />
           </Link>
 
           <div className="flex items-center gap-2">
@@ -131,7 +131,7 @@ export function EventCard({
                 title="Delete event"
                 className="p-2 text-neutral-400 hover:text-danger-600 hover:bg-danger-50 rounded-lg transition-colors"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash size={16} weight="regular" />
               </button>
             )}
 

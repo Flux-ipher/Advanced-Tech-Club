@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%" fill="none">
+  <defs>
+    <linearGradient id="bgGradRes" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#eff6ff" />
+      <stop offset="100%" stop-color="#f8fafc" />
+    </linearGradient>
+    <linearGradient id="folderGradBack" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+    <linearGradient id="folderGradFront" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60a5fa" />
+      <stop offset="100%" stop-color="#3b82f6" />
+    </linearGradient>
+    <filter id="folderShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#1e293b" flood-opacity="0.1" />
+    </filter>
+  </defs>
+
+  <!-- Ambient Backdrop -->
+  <circle cx="200" cy="200" r="160" fill="url(#bgGradRes)" />
+  <circle cx="100" cy="120" r="16" fill="#dbeafe" opacity="0.6" />
+  <circle cx="300" cy="140" r="22" fill="#bfdbfe" opacity="0.4" />
+
+  <!-- Shadow below folder -->
+  <ellipse cx="200" cy="320" rx="130" ry="14" fill="#cbd5e1" opacity="0.4" />
+
+  <!-- Central Folder Graphics -->
+  <g transform="translate(100, 120)" filter="url(#folderShadow)">
+    <!-- Back Folder Tab & Body -->
+    <path d="M12 28 C12 20 18 14 26 14 L80 14 C86 14 92 18 96 24 L108 36 L174 36 C182 36 188 42 188 50 L188 160 C188 168 182 174 174 174 L26 174 C18 174 12 168 12 160 Z" fill="url(#folderGradBack)" />
+
+    <!-- Clean Blank Document inside folder -->
+    <g transform="translate(40, -10)">
+      <rect x="0" y="0" width="120" height="150" rx="10" fill="#ffffff" stroke="#e2e8f0" stroke-width="2" />
+      <path d="M96 0 L120 24 L96 24 Z" fill="#cbd5e1" />
+      <rect x="20" y="38" width="80" height="8" rx="4" fill="#93c5fd" opacity="0.6" />
+      <rect x="20" y="56" width="60" height="6" rx="3" fill="#cbd5e1" opacity="0.6" />
+      <rect x="20" y="70" width="70" height="6" rx="3" fill="#cbd5e1" opacity="0.6" />
+      <rect x="20" y="84" width="50" height="6" rx="3" fill="#cbd5e1" opacity="0.6" />
+    </g>
+
+    <!-- Front Folder Flap (Angled forward for 3D look) -->
+    <path d="M4 70 C4 62 10 56 18 56 L182 56 C190 56 196 62 196 70 L188 166 C188 174 182 180 174 180 L26 180 C18 180 12 174 12 166 Z" fill="url(#folderGradFront)" opacity="0.95" />
+
+    <!-- Decorative ATC emblem on folder -->
+    <circle cx="100" cy="118" r="22" fill="#ffffff" opacity="0.25" />
+    <path d="M94 110 L106 110 L100 126 Z" fill="#ffffff" opacity="0.8" />
+  </g>
+
+  <!-- Sparkles & Floating Particles -->
+  <g transform="translate(70, 160)">
+    <path d="M12 0 L15 9 L24 12 L15 15 L12 24 L9 15 L0 12 L9 9 Z" fill="#38bdf8" />
+  </g>
+  <g transform="translate(300, 180)">
+    <path d="M10 0 L13 7 L20 10 L13 13 L10 20 L7 13 L0 10 L7 7 Z" fill="#fbbf24" />
+  </g>
+  <circle cx="280" cy="90" r="5" fill="#60a5fa" />
+  <circle cx="120" cy="270" r="6" fill="#93c5fd" />
+</svg>
