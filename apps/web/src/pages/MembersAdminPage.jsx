@@ -241,18 +241,70 @@ export function MembersAdminPage() {
                       </span>
                     </div>
 
-                    <div className="p-3 rounded-lg bg-white border border-neutral-200 text-xs space-y-1">
-                      <p>
-                        <strong className="text-neutral-700">Student ID:</strong> <span className="font-mono text-neutral-900">{student.student_id || 'ID-NA'}</span>
-                      </p>
-                      <p>
-                        <strong className="text-neutral-700">Department:</strong> {student.department || 'Engineering'}
-                      </p>
+                    <div className="p-3.5 rounded-lg bg-white border border-neutral-200 text-xs space-y-1.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p>
+                          <strong className="text-neutral-700">Student ID:</strong>{' '}
+                          <span className="font-mono font-bold text-neutral-900">{student.student_id || 'ID-NA'}</span>
+                        </p>
+                        {student.application_id && (
+                          <span className="px-1.5 py-0.5 rounded bg-primary-50 text-primary-700 font-mono text-[10px] font-bold border border-primary-200">
+                            {student.application_id}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-neutral-600">
+                        <p>
+                          <strong className="text-neutral-700">Department:</strong> {student.department || 'Computer Science & Engineering'}
+                        </p>
+                        {student.year && (
+                          <span className="text-[11px] font-medium text-neutral-500">
+                            Year: {student.year}
+                          </span>
+                        )}
+                      </div>
+
+                      {student.github_url && (
+                        <p className="pt-1">
+                          <strong className="text-neutral-700">GitHub:</strong>{' '}
+                          <a
+                            href={student.github_url.startsWith('http') ? student.github_url : `https://${student.github_url}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary-600 hover:underline font-mono text-[11px] inline-flex items-center gap-1"
+                          >
+                            <span>{student.github_url.replace(/^https?:\/\/(www\.)?github\.com\//, '@')}</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </p>
+                      )}
+
+                      {Array.isArray(student.interests) && student.interests.length > 0 && (
+                        <div className="pt-1">
+                          <p className="text-[11px] text-neutral-500 font-medium mb-1">Focus Tracks:</p>
+                          <div className="flex flex-wrap gap-1">
+                            {student.interests.map((t, idx) => (
+                              <span
+                                key={idx}
+                                className="px-2 py-0.5 rounded-md bg-neutral-100 text-neutral-700 text-[10px] font-medium border border-neutral-200"
+                              >
+                                {t}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       {student.bio && (
-                        <p className="text-neutral-500 text-[11px] pt-1 border-t border-neutral-100 italic">
+                        <p className="text-neutral-600 text-[11px] pt-1.5 border-t border-neutral-100 italic leading-relaxed">
                           "{student.bio}"
                         </p>
                       )}
+
+                      <div className="pt-1 text-[10px] text-neutral-400 flex items-center justify-between">
+                        <span>Applied: {formatDate(student.applied_at || student.created_at)}</span>
+                      </div>
                     </div>
                   </div>
 

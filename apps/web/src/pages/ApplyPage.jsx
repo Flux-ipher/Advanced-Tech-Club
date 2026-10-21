@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@atc/shared/hooks/useAuth';
 import { getSupabaseClient, mockDb, supabase } from '@atc/shared/supabaseClient';
+import { getPortalSiteUrl, getPublicSiteUrl, isPortalSubdomain } from '@atc/shared/utils/domains';
 import {
   Sparkles,
   CheckCircle2,
@@ -92,12 +93,16 @@ export function ApplyPage() {
 
     const applicationProfile = {
       full_name: fullName.trim(),
-      email: email.trim(),
+      email: email.trim().toLowerCase(),
       student_id: studentId.trim(),
-      department: 'Computer Science & Engineering', // All students are of the same department
+      roll_number: studentId.trim(),
+      department: 'Computer Science & Engineering',
       bio: `${year} student · Interests: ${tracks.join(', ')}. ${reason.trim()}`,
       interests: tracks,
       github_url: github.trim(),
+      year: year,
+      application_id: generatedId,
+      application_reason: reason.trim(),
       role: 'member',
       avatar_url:
         user?.avatar_url ||
@@ -113,17 +118,36 @@ export function ApplyPage() {
       updateUserProfile(applicationProfile);
     }
 
-    // Save to database
+    // Save to local storage for instant offline / reload availability
+    try {
+      localStorage.setItem('atc_student_application', JSON.stringify({
+        ...applicationProfile,
+        appId: generatedId
+      }));
+    } catch (e) {
+      // ignore
+    }
+
+    // Save to Supabase database
     try {
       const client = token ? getSupabaseClient(token) : supabase;
       const targetUserId = user?.id || firebaseUser?.uid || `usr-${Date.now()}`;
       if (client) {
-        await client
+        const { error } = await client
           .from('profiles')
           .upsert({
             id: targetUserId,
             ...applicationProfile
           }, { onConflict: 'id' });
+
+        if (error) {
+          console.warn('[ATC Apply] Upsert note, attempting update by email:', error?.message);
+          // Fallback: try update by email in case row exists
+          await client
+            .from('profiles')
+            .update(applicationProfile)
+            .eq('email', email.trim().toLowerCase());
+        }
       }
     } catch (err) {
       console.warn('[ATC Apply] Data persist note:', err);
@@ -169,20 +193,31 @@ export function ApplyPage() {
             <p className="text-[11px] text-neutral-400">Save this ID to check your verification status</p>
           </div>
 
-          <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <a
+              href={isPortalSubdomain() ? '/' : getPortalSiteUrl('/')}
+              className="w-full sm:w-auto btn-primary text-xs py-2.5 px-6 font-bold flex items-center justify-center gap-1.5 shadow-sm"
+            >
+              <span>Launch Club Portal</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </a>
             <Link
               to="/verification-status"
-              className="btn-primary text-xs py-2.5 px-5 font-bold"
+              className="w-full sm:w-auto btn-outline text-xs py-2.5 px-5 font-semibold"
             >
               Check Verification Status
             </Link>
             <Link
               to="/"
-              className="btn-secondary text-xs py-2.5 px-5"
+              className="w-full sm:w-auto btn-secondary text-xs py-2.5 px-5"
             >
-              Back to Public Homepage
+              Back to Home
             </Link>
           </div>
+
+          <p className="text-[11px] text-neutral-500 pt-2 max-w-md mx-auto leading-relaxed border-t border-neutral-100">
+            💡 When you access the Club Portal with your university Google account, your profile will automatically connect with this application.
+          </p>
         </div>
       ) : (
         <div className="voodoo-card p-6 sm:p-8">

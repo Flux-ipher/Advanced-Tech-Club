@@ -2438,8 +2438,29 @@ export default function App() {
     setIsGuest(false);
     await saveMobileSession(updatedUser);
     await persistGoogleAccount(updatedUser.email, updatedUser.full_name, updatedUser.avatar_url);
+    const applicationPayload = {
+      id: updatedUser.id,
+      email: updatedUser.email,
+      full_name: updatedUser.full_name,
+      student_id: sId,
+      roll_number: sId,
+      department: applyDept,
+      interests: applyInterests,
+      verification_status: 'pending',
+      is_verified: false,
+      year: applyYear,
+      avatar_url: updatedUser.avatar_url,
+      role: 'member',
+      bio: `${applyYear} student · Interests: ${applyInterests.join(', ')}`,
+      github_url: (applyGithub || '').trim(),
+      applied_at: new Date().toISOString()
+    };
     try {
-      await supabase.from('profiles').upsert(updatedUser, { onConflict: 'id' });
+      const { error } = await supabase.from('profiles').upsert(applicationPayload, { onConflict: 'id' });
+      if (error) {
+        console.warn('[ATC Mobile] Application upsert note, trying update by email:', error?.message);
+        await supabase.from('profiles').update(applicationPayload).eq('email', targetEmail);
+      }
     } catch (saveErr) {
       console.warn('[ATC Mobile] Application persist warning:', saveErr);
     }

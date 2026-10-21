@@ -65,31 +65,72 @@ export function VerificationGate({ children }) {
           </div>
           <div className="flex justify-between items-center pb-2 border-b border-neutral-200">
             <span className="text-neutral-500 font-medium">Student ID:</span>
-            <span className="font-mono font-bold text-neutral-800">{user?.student_id || 'Pending ID Submission'}</span>
+            <span className="font-mono font-bold text-neutral-800">
+              {user?.student_id || (
+                <span className="text-warning-600 font-semibold">Pending Application Submission</span>
+              )}
+            </span>
           </div>
+          {user?.application_id && (
+            <div className="flex justify-between items-center pb-2 border-b border-neutral-200">
+              <span className="text-neutral-500 font-medium">Application ID:</span>
+              <span className="font-mono font-bold text-primary-600">{user.application_id}</span>
+            </div>
+          )}
+          {user?.year && (
+            <div className="flex justify-between items-center pb-2 border-b border-neutral-200">
+              <span className="text-neutral-500 font-medium">Year:</span>
+              <span className="text-neutral-700">{user.year}</span>
+            </div>
+          )}
           <div className="flex justify-between items-center pb-2 border-b border-neutral-200">
             <span className="text-neutral-500 font-medium">Department:</span>
             <span className="text-neutral-700">{user?.department || 'Computer Science & Engineering'}</span>
           </div>
+          {Array.isArray(user?.interests) && user.interests.length > 0 && (
+            <div className="flex justify-between items-start pb-2 border-b border-neutral-200">
+              <span className="text-neutral-500 font-medium shrink-0">Interests:</span>
+              <span className="text-neutral-700 text-right text-[11px] font-medium">{user.interests.slice(0, 3).join(', ')}{user.interests.length > 3 ? '...' : ''}</span>
+            </div>
+          )}
           <div className="flex justify-between items-center">
             <span className="text-neutral-500 font-medium">Status:</span>
-            <span className="font-bold text-warning-700">Awaiting Verification Review</span>
+            <span className="font-bold text-warning-700">
+              {user?.student_id ? 'Awaiting Verification Review' : 'Incomplete — Application Needed'}
+            </span>
           </div>
         </div>
 
         {/* Action Buttons */}
         <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+          {!user?.student_id ? (
+            <Link
+              to="/apply"
+              className="w-full sm:w-auto btn-primary text-xs py-2.5 px-6 flex items-center justify-center gap-1.5 font-bold shadow-sm"
+            >
+              📝 Complete Membership Application
+            </Link>
+          ) : (
+            <Link
+              to="/apply"
+              className="w-full sm:w-auto btn-secondary text-xs py-2.5 px-5 flex items-center justify-center gap-1.5 font-semibold"
+            >
+              ✏️ Edit Application Details
+            </Link>
+          )}
+
           <Link
             to="/verification-status"
-            className="w-full sm:w-auto btn-primary text-xs py-2.5 px-5 flex items-center justify-center gap-1.5 font-bold shadow-sm"
-          >
-            <Search className="w-4 h-4" /> Check Application Status
-          </Link>
-          <a
-            href={getPublicSiteUrl('/')}
             className="w-full sm:w-auto btn-outline text-xs py-2.5 px-5 flex items-center justify-center gap-1.5 font-semibold text-neutral-700 hover:text-neutral-900"
           >
-            <ArrowLeft className="w-4 h-4" /> Return to Public Site
+            <Search className="w-4 h-4" /> Check Status
+          </Link>
+
+          <a
+            href={getPublicSiteUrl('/')}
+            className="w-full sm:w-auto btn-secondary text-xs py-2.5 px-4 flex items-center justify-center gap-1.5 font-semibold text-neutral-600 hover:text-neutral-800"
+          >
+            <ArrowLeft className="w-4 h-4" /> Public Site
           </a>
         </div>
 

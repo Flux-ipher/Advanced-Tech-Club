@@ -106,6 +106,52 @@ const createMockQueryBuilder = (table) => {
         }
       };
     },
+    upsert(rows, options = {}) {
+      const items = Array.isArray(rows) ? rows : [rows];
+      const resultItems = items.map((item) => {
+        const existingIndex = (mockDb.storage[table] || []).findIndex(
+          (existing) =>
+            (item.id && String(existing.id) === String(item.id)) ||
+            (item.email && existing.email && existing.email.toLowerCase() === String(item.email).toLowerCase())
+        );
+
+        if (existingIndex >= 0) {
+          const updated = {
+            ...mockDb.storage[table][existingIndex],
+            ...item,
+            updated_at: new Date().toISOString()
+          };
+          mockDb.storage[table][existingIndex] = updated;
+          mockDb.notify('UPDATE', table, updated);
+          return updated;
+        } else {
+          const newItem = {
+            id: item.id || `mock-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+            created_at: new Date().toISOString(),
+            ...item
+          };
+          mockDb.storage[table] = [...(mockDb.storage[table] || []), newItem];
+          mockDb.notify('INSERT', table, newItem);
+          return newItem;
+        }
+      });
+
+      return {
+        select() {
+          return {
+            single() {
+              return Promise.resolve({ data: resultItems[0] || null, error: null });
+            },
+            then(resolve) {
+              resolve({ data: resultItems, error: null });
+            }
+          };
+        },
+        then(resolve) {
+          resolve({ data: resultItems, error: null });
+        }
+      };
+    },
     update(updates) {
       return {
         eq(field, val) {

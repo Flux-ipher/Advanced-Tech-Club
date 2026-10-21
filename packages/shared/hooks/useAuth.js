@@ -52,7 +52,12 @@ export async function resolveRoleAndProfile(client, firebaseUser, existingProfil
     interests: existingProfile?.interests || [],
     role: resolvedRole,
     is_verified: isVerified,
-    verification_status: verificationStatus
+    verification_status: verificationStatus,
+    bio: existingProfile?.bio || '',
+    github_url: existingProfile?.github_url || '',
+    applied_at: existingProfile?.applied_at || (existingProfile?.student_id ? new Date().toISOString() : null),
+    application_id: existingProfile?.application_id || null,
+    year: existingProfile?.year || null
   };
 
   // If newly promoted to super_admin or profile record didn't exist in Supabase, persist immediately
@@ -117,6 +122,28 @@ export function useAuthListener() {
               .eq('id', user.uid)
               .maybeSingle();
             profile = data;
+
+            // If not found by UID, check if an application profile exists with the same email
+            if (!profile && user.email) {
+              const { data: emailProfile } = await client
+                .from('profiles')
+                .select('*')
+                .eq('email', user.email.trim().toLowerCase())
+                .maybeSingle();
+
+              if (emailProfile) {
+                // Link the applicant record to this user's real Firebase UID
+                const linkedProfile = {
+                  ...emailProfile,
+                  id: user.uid,
+                  avatar_url: emailProfile.avatar_url || user.photoURL || '',
+                  full_name: emailProfile.full_name || user.displayName || user.email?.split('@')[0],
+                  updated_at: new Date().toISOString()
+                };
+                await client.from('profiles').upsert(linkedProfile, { onConflict: 'id' });
+                profile = linkedProfile;
+              }
+            }
           } catch (fetchErr) {
             console.warn('[ATC Auth] Could not fetch Supabase profile:', fetchErr?.message);
           }
