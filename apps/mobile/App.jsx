@@ -7207,9 +7207,9 @@ export default function App() {
                 {/* SCROLLABLE EVENT DETAILS */}
                 <ScrollView
                   showsVerticalScrollIndicator={false}
-                  contentContainerStyle={{ paddingBottom: 110 }}
+                  contentContainerStyle={{ paddingBottom: 120 }}
                 >
-                  {/* HERO BANNER WITH FLOATING FROSTED-GLASS BUTTONS */}
+                  {/* HERO BANNER SECTION */}
                   <View style={{ position: 'relative', height: 260, width: '100%', backgroundColor: '#0f172a' }}>
                     <Image
                       source={{
@@ -7219,58 +7219,6 @@ export default function App() {
                       resizeMode="cover"
                     />
                     <View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.2)' }} />
-
-                    {/* FLOATING CIRCULAR FROSTED-GLASS BACK BUTTON */}
-                    <TouchableOpacity
-                      onPress={() => setSelectedEvent(null)}
-                      style={{
-                        position: 'absolute',
-                        top: Platform.OS === 'ios' ? 44 : 16,
-                        left: 16,
-                        width: 42,
-                        height: 42,
-                        borderRadius: 21,
-                        backgroundColor: 'rgba(15, 23, 42, 0.75)',
-                        borderWidth: 1,
-                        borderColor: 'rgba(255, 255, 255, 0.3)',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        zIndex: 20,
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 3 },
-                        shadowOpacity: 0.35,
-                        shadowRadius: 5,
-                        elevation: 6
-                      }}
-                    >
-                      <Text style={{ color: '#ffffff', fontSize: 18, fontWeight: 'bold' }}>←</Text>
-                    </TouchableOpacity>
-
-                    {/* FLOATING CIRCULAR FROSTED-GLASS SHARE BUTTON */}
-                    <TouchableOpacity
-                      onPress={() => handleShare(selectedEvent.title, selectedEvent.description)}
-                      style={{
-                        position: 'absolute',
-                        top: Platform.OS === 'ios' ? 44 : 16,
-                        right: 16,
-                        width: 42,
-                        height: 42,
-                        borderRadius: 21,
-                        backgroundColor: 'rgba(15, 23, 42, 0.75)',
-                        borderWidth: 1,
-                        borderColor: 'rgba(255, 255, 255, 0.3)',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        zIndex: 20,
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 3 },
-                        shadowOpacity: 0.35,
-                        shadowRadius: 5,
-                        elevation: 6
-                      }}
-                    >
-                      <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold' }}>↗</Text>
-                    </TouchableOpacity>
 
                     <View
                       style={{
@@ -7580,7 +7528,7 @@ export default function App() {
                   </View>
                 </ScrollView>
 
-                {/* STICKY BOTTOM ACTION BAR */}
+                {/* STICKY BOTTOM ACTION BAR (ERGONOMIC THUMB ZONE: BACK, SHARE & RSVP) */}
                 <View
                   style={{
                     position: 'absolute',
@@ -7588,29 +7536,74 @@ export default function App() {
                     left: 0,
                     right: 0,
                     backgroundColor: '#ffffff',
-                    paddingHorizontal: 20,
-                    paddingVertical: 14,
+                    paddingHorizontal: 16,
+                    paddingTop: 12,
+                    paddingBottom: Platform.OS === 'ios' ? 28 : 16,
                     borderTopWidth: 1,
                     borderTopColor: colors.neutral[200],
                     flexDirection: 'row',
-                    gap: 10,
-                    alignItems: 'center'
+                    gap: 8,
+                    alignItems: 'center',
+                    shadowColor: '#000000',
+                    shadowOffset: { width: 0, height: -3 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 6,
+                    elevation: 10,
+                    zIndex: 99
                   }}
                 >
+                  {/* BOTTOM BACK BUTTON */}
+                  <TouchableOpacity
+                    onPress={() => setSelectedEvent(null)}
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 14,
+                      backgroundColor: colors.neutral[100],
+                      borderWidth: 1,
+                      borderColor: colors.neutral[300],
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    accessibilityLabel="Back"
+                  >
+                    <Text style={{ fontSize: 20, color: colors.neutral[800], fontWeight: 'bold' }}>←</Text>
+                  </TouchableOpacity>
+
+                  {/* BOTTOM SHARE BUTTON */}
+                  <TouchableOpacity
+                    onPress={() => handleShare(selectedEvent.title, selectedEvent.description)}
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 14,
+                      backgroundColor: colors.neutral[100],
+                      borderWidth: 1,
+                      borderColor: colors.neutral[300],
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    accessibilityLabel="Share"
+                  >
+                    <Text style={{ fontSize: 18, color: colors.neutral[800] }}>↗</Text>
+                  </TouchableOpacity>
+
+                  {/* PRIMARY ACTION: RSVP / CONCLUDED */}
                   {isCompleted ? (
                     <View
                       style={{
                         flex: 1,
                         backgroundColor: colors.neutral[100],
-                        paddingVertical: 14,
-                        borderRadius: 12,
+                        height: 48,
+                        borderRadius: 14,
                         alignItems: 'center',
+                        justifyContent: 'center',
                         borderWidth: 1,
                         borderColor: colors.neutral[200]
                       }}
                     >
-                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[600] }}>
-                        🏁 Event Concluded · Registrations Closed
+                      <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.neutral[600] }}>
+                        🏁 Concluded
                       </Text>
                     </View>
                   ) : (
@@ -7621,9 +7614,9 @@ export default function App() {
                         }}
                         style={{
                           flex: 1,
+                          height: 48,
                           backgroundColor: isRSVPed ? colors.danger[500] : colors.primary[500],
-                          paddingVertical: 14,
-                          borderRadius: 12,
+                          borderRadius: 14,
                           alignItems: 'center',
                           justifyContent: 'center',
                           shadowColor: isRSVPed ? colors.danger[500] : colors.primary[500],
@@ -7633,8 +7626,8 @@ export default function App() {
                           elevation: 3
                         }}
                       >
-                        <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 14 }}>
-                          {isRSVPed ? '✕ Cancel My RSVP' : '✓ Confirm 1-Tap RSVP'}
+                        <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
+                          {isRSVPed ? '✕ Cancel RSVP' : '✓ Confirm 1-Tap RSVP'}
                         </Text>
                       </TouchableOpacity>
 
@@ -7645,17 +7638,18 @@ export default function App() {
                             setIsQrPassOpen(true);
                           }}
                           style={{
+                            height: 48,
                             backgroundColor: colors.primary[50],
                             borderWidth: 1,
                             borderColor: colors.primary[300],
-                            paddingVertical: 14,
-                            paddingHorizontal: 16,
-                            borderRadius: 12,
-                            alignItems: 'center'
+                            paddingHorizontal: 12,
+                            borderRadius: 14,
+                            alignItems: 'center',
+                            justifyContent: 'center'
                           }}
                         >
-                          <Text style={{ color: colors.primary[700], fontWeight: 'bold', fontSize: 13 }}>
-                            View Pass 🪪
+                          <Text style={{ color: colors.primary[700], fontWeight: 'bold', fontSize: 12 }}>
+                            Pass 🪪
                           </Text>
                         </TouchableOpacity>
                       )}
@@ -7692,8 +7686,8 @@ export default function App() {
 
             return (
               <View style={{ flex: 1, backgroundColor: '#0b0f19' }}>
-                <ScrollView contentContainerStyle={{ paddingBottom: 110 }} showsVerticalScrollIndicator={false}>
-                  {/* HERO BANNER SECTION WITH FLOATING CIRCULAR BUTTONS */}
+                <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+                  {/* HERO BANNER SECTION */}
                   <View style={{ position: 'relative', width: '100%', height: 230, backgroundColor: '#1e293b' }}>
                     <Image
                       source={{
@@ -7711,53 +7705,6 @@ export default function App() {
                         backgroundColor: 'rgba(11, 15, 25, 0.45)'
                       }}
                     />
-
-                    {/* FLOATING CIRCULAR BACK BUTTON */}
-                    <TouchableOpacity
-                      onPress={() => setSelectedResource(null)}
-                      style={{
-                        position: 'absolute',
-                        top: Platform.OS === 'ios' ? 14 : 20,
-                        left: 16,
-                        width: 42,
-                        height: 42,
-                        borderRadius: 21,
-                        backgroundColor: 'rgba(15, 23, 42, 0.75)',
-                        borderWidth: 1,
-                        borderColor: 'rgba(255, 255, 255, 0.25)',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        zIndex: 10
-                      }}
-                    >
-                      <Text style={{ color: '#ffffff', fontSize: 18, fontWeight: 'bold' }}>←</Text>
-                    </TouchableOpacity>
-
-                    {/* FLOATING CIRCULAR SHARE BUTTON */}
-                    <TouchableOpacity
-                      onPress={() =>
-                        handleShare(
-                          selectedResource.title,
-                          `${selectedResource.description || ''}\n\nAccess Resource: ${resUrl || 'ATC Vault'}`
-                        )
-                      }
-                      style={{
-                        position: 'absolute',
-                        top: Platform.OS === 'ios' ? 14 : 20,
-                        right: 16,
-                        width: 42,
-                        height: 42,
-                        borderRadius: 21,
-                        backgroundColor: 'rgba(15, 23, 42, 0.75)',
-                        borderWidth: 1,
-                        borderColor: 'rgba(255, 255, 255, 0.25)',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        zIndex: 10
-                      }}
-                    >
-                      <Text style={{ color: '#ffffff', fontSize: 16 }}>↗</Text>
-                    </TouchableOpacity>
 
                     {/* CATEGORY & FORMAT BADGE OVERLAY */}
                     <View style={{ position: 'absolute', bottom: 14, left: 18, flexDirection: 'row', gap: 6 }}>
@@ -7899,7 +7846,7 @@ export default function App() {
                   </View>
                 </ScrollView>
 
-                {/* STICKY BOTTOM ACTION BAR */}
+                {/* STICKY BOTTOM ACTION BAR (ERGONOMIC THUMB ZONE: BACK, SHARE & ACTION) */}
                 <View
                   style={{
                     position: 'absolute',
@@ -7907,15 +7854,64 @@ export default function App() {
                     left: 0,
                     right: 0,
                     backgroundColor: '#0b0f19',
-                    paddingHorizontal: 20,
-                    paddingVertical: 14,
+                    paddingHorizontal: 16,
+                    paddingTop: 12,
+                    paddingBottom: Platform.OS === 'ios' ? 28 : 16,
                     borderTopWidth: 1,
                     borderTopColor: '#1e293b',
                     flexDirection: 'row',
-                    gap: 10,
-                    alignItems: 'center'
+                    gap: 8,
+                    alignItems: 'center',
+                    shadowColor: '#000000',
+                    shadowOffset: { width: 0, height: -3 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 6,
+                    elevation: 10,
+                    zIndex: 99
                   }}
                 >
+                  {/* BOTTOM BACK BUTTON */}
+                  <TouchableOpacity
+                    onPress={() => setSelectedResource(null)}
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 14,
+                      backgroundColor: '#1e293b',
+                      borderWidth: 1,
+                      borderColor: '#334155',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    accessibilityLabel="Back"
+                  >
+                    <Text style={{ fontSize: 20, color: '#ffffff', fontWeight: 'bold' }}>←</Text>
+                  </TouchableOpacity>
+
+                  {/* BOTTOM SHARE BUTTON */}
+                  <TouchableOpacity
+                    onPress={() =>
+                      handleShare(
+                        selectedResource.title,
+                        `${selectedResource.description || ''}\n\nAccess Resource: ${resUrl || 'ATC Vault'}`
+                      )
+                    }
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 14,
+                      backgroundColor: '#1e293b',
+                      borderWidth: 1,
+                      borderColor: '#334155',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    accessibilityLabel="Share"
+                  >
+                    <Text style={{ fontSize: 18, color: '#ffffff' }}>↗</Text>
+                  </TouchableOpacity>
+
+                  {/* PRIMARY ACTION (DOWNLOAD / GITHUB / ARTICLE / PLATFORM) */}
                   <TouchableOpacity
                     onPress={() => {
                       if (actionType === 'external') {
@@ -7926,9 +7922,9 @@ export default function App() {
                     }}
                     style={{
                       flex: 1,
+                      height: 48,
                       backgroundColor: isGithub ? '#238636' : isArticle ? '#d97706' : '#2563eb',
-                      paddingVertical: 14,
-                      borderRadius: 12,
+                      borderRadius: 14,
                       alignItems: 'center',
                       justifyContent: 'center',
                       shadowColor: '#2563eb',
@@ -7938,25 +7934,8 @@ export default function App() {
                       elevation: 4
                     }}
                   >
-                    <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 14 }}>
+                    <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
                       {actionText}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => setSelectedResource(null)}
-                    style={{
-                      backgroundColor: '#1e293b',
-                      borderWidth: 1,
-                      borderColor: '#334155',
-                      paddingVertical: 14,
-                      paddingHorizontal: 18,
-                      borderRadius: 12,
-                      alignItems: 'center'
-                    }}
-                  >
-                    <Text style={{ color: '#cbd5e1', fontWeight: 'bold', fontSize: 13 }}>
-                      Close
                     </Text>
                   </TouchableOpacity>
                 </View>
