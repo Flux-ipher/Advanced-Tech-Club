@@ -1,6 +1,11 @@
-// useResources hook for managing and downloading resources
-import { useState, useEffect, useCallback } from 'react';
-import { getResources, createResource, deleteResource, incrementDownloadCount } from '../api/resources.js';
+import {
+  getResources,
+  createResource,
+  deleteResource,
+  incrementDownloadCount,
+  getVaultGalleryMemories,
+  addVaultGalleryMemory
+} from '../api/resources.js';
 
 const CACHE_KEY = 'atc_cache_resources';
 
@@ -78,6 +83,40 @@ export function useResources() {
     addResource,
     removeResource,
     downloadResource
+  };
+}
+
+export function useVaultGallery() {
+  const [memories, setMemories] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchMemories = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await getVaultGalleryMemories();
+      setMemories(data || []);
+    } catch (e) {
+      console.warn('[useVaultGallery] fetch error:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchMemories();
+  }, [fetchMemories]);
+
+  const addMemory = async (memory) => {
+    const created = await addVaultGalleryMemory(memory);
+    setMemories((prev) => [created, ...prev]);
+    return created;
+  };
+
+  return {
+    memories,
+    loading,
+    refresh: fetchMemories,
+    addMemory
   };
 }
 

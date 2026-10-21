@@ -11,11 +11,12 @@ import {
   getMemberBadges,
   getPointsLog,
   awardPoints,
-  recordEventCheckin
+  recordEventCheckin,
+  toggleLeaderboardVisibility
 } from '../api/gamification.js';
 import { initialBadges } from '../mockData.js';
 
-export function useLeaderboard(userId = null) {
+export function useLeaderboard(userId = null, includeHidden = false) {
   const [rankings, setRankings] = useState([]);
   const [myRank, setMyRank] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -23,7 +24,7 @@ export function useLeaderboard(userId = null) {
   const loadData = useCallback(async () => {
     try {
       const [board, rank] = await Promise.all([
-        getLeaderboard(25),
+        getLeaderboard(50, includeHidden),
         userId ? getMyRank(userId) : Promise.resolve(1)
       ]);
       setRankings(board || []);
@@ -33,7 +34,7 @@ export function useLeaderboard(userId = null) {
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, includeHidden]);
 
   useEffect(() => {
     loadData();
@@ -55,11 +56,25 @@ export function useLeaderboard(userId = null) {
     };
   }, [loadData]);
 
+  const toggleVisibility = async (targetUserId, isVisible) => {
+    setRankings((prev) =>
+      prev.map((r) =>
+        r.user_id === targetUserId ? { ...r, show_on_leaderboard: isVisible } : r
+      )
+    );
+    const res = await toggleLeaderboardVisibility(targetUserId, isVisible);
+    if (!res.success) {
+      loadData(); // Revert on failure
+    }
+    return res;
+  };
+
   return {
     rankings: rankings || [],
     myRank: myRank || 1,
     loading,
-    refresh: loadData
+    refresh: loadData,
+    toggleVisibility
   };
 }
 

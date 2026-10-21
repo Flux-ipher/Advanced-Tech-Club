@@ -16,7 +16,9 @@ import {
   UserX,
   Clock,
   Sparkles,
-  ExternalLink
+  ExternalLink,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 export function MembersAdminPage() {
@@ -28,7 +30,8 @@ export function MembersAdminPage() {
     loading,
     changeMemberRole,
     verifyMemberAccount,
-    rejectMemberAccount
+    rejectMemberAccount,
+    toggleLeaderboard
   } = useMembers();
 
   const [activeTab, setActiveTab] = useState('verifications'); // 'verifications' | 'roster'
@@ -369,6 +372,7 @@ export function MembersAdminPage() {
                     <th className="px-6 py-3.5">Email</th>
                     <th className="px-6 py-3.5">Department</th>
                     <th className="px-6 py-3.5">Student ID</th>
+                    <th className="px-6 py-3.5">Leaderboard</th>
                     <th className="px-6 py-3.5">Role</th>
                     <th className="px-6 py-3.5 text-right">Role Actions</th>
                   </tr>
@@ -377,6 +381,7 @@ export function MembersAdminPage() {
                   {filteredRoster.map((m) => {
                     const isSelf = m.id === user?.id;
                     const isSuper = m.role === 'super_admin';
+                    const isVisibleOnLeaderboard = m.show_on_leaderboard !== false;
 
                     return (
                       <tr key={m.id} className="hover:bg-neutral-50 transition-colors">
@@ -400,6 +405,21 @@ export function MembersAdminPage() {
                         <td className="px-6 py-3.5 text-neutral-600">{m.email}</td>
                         <td className="px-6 py-3.5 text-neutral-600">{m.department || 'Engineering'}</td>
                         <td className="px-6 py-3.5 text-neutral-500 font-mono">{m.student_id || 'ID-NA'}</td>
+                        <td className="px-6 py-3.5">
+                          <button
+                            type="button"
+                            onClick={() => toggleLeaderboard(m.id, !isVisibleOnLeaderboard)}
+                            title={isVisibleOnLeaderboard ? 'Visible on Leaderboard. Click to hide.' : 'Hidden from Leaderboard. Click to show.'}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 transition-colors ${
+                              isVisibleOnLeaderboard
+                                ? 'bg-success-50 text-success-700 border border-success-200 hover:bg-success-100'
+                                : 'bg-neutral-100 text-neutral-500 border border-neutral-300 hover:bg-neutral-200'
+                            }`}
+                          >
+                            {isVisibleOnLeaderboard ? <Eye className="w-3.5 h-3.5 text-success-600" /> : <EyeOff className="w-3.5 h-3.5 text-neutral-400" />}
+                            <span>{isVisibleOnLeaderboard ? 'Visible' : 'Hidden'}</span>
+                          </button>
+                        </td>
                         <td className="px-6 py-3.5">
                           <RoleBadge role={m.role} size="xs" />
                         </td>

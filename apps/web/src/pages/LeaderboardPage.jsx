@@ -5,11 +5,11 @@ import React, { useState } from 'react';
 import { useAuth } from '@atc/shared/hooks/useAuth';
 import { useLeaderboard, useMemberGamification } from '@atc/shared/hooks/useGamification';
 import { SkeletonLeaderboardRow } from '../components/SkeletonCard';
-import { Trophy, Flame, Award, Sparkles, Shield, ChevronRight, CheckCircle2, Star, Users } from 'lucide-react';
+import { Trophy, Flame, Award, Sparkles, Shield, ChevronRight, CheckCircle2, Star, Users, Eye, EyeOff } from 'lucide-react';
 
 export function LeaderboardPage() {
-  const { user } = useAuth();
-  const { rankings, myRank, loading, refresh } = useLeaderboard(user?.id);
+  const { user, isAdmin } = useAuth();
+  const { rankings, myRank, loading, refresh, toggleVisibility } = useLeaderboard(user?.id, isAdmin);
   const { badges, points } = useMemberGamification(user?.id);
   const [selectedBadge, setSelectedBadge] = useState(null);
 
@@ -125,13 +125,18 @@ export function LeaderboardPage() {
 
       {/* 3. FULL LEADERBOARD ROSTER */}
       <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-sm">
-        <div className="px-6 py-4 border-b border-neutral-100 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-neutral-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-primary-500" />
             <h2 className="font-bold text-neutral-900 text-sm">Campus Engineers Ranking</h2>
+            {isAdmin && (
+              <span className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-warning-50 text-warning-700 border border-warning-200">
+                Admin Moderation Active
+              </span>
+            )}
           </div>
           <span className="text-xs font-semibold text-neutral-400">
-            Realtime Auto-Syncing ⚡
+            {isAdmin ? 'Click Eye Icon to Toggle Visibility' : 'Realtime Auto-Syncing ⚡'}
           </span>
         </div>
 
@@ -142,11 +147,13 @@ export function LeaderboardPage() {
             ))
           ) : rankings.map((member) => {
             const isCurrentUser = user && member.user_id === user.id;
+            const isVisible = member.show_on_leaderboard !== false;
+
             return (
               <div
                 key={member.user_id}
                 className={`px-6 py-4 flex items-center gap-4 transition-colors ${
-                  isCurrentUser ? 'bg-primary-50/50 hover:bg-primary-50' : 'hover:bg-neutral-50'
+                  !isVisible ? 'bg-neutral-100/70 opacity-60' : isCurrentUser ? 'bg-primary-50/50 hover:bg-primary-50' : 'hover:bg-neutral-50'
                 }`}
               >
                 {/* Rank Badge */}
@@ -174,12 +181,17 @@ export function LeaderboardPage() {
                 {/* Name & Academic info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="font-bold text-sm text-neutral-900 truncate">
+                    <p className={`font-bold text-sm truncate ${!isVisible ? 'text-neutral-500 line-through' : 'text-neutral-900'}`}>
                       {member.full_name}
                     </p>
                     {isCurrentUser && (
                       <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary-100 text-primary-700">
                         You
+                      </span>
+                    )}
+                    {!isVisible && (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-neutral-200 text-neutral-600">
+                        Hidden
                       </span>
                     )}
                   </div>
@@ -202,6 +214,32 @@ export function LeaderboardPage() {
                     {member.total_points} pts
                   </span>
                 </div>
+
+                {/* Admin Visibility Toggle */}
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => toggleVisibility(member.user_id, !isVisible)}
+                    title={isVisible ? 'Visible on Leaderboard. Click to hide.' : 'Hidden from Leaderboard. Click to show.'}
+                    className={`shrink-0 p-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs ${
+                      isVisible
+                        ? 'bg-success-50 text-success-700 border border-success-200 hover:bg-success-100'
+                        : 'bg-neutral-200 text-neutral-600 border border-neutral-300 hover:bg-neutral-300'
+                    }`}
+                  >
+                    {isVisible ? (
+                      <>
+                        <Eye className="w-3.5 h-3.5 text-success-600" />
+                        <span className="hidden md:inline">Visible</span>
+                      </>
+                    ) : (
+                      <>
+                        <EyeOff className="w-3.5 h-3.5 text-neutral-500" />
+                        <span className="hidden md:inline">Hidden</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             );
           })}

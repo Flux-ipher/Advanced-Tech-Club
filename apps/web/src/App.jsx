@@ -15,6 +15,7 @@ import { HomePage } from './pages/HomePage'; // Announcements & Feed
 import { EventsPage } from './pages/EventsPage';
 import { EventDetailPage } from './pages/EventDetailPage';
 import { ResourcesPage } from './pages/ResourcesPage';
+import { ResourceDetailPage } from './pages/ResourceDetailPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { AdminPage } from './pages/AdminPage';
 import { MembersAdminPage } from './pages/MembersAdminPage';
@@ -116,6 +117,14 @@ export function App() {
           }
         />
         <Route
+          path="/resources/:id"
+          element={
+            <PortalLayout>
+              <ResourceDetailPage />
+            </PortalLayout>
+          }
+        />
+        <Route
           path="/profile"
           element={
             <PortalLayout>
@@ -195,6 +204,7 @@ export function App() {
         <Route path="/portal/events" element={<Navigate to="/events" replace />} />
         <Route path="/portal/events/:id" element={<Navigate to="/events/:id" replace />} />
         <Route path="/portal/resources" element={<Navigate to="/resources" replace />} />
+        <Route path="/portal/resources/:id" element={<Navigate to="/resources/:id" replace />} />
         <Route path="/portal/profile" element={<Navigate to="/profile" replace />} />
         <Route path="/portal/leaderboard" element={<Navigate to="/leaderboard" replace />} />
         <Route path="/portal/checkin" element={<Navigate to="/checkin" replace />} />
@@ -258,6 +268,22 @@ export function App() {
         }
       />
       <Route
+        path="/resources"
+        element={
+          <PublicLayout>
+            <ResourcesPage />
+          </PublicLayout>
+        }
+      />
+      <Route
+        path="/resources/:id"
+        element={
+          <PublicLayout>
+            <ResourceDetailPage />
+          </PublicLayout>
+        }
+      />
+      <Route
         path="/login"
         element={
           <PublicLayout>
@@ -301,6 +327,10 @@ export function App() {
       <Route
         path="/portal/resources"
         element={<PortalRoute component={ResourcesPage} cleanSubpath="/resources" />}
+      />
+      <Route
+        path="/portal/resources/:id"
+        element={<PortalRoute component={ResourceDetailPage} cleanSubpath="/resources" />}
       />
       <Route
         path="/portal/profile"

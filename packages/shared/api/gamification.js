@@ -25,8 +25,10 @@ export const POINT_VALUES = {
 
 /**
  * Fetch Leaderboard rankings sorted by total_points descending
+ * @param {number} limit - Maximum number of members to return
+ * @param {boolean} includeHidden - If true (e.g. for Admin), includes members even if hidden
  */
-export async function getLeaderboard(limit = 20) {
+export async function getLeaderboard(limit = 20, includeHidden = false) {
   try {
     const { data, error } = await supabase
       .from('member_points')
@@ -44,14 +46,20 @@ export async function getLeaderboard(limit = 20) {
           department,
           roll_number,
           branch,
-          year
+          year,
+          show_on_leaderboard
         )
       `)
       .order('total_points', { ascending: false })
       .limit(limit);
 
     if (!error && data && data.length > 0) {
-      return data.map((item, index) => ({
+      // Filter out hidden members unless includeHidden is requested by admin
+      const filtered = includeHidden
+        ? data
+        : data.filter((item) => item.profiles?.show_on_leaderboard !== false);
+
+      return filtered.map((item, index) => ({
         rank: index + 1,
         user_id: item.user_id,
         total_points: item.total_points || 0,
@@ -61,7 +69,8 @@ export async function getLeaderboard(limit = 20) {
         avatar_url: item.profiles?.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80',
         role: item.profiles?.role || 'member',
         branch: item.profiles?.branch || item.profiles?.department || 'CSE',
-        year: item.profiles?.year || 'Member'
+        year: item.profiles?.year || 'Member',
+        show_on_leaderboard: item.profiles?.show_on_leaderboard !== false
       }));
     }
   } catch (err) {
@@ -70,6 +79,28 @@ export async function getLeaderboard(limit = 20) {
 
   // If no live database rows yet, return empty list (no fake mock members)
   return [];
+}
+
+/**
+ * Admin function to toggle a member's visibility on the Leaderboard
+ * @param {string} userId - Target student profile ID
+ * @param {boolean} isVisible - True to show on leaderboard, false to hide
+ */
+export async function toggleLeaderboardVisibility(userId, isVisible) {
+  if (!userId) return { success: false, error: 'User ID is required' };
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ show_on_leaderboard: isVisible })
+      .eq('id', userId)
+      .select();
+
+    if (error) throw error;
+    return { success: true, data };
+  } catch (err) {
+    console.error('[ATC Gamification] toggleLeaderboardVisibility error:', err);
+    return { success: false, error: err.message };
+  }
 }
 
 /**

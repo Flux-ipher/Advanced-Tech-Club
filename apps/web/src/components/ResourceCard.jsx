@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   FilePdf,
   FileDoc,
@@ -9,7 +10,10 @@ import {
   DownloadSimple,
   Trash,
   Eye,
-  HardDrive
+  HardDrive,
+  GithubLogo,
+  BookOpen,
+  ArrowSquareOut
 } from '@phosphor-icons/react';
 import { formatRelativeTime } from '@atc/shared/utils/formatters';
 
@@ -22,11 +26,14 @@ export function ResourceCard({
   isBookmarked = false,
   onToggleBookmark
 }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const {
     id,
     title,
     description,
-    file_url,
+    file_url = '#',
     file_size = '1.2 MB',
     category = 'Slides',
     download_count = 0,
@@ -34,7 +41,42 @@ export function ResourceCard({
     author_name
   } = resource;
 
+  const isPortalPath = location.pathname.startsWith('/portal');
+  const targetDetailUrl = isPortalPath ? `/portal/resources/${id}` : `/resources/${id}`;
+
+  const isGithub = file_url && (file_url.includes('github.com') || file_url.includes('gitlab.com'));
+  const isArticle = file_url && (file_url.includes('medium.com') || file_url.includes('dev.to') || file_url.includes('substack.com') || file_url.includes('docs.') || category === 'Documentation');
+  const isTool = file_url && (file_url.includes('metaflow.org') || file_url.includes('mlflow.org') || file_url.includes('feast.dev') || (file_url.startsWith('http') && !file_url.match(/\.(pdf|zip|docx|pptx|gz|tar)$/i) && !isGithub && !isArticle));
+
+  const getActionButton = () => {
+    if (isGithub) {
+      return {
+        label: 'View Repo',
+        icon: <GithubLogo size={14} weight="bold" />
+      };
+    }
+    if (isArticle) {
+      return {
+        label: 'Read Article',
+        icon: <BookOpen size={14} weight="bold" />
+      };
+    }
+    if (isTool) {
+      return {
+        label: 'Open Platform',
+        icon: <ArrowSquareOut size={14} weight="bold" />
+      };
+    }
+    return {
+      label: 'Download',
+      icon: <DownloadSimple size={14} weight="bold" />
+    };
+  };
+
+  const action = getActionButton();
+
   const getCategoryIcon = () => {
+    if (isGithub) return <GithubLogo size={20} weight="duotone" className="text-neutral-800" />;
     switch (category) {
       case 'Code Samples':
         return <FileCode size={20} weight="duotone" className="text-primary-600" />;
@@ -51,6 +93,7 @@ export function ResourceCard({
   };
 
   const getCategoryBg = () => {
+    if (isGithub) return 'bg-neutral-100 text-neutral-800 border-neutral-300';
     switch (category) {
       case 'Code Samples':
         return 'bg-primary-50 text-primary-700 border-primary-200';
@@ -68,7 +111,7 @@ export function ResourceCard({
 
   return (
     <div
-      onClick={() => onPreview && onPreview(resource)}
+      onClick={() => navigate(targetDetailUrl)}
       className="voodoo-card-hover p-5 flex flex-col justify-between cursor-pointer group transition-all duration-200"
     >
       <div>
@@ -81,7 +124,7 @@ export function ResourceCard({
             <span
               className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border uppercase tracking-wider ${getCategoryBg()}`}
             >
-              {category}
+              {isGithub ? 'GitHub Repo' : category}
             </span>
 
             {onToggleBookmark && (
@@ -133,7 +176,7 @@ export function ResourceCard({
             {file_size}
           </span>
           <span>•</span>
-          <span>{download_count} downloads</span>
+          <span>{download_count} views</span>
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -141,10 +184,10 @@ export function ResourceCard({
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              if (onPreview) onPreview(resource);
+              navigate(targetDetailUrl);
             }}
             className="p-1.5 text-neutral-500 hover:text-primary-600 rounded-lg hover:bg-primary-50 transition-colors"
-            title="Preview resource"
+            title="View Details"
           >
             <Eye size={16} weight="regular" />
           </button>
@@ -153,12 +196,16 @@ export function ResourceCard({
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              onDownload(resource);
+              if (onDownload) {
+                onDownload(resource);
+              } else if (file_url && file_url !== '#') {
+                window.open(file_url, '_blank');
+              }
             }}
             className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5 shadow-sm"
           >
-            <DownloadSimple size={14} weight="bold" />
-            Download
+            {action.icon}
+            {action.label}
           </button>
         </div>
       </div>

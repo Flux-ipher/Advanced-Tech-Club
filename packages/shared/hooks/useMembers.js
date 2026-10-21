@@ -56,6 +56,13 @@ export function useMembers() {
     return updated;
   };
 
+  const toggleLeaderboard = async (userId, isVisible) => {
+    setMembers((prev) =>
+      prev.map((m) => (m.id === userId ? { ...m, show_on_leaderboard: isVisible } : m))
+    );
+    return await updateProfile(userId, { show_on_leaderboard: isVisible });
+  };
+
   const pendingMembers = members.filter((m) => {
     if (m.role === 'super_admin' || m.role === 'admin') return false;
     if (m.is_verified === true || m.verification_status === 'verified') return false;
@@ -74,7 +81,8 @@ export function useMembers() {
     changeMemberRole,
     updateMemberDetails,
     verifyMemberAccount,
-    rejectMemberAccount
+    rejectMemberAccount,
+    toggleLeaderboard
   };
 }
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '@atc/shared/hooks/useAuth';
-import { useResources } from '@atc/shared/hooks/useResources';
+import { useResources, useVaultGallery } from '@atc/shared/hooks/useResources';
 import { useApkMetadata } from '@atc/shared/hooks/useApkMetadata';
 import { ResourceCard } from '../components/ResourceCard';
 import { SkeletonResourceCard } from '../components/SkeletonCard';
@@ -25,7 +25,13 @@ import {
   Check,
   Eye,
   ArrowUpDown,
-  Share2
+  Share2,
+  Trophy,
+  Award,
+  Camera,
+  Heart,
+  X,
+  Users
 } from 'lucide-react';
 
 export function ResourcesPage() {
@@ -37,7 +43,22 @@ export function ResourcesPage() {
     removeResource,
     downloadResource
   } = useResources();
+  const { memories, loading: galleryLoading, addMemory } = useVaultGallery();
   const apk = useApkMetadata();
+
+  const [vaultView, setVaultView] = useState('resources'); // 'resources' | 'gallery'
+  const [galleryFilter, setGalleryFilter] = useState('All'); // 'All' | 'hackathon' | 'contributor' | 'event'
+  const [selectedMemory, setSelectedMemory] = useState(null); // Lightbox
+  const [isMemoryModalOpen, setIsMemoryModalOpen] = useState(false);
+
+  // New Memory Form
+  const [memTitle, setMemTitle] = useState('');
+  const [memCategory, setMemCategory] = useState('hackathon');
+  const [memAwardTitle, setMemAwardTitle] = useState('');
+  const [memImageUrl, setMemImageUrl] = useState('');
+  const [memAchievers, setMemAchievers] = useState('');
+  const [memDescription, setMemDescription] = useState('');
+  const [memSubmitting, setMemSubmitting] = useState(false);
 
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -141,163 +162,582 @@ export function ResourcesPage() {
     }
   };
 
+  const handleCreateMemory = async (e) => {
+    e.preventDefault();
+    if (!memTitle.trim() || !memImageUrl.trim()) {
+      alert('Please enter a title and select/enter an image URL.');
+      return;
+    }
+
+    try {
+      setMemSubmitting(true);
+      const achieversList = memAchievers
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      await addMemory({
+        title: memTitle.trim(),
+        category: memCategory,
+        award_title: memAwardTitle.trim(),
+        image_url: memImageUrl.trim(),
+        achievers: achieversList,
+        description: memDescription.trim(),
+        author_name: user?.full_name || 'Club Admin (Ritesh Mishra)'
+      });
+
+      setIsMemoryModalOpen(false);
+      setMemTitle('');
+      setMemAwardTitle('');
+      setMemImageUrl('');
+      setMemAchievers('');
+      setMemDescription('');
+    } catch (err) {
+      alert(err.message || 'Error saving campus memory');
+    } finally {
+      setMemSubmitting(false);
+    }
+  };
+
+  const filteredMemories = memories.filter((m) => {
+    if (galleryFilter === 'All') return true;
+    return m.category === galleryFilter;
+  });
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="p-1.5 rounded-lg bg-warning-100 text-warning-700">
-              <FolderGit2 className="w-4 h-4" />
-            </span>
-            <span className="text-xs font-bold uppercase tracking-wider text-warning-700">
-              Club Knowledge Vault
-            </span>
-          </div>
-          <h1 className="text-3xl font-bold text-neutral-900 tracking-tight">
-            Resource Library
-          </h1>
-          <p className="text-sm text-neutral-500 mt-1">
-            Download slides, starter templates, cheat sheets, and architectural guides curated by ATC Leads.
-          </p>
-        </div>
+      {/* 1. VAULT MODE SEGMENTED SWITCHER */}
+      <div className="flex items-center gap-2 p-1.5 bg-neutral-100 rounded-2xl w-fit mb-8 border border-neutral-200">
+        <button
+          type="button"
+          onClick={() => setVaultView('resources')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+            vaultView === 'resources'
+              ? 'bg-white text-neutral-900 shadow-sm'
+              : 'text-neutral-500 hover:text-neutral-900'
+          }`}
+        >
+          <FolderGit2 className="w-4 h-4 text-warning-500" />
+          <span>Knowledge Assets & Docs ({resources.length})</span>
+        </button>
 
-        <div className="flex items-center gap-3">
-          <a
-            href={apk.downloadUrl}
-            download={apk.fileName}
-            className="btn-secondary text-xs shadow-sm flex items-center gap-1.5"
-            title={`Download Mobile App Standalone APK (v${apk.version} • ${apk.sizeShort})`}
-          >
-            <Download className="w-3.5 h-3.5 text-primary-600" />
-            Download Mobile APK ({apk.sizeShort})
-          </a>
-
-          {isAdmin && (
-            <button
-              onClick={() => setIsUploadModalOpen(true)}
-              className="btn-primary text-sm shadow-sm flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Upload New Resource
-            </button>
-          )}
-        </div>
+        <button
+          type="button"
+          onClick={() => setVaultView('gallery')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+            vaultView === 'gallery'
+              ? 'bg-white text-primary-700 shadow-sm'
+              : 'text-neutral-500 hover:text-neutral-900'
+          }`}
+        >
+          <Trophy className="w-4 h-4 text-warning-500" />
+          <span>Campus Gallery & Hall of Fame ({memories.length})</span>
+        </button>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="voodoo-card p-4 mb-8 space-y-3">
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-          {/* Category Pills & Saved Filter */}
-          <div
-            className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0"
-            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-          >
-            {categories.map((cat) => (
+      {vaultView === 'resources' ? (
+        <>
+          {/* Resource Library Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="p-1.5 rounded-lg bg-warning-100 text-warning-700">
+                  <FolderGit2 className="w-4 h-4" />
+                </span>
+                <span className="text-xs font-bold uppercase tracking-wider text-warning-700">
+                  Club Knowledge Vault
+                </span>
+              </div>
+              <h1 className="text-3xl font-bold text-neutral-900 tracking-tight">
+                Resource Library
+              </h1>
+              <p className="text-sm text-neutral-500 mt-1">
+                Download slides, starter templates, cheat sheets, and architectural guides curated by ATC Leads.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <a
+                href={apk.downloadUrl}
+                download={apk.fileName}
+                className="btn-secondary text-xs shadow-sm flex items-center gap-1.5"
+                title={`Download Mobile App Standalone APK (v${apk.version} • ${apk.sizeShort})`}
+              >
+                <Download className="w-3.5 h-3.5 text-primary-600" />
+                Download Mobile APK ({apk.sizeShort})
+              </a>
+
+              {isAdmin && (
+                <button
+                  onClick={() => setIsUploadModalOpen(true)}
+                  className="btn-primary text-sm shadow-sm flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Upload New Resource
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Filter and Search Bar */}
+          <div className="voodoo-card p-4 mb-8 space-y-3">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+              {/* Category Pills & Saved Filter */}
+              <div
+                className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              >
+                {categories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => {
+                      setCategoryFilter(cat);
+                      setShowSavedOnly(false);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors shrink-0 ${
+                      !showSavedOnly && categoryFilter === cat
+                        ? 'bg-primary-500 text-white shadow-xs'
+                        : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+
+                <button
+                  onClick={() => setShowSavedOnly((prev) => !prev)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition-colors shrink-0 ${
+                    showSavedOnly
+                      ? 'bg-warning-500 text-white shadow-sm'
+                      : 'bg-warning-50 text-warning-700 hover:bg-warning-100 border border-warning-200'
+                  }`}
+                >
+                  <Star className={`w-3.5 h-3.5 ${showSavedOnly ? 'fill-white' : 'fill-warning-500'}`} />
+                  Saved ({bookmarkedIds.length})
+                </button>
+              </div>
+
+              {/* Controls: Search and Sort */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <div className="relative w-full sm:w-64">
+                  <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    placeholder="Search templates & slides..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-neutral-200 bg-neutral-50 focus:bg-white focus:outline-none focus:border-primary-500 transition-colors"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between sm:justify-start gap-1.5 text-xs text-neutral-500">
+                  <span className="flex items-center gap-1 text-neutral-400">
+                    <ArrowUpDown className="w-3.5 h-3.5" />
+                    <span className="sm:hidden text-[11px]">Sort:</span>
+                  </span>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="flex-1 sm:flex-initial px-2 py-1.5 rounded-lg border border-neutral-200 bg-neutral-50 text-xs font-medium text-neutral-700 focus:outline-none focus:border-primary-500"
+                  >
+                    <option value="popular">Most Popular</option>
+                    <option value="newest">Recently Added</option>
+                    <option value="alpha">Alphabetical (A-Z)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Resources Grid */}
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <SkeletonResourceCard key={i} />
+              ))}
+            </div>
+          ) : filteredResources.length === 0 ? (
+            <div className="voodoo-card bg-white overflow-hidden p-6">
+              <EmptyState
+                illustration={searchQuery ? emptySearchIllustration : emptyResourcesIllustration}
+                title={showSavedOnly ? 'No saved resources' : searchQuery ? 'No matching resources' : 'Vault library is empty'}
+                subtitle={
+                  showSavedOnly
+                    ? 'You have not bookmarked any resources yet. Click the bookmark icon on any card to save it.'
+                    : searchQuery
+                    ? `No materials found matching "${searchQuery}". Try a different keyword.`
+                    : 'Curated workshop slides, cheat sheets, code templates, and engineering guides will be published here.'
+                }
+                action={
+                  isAdmin
+                    ? {
+                        label: 'Upload Resource',
+                        onClick: () => setIsUploadModalOpen(true)
+                      }
+                    : null
+                }
+              />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredResources.map((res) => (
+                <ResourceCard
+                  key={res.id}
+                  resource={res}
+                  onDownload={downloadResource}
+                  isAdmin={isAdmin}
+                  onDelete={removeResource}
+                  onPreview={setSelectedResource}
+                  isBookmarked={bookmarkedIds.includes(res.id)}
+                  onToggleBookmark={toggleBookmark}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        /* CAMPUS GALLERY & HALL OF FAME */
+        <div className="space-y-8 animate-in fade-in duration-200">
+          {/* Gallery Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="p-1.5 rounded-lg bg-warning-100 text-warning-700">
+                  <Trophy className="w-4 h-4" />
+                </span>
+                <span className="text-xs font-bold uppercase tracking-wider text-warning-700">
+                  Campus Achievements & Memories
+                </span>
+              </div>
+              <h1 className="text-3xl font-bold text-neutral-900 tracking-tight">
+                Vault Campus Gallery
+              </h1>
+              <p className="text-sm text-neutral-500 mt-1">
+                Celebrating student hackathon champions, outstanding open-source contributors, and memorable campus tech milestones.
+              </p>
+            </div>
+
+            {isAdmin && (
               <button
-                key={cat}
-                onClick={() => {
-                  setCategoryFilter(cat);
-                  setShowSavedOnly(false);
-                }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors shrink-0 ${
-                  !showSavedOnly && categoryFilter === cat
-                    ? 'bg-primary-500 text-white shadow-xs'
+                onClick={() => setIsMemoryModalOpen(true)}
+                className="btn-primary text-sm shadow-sm flex items-center gap-2 self-start md:self-auto"
+              >
+                <Plus className="w-4 h-4" />
+                Add Campus Memory / Award
+              </button>
+            )}
+          </div>
+
+          {/* Gallery Category Filter Chips */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+            {[
+              { id: 'All', label: 'All Memories' },
+              { id: 'hackathon', label: '🏆 Hackathon Winners' },
+              { id: 'contributor', label: '⭐ Top Contributors' },
+              { id: 'event', label: '📸 Campus Events' }
+            ].map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setGalleryFilter(cat.id)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                  galleryFilter === cat.id
+                    ? 'bg-neutral-900 text-white shadow-xs'
                     : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
                 }`}
               >
-                {cat}
+                {cat.label}
               </button>
             ))}
+          </div>
 
-            <button
-              onClick={() => setShowSavedOnly((prev) => !prev)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition-colors shrink-0 ${
-                showSavedOnly
-                  ? 'bg-warning-500 text-white shadow-sm'
-                  : 'bg-warning-50 text-warning-700 hover:bg-warning-100 border border-warning-200'
-              }`}
+          {/* Gallery Grid */}
+          {galleryLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-80 rounded-3xl bg-neutral-200 animate-pulse" />
+              ))}
+            </div>
+          ) : filteredMemories.length === 0 ? (
+            <div className="voodoo-card p-12 text-center space-y-3">
+              <Camera className="w-10 h-10 text-neutral-400 mx-auto" />
+              <h3 className="text-base font-bold text-neutral-800">No Memories in this category</h3>
+              <p className="text-xs text-neutral-500 max-w-sm mx-auto">
+                Club Admins can upload event photos and honor students who won hackathons or made outstanding contributions.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {filteredMemories.map((mem) => (
+                <div
+                  key={mem.id}
+                  className="voodoo-card overflow-hidden group flex flex-col justify-between hover:shadow-xl transition-all duration-300"
+                >
+                  <div className="relative h-64 overflow-hidden bg-neutral-950 cursor-pointer" onClick={() => setSelectedMemory(mem)}>
+                    <img
+                      src={mem.image_url}
+                      alt={mem.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-neutral-950/80 via-transparent to-black/20" />
+
+                    {/* Top Badges */}
+                    <div className="absolute top-3 left-3 flex flex-wrap gap-2">
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-black/60 text-white border border-white/20 backdrop-blur-md">
+                        {mem.category === 'hackathon' ? '🏆 Hackathon' : mem.category === 'contributor' ? '⭐ Top Contributor' : '📸 Campus Event'}
+                      </span>
+                      {mem.award_title && (
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/90 text-amber-950 shadow-sm flex items-center gap-1 backdrop-blur-md">
+                          <Trophy className="w-3 h-3" />
+                          <span>{mem.award_title}</span>
+                        </span>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedMemory(mem);
+                      }}
+                      className="absolute bottom-3 right-3 p-2 rounded-xl bg-black/60 text-white hover:bg-black/90 backdrop-blur-md text-xs font-semibold flex items-center gap-1 transition-all"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Expand Photo</span>
+                    </button>
+                  </div>
+
+                  <div className="p-6 space-y-4 flex-1 flex flex-col justify-between">
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-bold text-neutral-900 leading-snug group-hover:text-primary-600 transition-colors">
+                        {mem.title}
+                      </h3>
+                      <p className="text-xs text-neutral-600 leading-relaxed line-clamp-3">
+                        {mem.description}
+                      </p>
+                    </div>
+
+                    {/* Achievers / Contributors Tags */}
+                    {mem.achievers && mem.achievers.length > 0 && (
+                      <div className="pt-3 border-t border-neutral-100">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5 flex items-center gap-1">
+                          <Users className="w-3 h-3 text-primary-500" />
+                          <span>Recognized Students:</span>
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {mem.achievers.map((name, idx) => (
+                            <span
+                              key={idx}
+                              className="px-2 py-0.5 rounded-lg text-xs font-bold bg-primary-50 text-primary-700 border border-primary-200"
+                            >
+                              {name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="pt-3 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-400">
+                      <span>Recorded on {mem.event_date || 'Campus Archive'}</span>
+                      <span className="flex items-center gap-1 text-primary-600 font-bold">
+                        <Heart className="w-3.5 h-3.5 fill-primary-600" />
+                        {mem.likes_count || 42} Kudos
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Photo Lightbox Modal */}
+          {selectedMemory && (
+            <div
+              className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4"
+              onClick={() => setSelectedMemory(null)}
             >
-              <Star className={`w-3.5 h-3.5 ${showSavedOnly ? 'fill-white' : 'fill-warning-500'}`} />
-              Saved ({bookmarkedIds.length})
-            </button>
-          </div>
-
-          {/* Controls: Search and Sort */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <div className="relative w-full sm:w-64">
-              <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                placeholder="Search templates & slides..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-neutral-200 bg-neutral-50 focus:bg-white focus:outline-none focus:border-primary-500 transition-colors"
-              />
-            </div>
-
-            <div className="flex items-center justify-between sm:justify-start gap-1.5 text-xs text-neutral-500">
-              <span className="flex items-center gap-1 text-neutral-400">
-                <ArrowUpDown className="w-3.5 h-3.5" />
-                <span className="sm:hidden text-[11px]">Sort:</span>
-              </span>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="flex-1 sm:flex-initial px-2 py-1.5 rounded-lg border border-neutral-200 bg-neutral-50 text-xs font-medium text-neutral-700 focus:outline-none focus:border-primary-500"
+              <div
+                className="relative max-w-4xl w-full bg-neutral-950 border border-neutral-800 rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200"
+                onClick={(e) => e.stopPropagation()}
               >
-                <option value="popular">Most Popular</option>
-                <option value="newest">Recently Added</option>
-                <option value="alpha">Alphabetical (A-Z)</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedMemory(null)}
+                  className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-black transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
 
-      {/* Resources Grid */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <SkeletonResourceCard key={i} />
-          ))}
-        </div>
-      ) : filteredResources.length === 0 ? (
-        <div className="voodoo-card bg-white overflow-hidden p-6">
-          <EmptyState
-            illustration={searchQuery ? emptySearchIllustration : emptyResourcesIllustration}
-            title={showSavedOnly ? 'No saved resources' : searchQuery ? 'No matching resources' : 'Vault library is empty'}
-            subtitle={
-              showSavedOnly
-                ? 'You have not bookmarked any resources yet. Click the bookmark icon on any card to save it.'
-                : searchQuery
-                ? `No materials found matching "${searchQuery}". Try a different keyword.`
-                : 'Curated workshop slides, cheat sheets, code templates, and engineering guides will be published here.'
-            }
-            action={
-              isAdmin
-                ? {
-                    label: 'Upload Resource',
-                    onClick: () => setIsUploadModalOpen(true)
-                  }
-                : null
-            }
-          />
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredResources.map((res) => (
-            <ResourceCard
-              key={res.id}
-              resource={res}
-              onDownload={downloadResource}
-              isAdmin={isAdmin}
-              onDelete={removeResource}
-              onPreview={setSelectedResource}
-              isBookmarked={bookmarkedIds.includes(res.id)}
-              onToggleBookmark={toggleBookmark}
-            />
-          ))}
+                <div className="max-h-[60vh] bg-black flex items-center justify-center">
+                  <img
+                    src={selectedMemory.image_url}
+                    alt={selectedMemory.title}
+                    className="max-h-[60vh] w-auto object-contain mx-auto"
+                  />
+                </div>
+
+                <div className="p-6 text-white space-y-3">
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary-500/20 text-primary-300 border border-primary-500/30">
+                      {selectedMemory.category.toUpperCase()}
+                    </span>
+                    {selectedMemory.award_title && (
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-amber-950">
+                        🏆 {selectedMemory.award_title}
+                      </span>
+                    )}
+                  </div>
+
+                  <h3 className="text-xl font-bold text-white">{selectedMemory.title}</h3>
+                  <p className="text-xs text-neutral-300 leading-relaxed">{selectedMemory.description}</p>
+
+                  {selectedMemory.achievers && selectedMemory.achievers.length > 0 && (
+                    <div className="pt-2 flex flex-wrap gap-2 items-center">
+                      <span className="text-xs text-neutral-400 font-semibold">Honorees:</span>
+                      {selectedMemory.achievers.map((ach, i) => (
+                        <span key={i} className="px-2 py-0.5 rounded bg-white/10 text-white text-xs font-bold">
+                          {ach}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Admin Add Campus Memory Modal */}
+          {isMemoryModalOpen && (
+            <Modal
+              isOpen={isMemoryModalOpen}
+              onClose={() => setIsMemoryModalOpen(false)}
+              title="Add Campus Memory / Student Award"
+              maxWidth="max-w-xl"
+            >
+              <form onSubmit={handleCreateMemory} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase text-neutral-700 mb-1">
+                    Memory Title *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 1st Place at Hackathon or Top Committer Honors"
+                    value={memTitle}
+                    onChange={(e) => setMemTitle(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-neutral-700 mb-1">
+                      Category
+                    </label>
+                    <select
+                      value={memCategory}
+                      onChange={(e) => setMemCategory(e.target.value)}
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500 bg-white"
+                    >
+                      <option value="hackathon">Hackathon Winner</option>
+                      <option value="contributor">Top Contributor</option>
+                      <option value="event">Campus Event Photo</option>
+                      <option value="project">Featured Project</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-neutral-700 mb-1">
+                      Award / Honor Title
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 1st Prize · Gold Trophy"
+                      value={memAwardTitle}
+                      onChange={(e) => setMemAwardTitle(e.target.value)}
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-neutral-700 mb-1">
+                    Student Honorees (Comma separated names)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Ritesh Mishra, Aryan Sharma, Sneha Patel"
+                    value={memAchievers}
+                    onChange={(e) => setMemAchievers(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-neutral-700 mb-1">
+                    Photo URL *
+                  </label>
+                  <input
+                    type="url"
+                    required
+                    placeholder="https://images.unsplash.com/... or uploaded photo link"
+                    value={memImageUrl}
+                    onChange={(e) => setMemImageUrl(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500 mb-2"
+                  />
+
+                  {/* 1-Tap Presets */}
+                  <div className="flex flex-wrap gap-1.5 items-center">
+                    <span className="text-[10px] text-neutral-400 font-bold uppercase">Presets:</span>
+                    {[
+                      { label: '🏆 SIH Hackathon', url: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=1200&q=80' },
+                      { label: '💻 CTF Heist', url: 'https://cjmviumwfzxkxtorzyvk.supabase.co/storage/v1/object/public/event-images/1772085185188-jggj8y620bh.jpg' },
+                      { label: '⭐ Top Contributors', url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1200&q=80' },
+                      { label: '⚡ Jugaad-a-thon', url: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1200&q=80' }
+                    ].map((p, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setMemImageUrl(p.url)}
+                        className="px-2 py-0.5 rounded text-[11px] font-semibold bg-neutral-100 text-neutral-700 hover:bg-primary-50 hover:text-primary-700 transition-colors"
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-neutral-700 mb-1">
+                    Memory Description
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="Describe the milestone, what the team built, and how they won..."
+                    value={memDescription}
+                    onChange={(e) => setMemDescription(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-200">
+                  <button
+                    type="button"
+                    onClick={() => setIsMemoryModalOpen(false)}
+                    className="btn-secondary text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={memSubmitting}
+                    className="btn-primary text-sm"
+                  >
+                    {memSubmitting ? 'Publishing...' : 'Add to Campus Gallery'}
+                  </button>
+                </div>
+              </form>
+            </Modal>
+          )}
         </div>
       )}
 
