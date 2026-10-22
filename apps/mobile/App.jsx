@@ -159,7 +159,7 @@ export default function App() {
 
   // Gamification & Badges State (Synchronized directly with Supabase)
   const [memberPoints, setMemberPoints] = useState(0);
-  const [memberRank, setMemberRank] = useState(1);
+  const [memberRank, setMemberRank] = useState(null);
   const [memberStreak, setMemberStreak] = useState(0);
   const [allBadgesList, setAllBadgesList] = useState([]);
   const [earnedBadgesList, setEarnedBadgesList] = useState([]);
@@ -212,6 +212,14 @@ export default function App() {
   const [customGoogleName, setCustomGoogleName] = useState('');
 
   const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
+
+  // Open Leaderboard with up-to-date visibility and rankings
+  const openLeaderboard = () => {
+    setIsLeaderboardOpen(true);
+    getLeaderboard(50, isAdmin).then((lb) => {
+      if (lb && lb.length > 0) setLeaderboardList(lb);
+    }).catch(() => {});
+  };
 
   // Rule 4: Admin Role Privacy - format strictly as 'Admin' or 'Member'
   const getDisplayRole = (role) => {
@@ -2049,7 +2057,7 @@ export default function App() {
 
           {/* Top 3 Podium Cards */}
           <View style={{ flexDirection: 'row', gap: 6, marginBottom: 14, justifyContent: 'center' }}>
-            {leaderboardList.slice(0, 3).map((item, idx) => {
+            {leaderboardList.filter((m) => m.show_on_leaderboard !== false).slice(0, 3).map((item, idx) => {
               const medals = ['🥇', '🥈', '🥉'];
               const bgColors = ['#fef3c7', '#f1f5f9', '#ffedd5'];
               return (
@@ -2083,67 +2091,106 @@ export default function App() {
 
           {/* Full Rankings ScrollView */}
           <ScrollView showsVerticalScrollIndicator={false} style={{ gap: 6 }}>
-            {leaderboardList.map((m, idx) => (
-              <View
-                key={m.user_id || idx}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingVertical: 8,
-                  paddingHorizontal: 10,
-                  borderRadius: 10,
-                  backgroundColor: m.user_id === currentUser?.id ? colors.primary[50] : '#ffffff',
-                  borderWidth: 1,
-                  borderColor: m.user_id === currentUser?.id ? colors.primary[200] : colors.neutral[100],
-                  marginBottom: 6
-                }}
-              >
-                <Text style={{ width: 28, fontSize: 12, fontWeight: 'bold', color: colors.neutral[500] }}>
-                  #{idx + 1}
-                </Text>
-                <Image
-                  source={{ uri: m.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80' }}
-                  style={{ width: 32, height: 32, borderRadius: 16, marginRight: 10 }}
-                />
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.neutral[900] }} numberOfLines={1}>
-                    {m.full_name}
+            {leaderboardList.map((m, idx) => {
+              const isVisible = m.show_on_leaderboard !== false;
+              const isMe = m.user_id === currentUser?.id;
+              return (
+                <View
+                  key={m.user_id || idx}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingVertical: 8,
+                    paddingHorizontal: 10,
+                    borderRadius: 10,
+                    backgroundColor: !isVisible
+                      ? '#f8fafc'
+                      : isMe
+                      ? colors.primary[50]
+                      : '#ffffff',
+                    borderWidth: 1,
+                    borderColor: !isVisible
+                      ? colors.neutral[200]
+                      : isMe
+                      ? colors.primary[200]
+                      : colors.neutral[100],
+                    marginBottom: 6,
+                    opacity: !isVisible ? 0.6 : 1
+                  }}
+                >
+                  <Text style={{ width: 28, fontSize: 12, fontWeight: 'bold', color: colors.neutral[500] }}>
+                    {m.rank ? `#${m.rank}` : '—'}
                   </Text>
-                  <Text style={{ fontSize: 10, color: colors.neutral[400] }}>
-                    {m.branch || 'CSE'} · {m.checkin_streak || 0}d streak 🔥
-                  </Text>
-                </View>
-                <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.primary[700] }}>
-                  {m.total_points} XP
-                </Text>
-
-                {isAdmin && (
-                  <TouchableOpacity
-                    onPress={async () => {
-                      const newVis = m.show_on_leaderboard === false;
-                      setLeaderboardList((prev) =>
-                        prev.map((item) =>
-                          item.user_id === m.user_id ? { ...item, show_on_leaderboard: newVis } : item
-                        )
-                      );
-                      await toggleLeaderboardVisibility(m.user_id, newVis);
-                      triggerToast(newVis ? `✓ ${m.full_name} visible` : `✕ ${m.full_name} hidden`);
-                    }}
-                    style={{
-                      paddingHorizontal: 8,
-                      paddingVertical: 4,
-                      borderRadius: 6,
-                      backgroundColor: m.show_on_leaderboard !== false ? colors.success[50] : colors.neutral[200],
-                      marginLeft: 8
-                    }}
-                  >
-                    <Text style={{ fontSize: 9, fontWeight: 'bold', color: m.show_on_leaderboard !== false ? colors.success[700] : colors.neutral[600] }}>
-                      {m.show_on_leaderboard !== false ? '👁 On' : '✕ Off'}
+                  <Image
+                    source={{ uri: m.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80' }}
+                    style={{ width: 32, height: 32, borderRadius: 16, marginRight: 10 }}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 'bold',
+                          color: colors.neutral[900],
+                          textDecorationLine: !isVisible ? 'line-through' : 'none'
+                        }}
+                        numberOfLines={1}
+                      >
+                        {m.full_name}
+                      </Text>
+                      {!isVisible && (
+                        <View style={{ backgroundColor: colors.neutral[200], paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4 }}>
+                          <Text style={{ fontSize: 9, fontWeight: 'bold', color: colors.neutral[600] }}>Hidden</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={{ fontSize: 10, color: colors.neutral[400] }}>
+                      {m.branch || 'CSE'} · {m.checkin_streak || 0}d streak 🔥
                     </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            ))}
+                  </View>
+                  <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.primary[700] }}>
+                    {m.total_points} XP
+                  </Text>
+
+                  {isAdmin && (
+                    <TouchableOpacity
+                      onPress={async () => {
+                        const newVis = m.show_on_leaderboard === false;
+                        setLeaderboardList((prev) => {
+                          const updated = prev.map((item) =>
+                            item.user_id === m.user_id ? { ...item, show_on_leaderboard: newVis } : item
+                          );
+                          let visRank = 1;
+                          return updated.map((item) => ({
+                            ...item,
+                            rank: item.show_on_leaderboard !== false ? visRank++ : null
+                          }));
+                        });
+                        const res = await toggleLeaderboardVisibility(m.user_id, newVis);
+                        if (!res.success) {
+                          getLeaderboard(50, true).then(setLeaderboardList);
+                        } else if (currentUser?.id) {
+                          const updatedRank = await getMyRank(currentUser.id);
+                          setMemberRank(updatedRank);
+                        }
+                        triggerToast(newVis ? `✓ ${m.full_name} visible` : `✕ ${m.full_name} hidden`);
+                      }}
+                      style={{
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                        borderRadius: 6,
+                        backgroundColor: m.show_on_leaderboard !== false ? colors.success[50] : colors.neutral[200],
+                        marginLeft: 8
+                      }}
+                    >
+                      <Text style={{ fontSize: 9, fontWeight: 'bold', color: m.show_on_leaderboard !== false ? colors.success[700] : colors.neutral[600] }}>
+                        {m.show_on_leaderboard !== false ? '👁 On' : '✕ Off'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })}
           </ScrollView>
 
           <TouchableOpacity
@@ -3749,7 +3796,7 @@ export default function App() {
                   <TouchableOpacity
                     onPress={() => {
                       setIsFabActionMenuOpen(false);
-                      setIsLeaderboardOpen(true);
+                      openLeaderboard();
                     }}
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.neutral[50], padding: 12, borderRadius: 14, borderWidth: 1, borderColor: colors.neutral[200] }}
                   >
@@ -4960,7 +5007,7 @@ export default function App() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => setIsLeaderboardOpen(true)}
+                onPress={openLeaderboard}
                 style={{
                   flex: 1,
                   backgroundColor: '#ffffff',
@@ -6336,10 +6383,10 @@ export default function App() {
                     <Text style={{ fontSize: 10, color: '#92400e', marginTop: 2, fontWeight: 'bold' }}>Total Points</Text>
                   </View>
                   <TouchableOpacity
-                    onPress={() => setIsLeaderboardOpen(true)}
+                    onPress={openLeaderboard}
                     style={{ flex: 1, backgroundColor: colors.primary[50], borderWidth: 1, borderColor: colors.primary[200], borderRadius: 14, padding: 12, alignItems: 'center' }}
                   >
-                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.primary[700] }}>#{memberRank || '-'}</Text>
+                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.primary[700] }}>{memberRank ? `#${memberRank}` : '—'}</Text>
                     <Text style={{ fontSize: 10, color: colors.primary[600], marginTop: 2, fontWeight: 'bold' }}>Leaderboard ❯</Text>
                   </TouchableOpacity>
                   <View style={{ flex: 1, backgroundColor: '#fff7ed', borderWidth: 1, borderColor: '#fed7aa', borderRadius: 14, padding: 12, alignItems: 'center' }}>
@@ -6362,7 +6409,7 @@ export default function App() {
                     <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900] }}>
                       🎖️ Badges & Accolades ({earnedBadgesList.length}/{allBadgesList.length})
                     </Text>
-                    <TouchableOpacity onPress={() => setIsLeaderboardOpen(true)}>
+                    <TouchableOpacity onPress={openLeaderboard}>
                       <Text style={{ fontSize: 11, color: colors.primary[600], fontWeight: 'bold' }}>
                         Leaderboard ❯
                       </Text>

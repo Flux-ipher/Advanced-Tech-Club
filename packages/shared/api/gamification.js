@@ -59,19 +59,24 @@ export async function getLeaderboard(limit = 20, includeHidden = false) {
         ? data
         : data.filter((item) => item.profiles?.show_on_leaderboard !== false);
 
-      return filtered.map((item, index) => ({
-        rank: index + 1,
-        user_id: item.user_id,
-        total_points: item.total_points || 0,
-        checkin_streak: item.checkin_streak || 0,
-        full_name: item.profiles?.full_name || 'ATC Engineer',
-        email: item.profiles?.email || '',
-        avatar_url: item.profiles?.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80',
-        role: item.profiles?.role || 'member',
-        branch: item.profiles?.branch || item.profiles?.department || 'CSE',
-        year: item.profiles?.year || 'Member',
-        show_on_leaderboard: item.profiles?.show_on_leaderboard !== false
-      }));
+      // Dynamically assign ranks ONLY to visible members so hidden admins/testers don't steal ranks
+      let visibleRank = 1;
+      return filtered.map((item) => {
+        const isVisible = item.profiles?.show_on_leaderboard !== false;
+        return {
+          rank: isVisible ? visibleRank++ : null,
+          user_id: item.user_id,
+          total_points: item.total_points || 0,
+          checkin_streak: item.checkin_streak || 0,
+          full_name: item.profiles?.full_name || 'ATC Engineer',
+          email: item.profiles?.email || '',
+          avatar_url: item.profiles?.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80',
+          role: item.profiles?.role || 'member',
+          branch: item.profiles?.branch || item.profiles?.department || 'CSE',
+          year: item.profiles?.year || 'Member',
+          show_on_leaderboard: isVisible
+        };
+      });
     }
   } catch (err) {
     console.warn('[ATC Gamification] Live leaderboard fetch note:', err);
@@ -107,19 +112,20 @@ export async function toggleLeaderboardVisibility(userId, isVisible) {
  * Get specific member's rank
  */
 export async function getMyRank(userId) {
-  if (!userId) return 1;
+  if (!userId) return null;
   try {
     const { data: rankRpc, error } = await supabase.rpc('get_member_rank', { member_id: userId });
-    if (!error && rankRpc) {
+    if (!error) {
       return rankRpc;
     }
   } catch (err) {
-    // Fallback to computing from leaderboard list
+    // Fallback to computing from visible leaderboard
   }
 
-  const leaderboard = await getLeaderboard(100);
-  const foundIndex = leaderboard.findIndex((m) => m.user_id === userId);
-  return foundIndex !== -1 ? foundIndex + 1 : leaderboard.length + 1;
+  // Fallback: search within visible leaderboard only (exclude hidden)
+  const leaderboard = await getLeaderboard(100, false);
+  const found = leaderboard.find((m) => m.user_id === userId);
+  return found ? found.rank : null;
 }
 
 /**

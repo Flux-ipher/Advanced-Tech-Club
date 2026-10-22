@@ -13,8 +13,9 @@ export function LeaderboardPage() {
   const { badges, points } = useMemberGamification(user?.id);
   const [selectedBadge, setSelectedBadge] = useState(null);
 
-  const topThree = rankings.slice(0, 3);
-  const restOfRankings = rankings.slice(3);
+  const visibleRankings = rankings.filter((m) => m.show_on_leaderboard !== false);
+  const topThree = visibleRankings.slice(0, 3);
+  const restOfRankings = visibleRankings.slice(3);
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-300">
@@ -41,10 +42,12 @@ export function LeaderboardPage() {
           {user && (
             <div className="flex items-center gap-4 bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-md shrink-0">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-primary-600 to-primary-400 flex items-center justify-center font-black text-xl text-white shadow-inner">
-                #{myRank}
+                {myRank ? `#${myRank}` : '—'}
               </div>
               <div>
-                <p className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">Your Standing</p>
+                <p className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
+                  {myRank ? 'Your Standing' : 'Hidden From Roster'}
+                </p>
                 <div className="flex items-center gap-3 mt-0.5">
                   <span className="text-lg font-extrabold text-white">{points.total_points || 0} pts</span>
                   <span className="text-xs font-semibold text-warning-400 flex items-center gap-1 bg-warning-500/10 px-2 py-0.5 rounded-full">
@@ -166,7 +169,7 @@ export function LeaderboardPage() {
                     <span className="text-lg">🥉</span>
                   ) : (
                     <span className="font-mono font-bold text-neutral-400 text-sm">
-                      #{member.rank}
+                      {member.rank ? `#${member.rank}` : '—'}
                     </span>
                   )}
                 </div>
