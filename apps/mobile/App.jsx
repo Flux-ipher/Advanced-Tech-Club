@@ -68,6 +68,15 @@ import {
   toggleLikeVaultGalleryMemory,
   deleteResource
 } from '@atc/shared/api/resources';
+import { setRole } from '@atc/shared/api/profiles';
+import {
+  fetchAssignedTasks,
+  createAssignedTask,
+  updateTaskStatus,
+  submitTaskDeliverable,
+  reviewAssignedTask,
+  deleteAssignedTask
+} from '@atc/shared/api/tasks';
 import { idempotency } from '@atc/shared/utils/idempotency';
 import { canStudentCheckIn, validateAttendanceCheckInTransition } from '@atc/shared/utils/stateMachines';
 import { checkTokenBucket } from '@atc/shared/utils/rateLimiter';
@@ -242,6 +251,12 @@ export default function App() {
   const [customGoogleName, setCustomGoogleName] = useState('');
 
   const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
+  const isSuperAdmin = currentUser?.role === 'super_admin';
+  const isMediaHead = currentUser?.role === 'media_head';
+  const canManageMedia = isAdmin || isMediaHead;
+  const canManagePosts = isAdmin || isMediaHead;
+  const canAssignRoles = isSuperAdmin;
+  const canAssignTasks = isAdmin || isSuperAdmin;
 
   // Open Leaderboard with up-to-date visibility and rankings
   const openLeaderboard = () => {
@@ -251,11 +266,42 @@ export default function App() {
     }).catch(() => {});
   };
 
-  // Rule 4: Admin Role Privacy - format strictly as 'Admin' or 'Member'
+  // Rule 4: Admin Role Privacy - format strictly as 'Admin' or 'Member' (and 'Media Head' for media head)
   const getDisplayRole = (role) => {
     if (role === 'admin' || role === 'super_admin') return 'Admin';
+    if (role === 'media_head') return 'Media Head';
     return 'Member';
   };
+
+  // Role Tasks Hub State
+  const [assignedTasks, setAssignedTasks] = useState([]);
+  const [isAssignTaskModalOpen, setIsAssignTaskModalOpen] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskDesc, setNewTaskDesc] = useState('');
+  const [newTaskRole, setNewTaskRole] = useState('media_head');
+  const [newTaskAssigneeId, setNewTaskAssigneeId] = useState('');
+  const [newTaskAssigneeName, setNewTaskAssigneeName] = useState('');
+  const [newTaskPriority, setNewTaskPriority] = useState('high');
+  const [newTaskPoints, setNewTaskPoints] = useState('100');
+  const [newTaskDueDate, setNewTaskDueDate] = useState('');
+  const [taskAssignSubmitting, setTaskAssignSubmitting] = useState(false);
+
+  // Deliverable Submit Modal State (for Media Head / Assignee)
+  const [isSubmitDeliverableModalOpen, setIsSubmitDeliverableModalOpen] = useState(false);
+  const [targetDeliverableTask, setTargetDeliverableTask] = useState(null);
+  const [deliverableUrl, setDeliverableUrl] = useState('');
+  const [deliverableNotes, setDeliverableNotes] = useState('');
+  const [deliverableSubmitting, setDeliverableSubmitting] = useState(false);
+
+  // Deliverable Review Modal State (for Admin / Super Admin)
+  const [isReviewTaskModalOpen, setIsReviewTaskModalOpen] = useState(false);
+  const [targetReviewTask, setTargetReviewTask] = useState(null);
+  const [reviewTaskFeedback, setReviewTaskFeedback] = useState('');
+  const [reviewTaskPoints, setReviewTaskPoints] = useState('100');
+  const [reviewTaskSubmitting, setReviewTaskSubmitting] = useState(false);
+
+  // Role Assignment Processing State
+  const [roleChangeLoading, setRoleChangeLoading] = useState(false);
 
   // Helper: Persist mobile session to disk across app reboots
   const saveMobileSession = async (user) => {
@@ -612,6 +658,16 @@ export default function App() {
         console.warn('[ATC Mobile] Contribution reports fetch note:', repErr);
       }
 
+      // Load Assigned Role Tasks
+      try {
+        const tasks = await fetchAssignedTasks();
+        if (tasks && Array.isArray(tasks)) {
+          setAssignedTasks(tasks);
+        }
+      } catch (tErr) {
+        console.warn('[ATC Mobile] Assigned tasks fetch note:', tErr);
+      }
+
       // Re-sync current logged-in user profile & gamification directly from Supabase
       if (currentUser?.email) {
         const { data: dbUser } = await supabase
@@ -691,6 +747,14 @@ export default function App() {
         if (payload?.new?.title) {
           sendDevicePushNotification(payload.new.title, payload.new.message || 'New Campus Notification');
         }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'assigned_tasks' }, async () => {
+        try {
+          const updatedTasks = await fetchAssignedTasks();
+          if (updatedTasks && Array.isArray(updatedTasks)) {
+            setAssignedTasks(updatedTasks);
+          }
+        } catch (_) {}
       })
       .subscribe();
 
@@ -2787,6 +2851,151 @@ export default function App() {
     }
   };
 
+  // Role Assignment Execution (Rule 4 Preserved)
+  const handleAssignRole = async (targetUser, newRole) => {
+    if (!targetUser || !targetUser.id) return;
+    setRoleChangeLoading(true);
+    try {
+      await setRole(targetUser.id, newRole);
+      setAdjustTargetUser((prev) => (prev ? { ...prev, role: newRole } : null));
+      setAllProfiles((prev) =>
+        prev.map((p) =>
+          p.id === targetUser.id || p.student_id === targetUser.id || p.email === targetUser.email
+            ? { ...p, role: newRole }
+            : p
+        )
+      );
+      if (currentUser?.id === targetUser.id || currentUser?.email === targetUser.email) {
+        const updatedUser = { ...currentUser, role: newRole };
+        setCurrentUser(updatedUser);
+        saveMobileSession(updatedUser);
+      }
+      triggerToast(`Role updated to ${getDisplayRole(newRole)} ✓`);
+    } catch (err) {
+      Alert.alert('Role Update Error', err.message || 'Failed to update user role');
+    } finally {
+      setRoleChangeLoading(false);
+    }
+  };
+
+  // Create Assigned Task (Super Admin / Admin)
+  const handleCreateAssignedTask = async () => {
+    if (!newTaskTitle.trim()) {
+      Alert.alert('Required', 'Please enter a task title.');
+      return;
+    }
+    setTaskAssignSubmitting(true);
+    try {
+      const pts = parseInt(newTaskPoints, 10) || 100;
+      const created = await createAssignedTask({
+        title: newTaskTitle.trim(),
+        description: newTaskDesc.trim(),
+        assigned_to_role: newTaskRole,
+        assigned_to_user_id: newTaskAssigneeId || null,
+        assigned_to_user_name: newTaskAssigneeName.trim() || (newTaskRole === 'media_head' ? 'Media Team' : 'Member'),
+        assigned_by: currentUser?.id || 'admin',
+        assigned_by_name: currentUser?.full_name || 'Club Admin (Ritesh Mishra)',
+        due_date: newTaskDueDate ? new Date(newTaskDueDate).toISOString() : null,
+        priority: newTaskPriority,
+        points_reward: pts
+      });
+
+      setAssignedTasks((prev) => [created, ...prev]);
+      setIsAssignTaskModalOpen(false);
+      setNewTaskTitle('');
+      setNewTaskDesc('');
+      setNewTaskRole('media_head');
+      setNewTaskAssigneeId('');
+      setNewTaskAssigneeName('');
+      setNewTaskPriority('high');
+      setNewTaskPoints('100');
+      setNewTaskDueDate('');
+      triggerToast('Task assigned successfully ✓');
+    } catch (err) {
+      Alert.alert('Task Error', err.message || 'Could not create task assignment');
+    } finally {
+      setTaskAssignSubmitting(false);
+    }
+  };
+
+  // Submit Deliverable (Media Head / Assignee)
+  const handleSubmitDeliverable = async () => {
+    if (!targetDeliverableTask) return;
+    if (!deliverableUrl.trim() && !deliverableNotes.trim()) {
+      Alert.alert('Required', 'Please enter a deliverable link or descriptive notes.');
+      return;
+    }
+    setDeliverableSubmitting(true);
+    try {
+      const updated = await submitTaskDeliverable(
+        targetDeliverableTask.id,
+        deliverableUrl.trim(),
+        deliverableNotes.trim()
+      );
+
+      setAssignedTasks((prev) =>
+        prev.map((t) => (t.id === targetDeliverableTask.id ? updated : t))
+      );
+      setIsSubmitDeliverableModalOpen(false);
+      setTargetDeliverableTask(null);
+      setDeliverableUrl('');
+      setDeliverableNotes('');
+      triggerToast('Deliverable submitted for review! 🚀');
+    } catch (err) {
+      Alert.alert('Submission Error', err.message || 'Could not submit deliverable');
+    } finally {
+      setDeliverableSubmitting(false);
+    }
+  };
+
+  // Review Assigned Task Deliverable (Admin / Super Admin)
+  const handleReviewDeliverable = async (decisionStatus) => {
+    if (!targetReviewTask) return;
+    setReviewTaskSubmitting(true);
+    try {
+      const pts = parseInt(reviewTaskPoints, 10) || 100;
+      const updated = await reviewAssignedTask(
+        targetReviewTask.id,
+        decisionStatus,
+        pts,
+        reviewTaskFeedback.trim(),
+        targetReviewTask.assigned_to_user_id || currentUser?.id
+      );
+
+      setAssignedTasks((prev) =>
+        prev.map((t) => (t.id === targetReviewTask.id ? updated : t))
+      );
+      setIsReviewTaskModalOpen(false);
+      setTargetReviewTask(null);
+      setReviewTaskFeedback('');
+      triggerToast(decisionStatus === 'approved' ? `Task Approved & +${pts} XP Awarded! 🎉` : 'Task Returned for Revision ✓');
+    } catch (err) {
+      Alert.alert('Review Error', err.message || 'Could not submit task review');
+    } finally {
+      setReviewTaskSubmitting(false);
+    }
+  };
+
+  // Delete Task
+  const handleDeleteAssignedTask = (taskId, taskTitle) => {
+    Alert.alert('Delete Task', `Are you sure you want to delete "${taskTitle}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteAssignedTask(taskId);
+            setAssignedTasks((prev) => prev.filter((t) => t.id !== taskId));
+            triggerToast('Task deleted');
+          } catch (err) {
+            Alert.alert('Error', err.message || 'Could not delete task');
+          }
+        }
+      }
+    ]);
+  };
+
   // UNIFIED STUDENT ONBOARDING & MEMBERSHIP APPLICATION MODAL
   const renderApplyModal = () => (
     <Modal visible={isApplyModalOpen} animationType="slide" transparent>
@@ -3524,6 +3733,53 @@ export default function App() {
                         <Text style={{ fontSize: 11, color: colors.primary[700], fontWeight: 'bold' }}>Change</Text>
                       </TouchableOpacity>
                     </View>
+
+                    {/* Role Assignment Pill Bar (Super Admin only) */}
+                    {canAssignRoles && (
+                      <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.primary[200] }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[900] }}>
+                            Assign Functional Role:
+                          </Text>
+                          {roleChangeLoading && <ActivityIndicator size="small" color={colors.primary[600]} />}
+                        </View>
+                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                          {[
+                            { role: 'member', label: 'Member' },
+                            { role: 'media_head', label: 'Media Head' },
+                            { role: 'admin', label: 'Admin' }
+                          ].map((r) => {
+                            const isCurrentRole = (adjustTargetUser.role || 'member') === r.role;
+                            return (
+                              <TouchableOpacity
+                                key={r.role}
+                                disabled={roleChangeLoading || isCurrentRole}
+                                onPress={() => handleAssignRole(adjustTargetUser, r.role)}
+                                style={{
+                                  flex: 1,
+                                  paddingVertical: 7,
+                                  borderRadius: 8,
+                                  backgroundColor: isCurrentRole ? colors.primary[700] : '#ffffff',
+                                  borderWidth: 1,
+                                  borderColor: isCurrentRole ? colors.primary[800] : colors.primary[300],
+                                  alignItems: 'center'
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: 'bold',
+                                    color: isCurrentRole ? '#ffffff' : colors.primary[800]
+                                  }}
+                                >
+                                  {r.label}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    )}
                   </View>
                 ) : (
                   <View style={{ gap: 8 }}>
@@ -3905,6 +4161,509 @@ export default function App() {
           </View>
         </TouchableWithoutFeedback>
       </TouchableOpacity>
+    </Modal>
+  );
+
+  // ASSIGN TASK MODAL (SUPER ADMIN / ADMIN)
+  const renderAssignTaskModal = () => (
+    <Modal visible={isAssignTaskModalOpen} animationType="slide" transparent>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center', padding: 20 }}
+      >
+        <View style={{ backgroundColor: '#ffffff', borderRadius: 24, padding: 22, maxHeight: '88%' }}>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#f3e8ff', justifyContent: 'center', alignItems: 'center' }}>
+                <Megaphone size={20} color="#7c3aed" weight="bold" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 17, fontWeight: 'bold', color: colors.neutral[900] }}>
+                  Assign Role Task
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.neutral[500] }}>
+                  Delegate media creation or club duties to functional roles
+                </Text>
+              </View>
+            </View>
+
+            <View style={{ gap: 12, marginTop: 10 }}>
+              {/* Task Title */}
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                  Task Title *
+                </Text>
+                <TextInput
+                  placeholder="e.g. Capture & Curate Workshop Highlight Photos"
+                  placeholderTextColor={colors.neutral[400]}
+                  value={newTaskTitle}
+                  onChangeText={setNewTaskTitle}
+                  style={{
+                    backgroundColor: colors.neutral[50],
+                    borderWidth: 1,
+                    borderColor: colors.neutral[300],
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    fontSize: 13,
+                    color: colors.neutral[900]
+                  }}
+                />
+              </View>
+
+              {/* Task Role Target */}
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                  Assigned Functional Role *
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {[
+                    { id: 'media_head', label: 'Media Head' },
+                    { id: 'member', label: 'General Member' }
+                  ].map((r) => (
+                    <TouchableOpacity
+                      key={r.id}
+                      onPress={() => setNewTaskRole(r.id)}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 9,
+                        borderRadius: 10,
+                        backgroundColor: newTaskRole === r.id ? '#7c3aed' : colors.neutral[100],
+                        borderWidth: 1,
+                        borderColor: newTaskRole === r.id ? '#6d28d9' : colors.neutral[200],
+                        alignItems: 'center'
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: newTaskRole === r.id ? '#ffffff' : colors.neutral[700] }}>
+                        {r.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Priority Selector */}
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                  Task Priority *
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  {[
+                    { id: 'low', label: 'Low', color: '#3b82f6' },
+                    { id: 'medium', label: 'Medium', color: '#10b981' },
+                    { id: 'high', label: 'High', color: '#f59e0b' },
+                    { id: 'urgent', label: 'Urgent', color: '#ef4444' }
+                  ].map((p) => (
+                    <TouchableOpacity
+                      key={p.id}
+                      onPress={() => setNewTaskPriority(p.id)}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 8,
+                        borderRadius: 8,
+                        backgroundColor: newTaskPriority === p.id ? p.color : colors.neutral[100],
+                        alignItems: 'center'
+                      }}
+                    >
+                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: newTaskPriority === p.id ? '#ffffff' : colors.neutral[700], textTransform: 'capitalize' }}>
+                        {p.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Points Reward & Due Date */}
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                    XP Reward Points *
+                  </Text>
+                  <TextInput
+                    placeholder="100"
+                    placeholderTextColor={colors.neutral[400]}
+                    keyboardType="numeric"
+                    value={newTaskPoints}
+                    onChangeText={setNewTaskPoints}
+                    style={{
+                      backgroundColor: colors.neutral[50],
+                      borderWidth: 1,
+                      borderColor: colors.neutral[300],
+                      borderRadius: 10,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      fontSize: 13,
+                      color: colors.neutral[900]
+                    }}
+                  />
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                    Assignee Name (Opt)
+                  </Text>
+                  <TextInput
+                    placeholder="e.g. Media Team"
+                    placeholderTextColor={colors.neutral[400]}
+                    value={newTaskAssigneeName}
+                    onChangeText={setNewTaskAssigneeName}
+                    style={{
+                      backgroundColor: colors.neutral[50],
+                      borderWidth: 1,
+                      borderColor: colors.neutral[300],
+                      borderRadius: 10,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      fontSize: 13,
+                      color: colors.neutral[900]
+                    }}
+                  />
+                </View>
+              </View>
+
+              {/* Task Description */}
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                  Detailed Task Instructions *
+                </Text>
+                <TextInput
+                  placeholder="Outline the deliverable requirements, format, guidelines..."
+                  placeholderTextColor={colors.neutral[400]}
+                  multiline
+                  numberOfLines={3}
+                  value={newTaskDesc}
+                  onChangeText={setNewTaskDesc}
+                  style={{
+                    backgroundColor: colors.neutral[50],
+                    borderWidth: 1,
+                    borderColor: colors.neutral[300],
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    fontSize: 13,
+                    color: colors.neutral[900],
+                    minHeight: 70,
+                    textAlignVertical: 'top'
+                  }}
+                />
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 20 }}>
+              <TouchableOpacity
+                onPress={() => setIsAssignTaskModalOpen(false)}
+                disabled={taskAssignSubmitting}
+                style={{
+                  flex: 1,
+                  backgroundColor: colors.neutral[100],
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{ color: colors.neutral[700], fontWeight: 'bold', fontSize: 13 }}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleCreateAssignedTask}
+                disabled={taskAssignSubmitting}
+                style={{
+                  flex: 1.5,
+                  backgroundColor: '#7c3aed',
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  alignItems: 'center'
+                }}
+              >
+                {taskAssignSubmitting ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
+                    Assign Task & Notify
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+
+  // SUBMIT DELIVERABLE MODAL (FOR MEDIA HEAD / ASSIGNEE)
+  const renderSubmitDeliverableModal = () => (
+    <Modal visible={isSubmitDeliverableModalOpen} animationType="slide" transparent>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center', padding: 20 }}
+      >
+        <View style={{ backgroundColor: '#ffffff', borderRadius: 24, padding: 22, maxHeight: '88%' }}>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#f3e8ff', justifyContent: 'center', alignItems: 'center' }}>
+                <RocketLaunch size={20} color="#7c3aed" weight="bold" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 17, fontWeight: 'bold', color: colors.neutral[900] }}>
+                  Submit Deliverable
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.neutral[500] }}>
+                  Submit completed media assets, URLs, or notes for Admin review
+                </Text>
+              </View>
+            </View>
+
+            {targetDeliverableTask && (
+              <View style={{ backgroundColor: '#faf5ff', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#e9d5ff', marginTop: 8 }}>
+                <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#5b21b6', marginBottom: 2 }}>
+                  {targetDeliverableTask.title}
+                </Text>
+                {targetDeliverableTask.description ? (
+                  <Text style={{ fontSize: 11, color: colors.neutral[600] }}>
+                    {targetDeliverableTask.description}
+                  </Text>
+                ) : null}
+              </View>
+            )}
+
+            <View style={{ gap: 12, marginTop: 14 }}>
+              {/* Deliverable Link */}
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                  Asset / Deliverable Link (Google Drive, Figma, GitHub, Gallery URL)
+                </Text>
+                <TextInput
+                  placeholder="https://drive.google.com/... or Figma link"
+                  placeholderTextColor={colors.neutral[400]}
+                  value={deliverableUrl}
+                  onChangeText={setDeliverableUrl}
+                  autoCapitalize="none"
+                  style={{
+                    backgroundColor: colors.neutral[50],
+                    borderWidth: 1,
+                    borderColor: colors.neutral[300],
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    fontSize: 13,
+                    color: colors.neutral[900]
+                  }}
+                />
+              </View>
+
+              {/* Notes */}
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                  Deliverable Notes & Summary *
+                </Text>
+                <TextInput
+                  placeholder="Describe the media content created, photos edited, posts published..."
+                  placeholderTextColor={colors.neutral[400]}
+                  multiline
+                  numberOfLines={3}
+                  value={deliverableNotes}
+                  onChangeText={setDeliverableNotes}
+                  style={{
+                    backgroundColor: colors.neutral[50],
+                    borderWidth: 1,
+                    borderColor: colors.neutral[300],
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    fontSize: 13,
+                    color: colors.neutral[900],
+                    minHeight: 70,
+                    textAlignVertical: 'top'
+                  }}
+                />
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 20 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  setIsSubmitDeliverableModalOpen(false);
+                  setTargetDeliverableTask(null);
+                }}
+                disabled={deliverableSubmitting}
+                style={{
+                  flex: 1,
+                  backgroundColor: colors.neutral[100],
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{ color: colors.neutral[700], fontWeight: 'bold', fontSize: 13 }}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleSubmitDeliverable}
+                disabled={deliverableSubmitting}
+                style={{
+                  flex: 1.5,
+                  backgroundColor: '#7c3aed',
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  alignItems: 'center'
+                }}
+              >
+                {deliverableSubmitting ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
+                    Send for Review 🚀
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+
+  // REVIEW ASSIGNED TASK MODAL (FOR SUPER ADMIN / ADMIN)
+  const renderReviewTaskModal = () => (
+    <Modal visible={isReviewTaskModalOpen} animationType="slide" transparent>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center', padding: 20 }}
+      >
+        <View style={{ backgroundColor: '#ffffff', borderRadius: 24, padding: 22, maxHeight: '88%' }}>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#dcfce7', justifyContent: 'center', alignItems: 'center' }}>
+                <SealCheck size={20} color="#15803d" weight="bold" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 17, fontWeight: 'bold', color: colors.neutral[900] }}>
+                  Review Deliverable & Award XP
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.neutral[500] }}>
+                  Verify submitted media or task output and grant points
+                </Text>
+              </View>
+            </View>
+
+            {targetReviewTask && (
+              <View style={{ backgroundColor: colors.neutral[50], borderRadius: 12, padding: 12, borderWidth: 1, borderColor: colors.neutral[200], gap: 6, marginTop: 8 }}>
+                <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900] }}>
+                  {targetReviewTask.title}
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.neutral[500] }}>
+                  Assigned To: {targetReviewTask.assigned_to_user_name || 'Media Team'} ({targetReviewTask.assigned_to_role})
+                </Text>
+                {targetReviewTask.deliverable_url ? (
+                  <View style={{ backgroundColor: '#ffffff', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: colors.neutral[200] }}>
+                    <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.neutral[500] }}>DELIVERABLE LINK:</Text>
+                    <Text numberOfLines={1} style={{ fontSize: 11, color: '#7c3aed', fontStyle: 'italic' }}>
+                      🔗 {targetReviewTask.deliverable_url}
+                    </Text>
+                  </View>
+                ) : null}
+                {targetReviewTask.deliverable_notes ? (
+                  <View style={{ backgroundColor: '#ffffff', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: colors.neutral[200] }}>
+                    <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.neutral[500] }}>SUBMISSION NOTES:</Text>
+                    <Text style={{ fontSize: 11, color: colors.neutral[700] }}>
+                      {targetReviewTask.deliverable_notes}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            )}
+
+            <View style={{ gap: 12, marginTop: 14 }}>
+              {/* Points to Award */}
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                  XP Points to Grant *
+                </Text>
+                <TextInput
+                  placeholder="100"
+                  placeholderTextColor={colors.neutral[400]}
+                  keyboardType="numeric"
+                  value={reviewTaskPoints}
+                  onChangeText={setReviewTaskPoints}
+                  style={{
+                    backgroundColor: colors.neutral[50],
+                    borderWidth: 1,
+                    borderColor: colors.neutral[300],
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    fontSize: 13,
+                    color: colors.neutral[900]
+                  }}
+                />
+              </View>
+
+              {/* Feedback */}
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                  Admin Feedback / Recognition Note
+                </Text>
+                <TextInput
+                  placeholder="e.g. Excellent photography and quick turnaround on gallery post!"
+                  placeholderTextColor={colors.neutral[400]}
+                  multiline
+                  numberOfLines={2}
+                  value={reviewTaskFeedback}
+                  onChangeText={setReviewTaskFeedback}
+                  style={{
+                    backgroundColor: colors.neutral[50],
+                    borderWidth: 1,
+                    borderColor: colors.neutral[300],
+                    borderRadius: 10,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    fontSize: 13,
+                    color: colors.neutral[900]
+                  }}
+                />
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 20 }}>
+              <TouchableOpacity
+                onPress={() => handleReviewDeliverable('in_progress')}
+                disabled={reviewTaskSubmitting}
+                style={{
+                  flex: 1,
+                  backgroundColor: colors.warning[50],
+                  borderWidth: 1,
+                  borderColor: colors.warning[300],
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{ color: colors.warning[800], fontWeight: 'bold', fontSize: 13 }}>Needs Revision</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => handleReviewDeliverable('approved')}
+                disabled={reviewTaskSubmitting}
+                style={{
+                  flex: 1.5,
+                  backgroundColor: '#059669',
+                  paddingVertical: 12,
+                  borderRadius: 10,
+                  alignItems: 'center'
+                }}
+              >
+                {reviewTaskSubmitting ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
+                    Approve (+{reviewTaskPoints} XP)
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 
@@ -5340,6 +6099,72 @@ export default function App() {
               </View>
             )}
 
+            {/* Media Head Command Bar (for Media Head users) */}
+            {isMediaHead && !isAdmin && (
+              <View
+                style={{
+                  backgroundColor: '#2e1065',
+                  borderRadius: 14,
+                  padding: 12,
+                  borderWidth: 1,
+                  borderColor: '#4c1d95',
+                  gap: 8
+                }}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Megaphone size={13} color="#c4b5fd" weight="bold" />
+                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#c4b5fd' }}>
+                      Media Head Console
+                    </Text>
+                  </View>
+                  <View style={{ backgroundColor: '#4c1d95', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                    <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#e9d5ff' }}>MEDIA & POSTS</Text>
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <TouchableOpacity
+                    onPress={() => setIsBroadcastModalOpen(true)}
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#6b21a8',
+                      paddingVertical: 8,
+                      borderRadius: 8,
+                      alignItems: 'center',
+                      flexDirection: 'row',
+                      justifyContent: 'center',
+                      gap: 4
+                    }}
+                  >
+                    <Megaphone size={13} color="#ffffff" weight="bold" />
+                    <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>New Broadcast</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      setCurrentTab('resources');
+                      setTasksSubTab('gallery');
+                      setIsCreateMemoryModalOpen(true);
+                    }}
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#7c3aed',
+                      paddingVertical: 8,
+                      borderRadius: 8,
+                      alignItems: 'center',
+                      flexDirection: 'row',
+                      justifyContent: 'center',
+                      gap: 4
+                    }}
+                  >
+                    <Camera size={13} color="#ffffff" weight="bold" />
+                    <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>Add Memory</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
             {/* Quick Action Tray: Status & Application */}
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
               <TouchableOpacity
@@ -6084,7 +6909,7 @@ export default function App() {
                   <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900] }}>
                     Campus Memories & Accolades
                   </Text>
-                  {isAdmin && (
+                  {canManageMedia && (
                     <TouchableOpacity
                       onPress={() => setIsCreateMemoryModalOpen(true)}
                       style={{ backgroundColor: colors.warning[500], paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}
@@ -6201,8 +7026,8 @@ export default function App() {
                               ) : null}
                             </View>
 
-                            {/* Admin Quick Action Buttons */}
-                            {isAdmin && (
+                            {/* Media & Admin Quick Action Buttons */}
+                            {canManageMedia && (
                               <View style={{ position: 'absolute', top: 10, right: 10, flexDirection: 'row', gap: 6 }}>
                                 <TouchableOpacity
                                   onPress={() => openEditMemoryModal(mem)}
@@ -6355,6 +7180,245 @@ export default function App() {
                       + Submit Contribution / PR
                     </Text>
                   </TouchableOpacity>
+                </View>
+
+                {/* ROLE & FUNCTIONAL TASKS HUB */}
+                <View
+                  style={{
+                    backgroundColor: '#ffffff',
+                    borderRadius: 20,
+                    padding: 16,
+                    borderWidth: 1,
+                    borderColor: '#ede9fe',
+                    shadowColor: '#7c3aed',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.06,
+                    shadowRadius: 8,
+                    elevation: 2,
+                    gap: 12
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#f3e8ff', justifyContent: 'center', alignItems: 'center' }}>
+                        <Megaphone size={16} color="#7c3aed" weight="bold" />
+                      </View>
+                      <View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.neutral[900] }}>
+                            Role Tasks Hub
+                          </Text>
+                          <View style={{ backgroundColor: '#f5f3ff', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
+                            <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#7c3aed' }}>
+                              {isMediaHead ? 'Media Head' : 'Assigned Deliverables'}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={{ fontSize: 10, color: colors.neutral[500] }}>
+                          Functional club duties & media production assignments
+                        </Text>
+                      </View>
+                    </View>
+
+                    {canAssignTasks && (
+                      <TouchableOpacity
+                        onPress={() => setIsAssignTaskModalOpen(true)}
+                        style={{
+                          backgroundColor: '#7c3aed',
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          borderRadius: 8,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 4
+                        }}
+                      >
+                        <Plus size={12} color="#ffffff" weight="bold" />
+                        <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>Assign Task</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {/* Tasks List */}
+                  {assignedTasks.length === 0 ? (
+                    <View style={{ padding: 16, alignItems: 'center', backgroundColor: colors.neutral[50], borderRadius: 12 }}>
+                      <Text style={{ fontSize: 12, color: colors.neutral[500] }}>
+                        No functional role tasks currently assigned.
+                      </Text>
+                    </View>
+                  ) : (
+                    assignedTasks.map((t) => {
+                      const isAssignedToMe = (isMediaHead && t.assigned_to_role === 'media_head') ||
+                        (currentUser && (t.assigned_to_user_id === currentUser.id || t.assigned_to_user_name?.toLowerCase().includes(currentUser.full_name?.toLowerCase())));
+                      const isPending = t.status === 'pending' || !t.status;
+                      const isInProgress = t.status === 'in_progress';
+                      const isUnderReview = t.status === 'under_review';
+                      const isCompleted = t.status === 'completed';
+
+                      return (
+                        <View
+                          key={t.id}
+                          style={{
+                            backgroundColor: isCompleted ? '#f0fdf4' : isUnderReview ? '#fffbeb' : '#faf5ff',
+                            borderRadius: 14,
+                            padding: 14,
+                            borderWidth: 1,
+                            borderColor: isCompleted ? '#bbf7d0' : isUnderReview ? '#fde68a' : '#e9d5ff',
+                            gap: 8
+                          }}
+                        >
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <View style={{ flex: 1, marginRight: 8 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                <View style={{ backgroundColor: '#7c3aed', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                  <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#ffffff', textTransform: 'uppercase' }}>
+                                    {t.assigned_to_role === 'media_head' ? 'Media Head' : t.assigned_to_role}
+                                  </Text>
+                                </View>
+                                {t.priority && (
+                                  <View style={{
+                                    backgroundColor: t.priority === 'urgent' ? '#fee2e2' : t.priority === 'high' ? '#ffedd5' : '#e0e7ff',
+                                    paddingHorizontal: 6,
+                                    paddingVertical: 2,
+                                    borderRadius: 4
+                                  }}>
+                                    <Text style={{
+                                      fontSize: 9,
+                                      fontWeight: 'bold',
+                                      color: t.priority === 'urgent' ? '#b91c1c' : t.priority === 'high' ? '#c2410c' : '#3730a3',
+                                      textTransform: 'uppercase'
+                                    }}>
+                                      {t.priority}
+                                    </Text>
+                                  </View>
+                                )}
+                                <Text style={{ fontSize: 10, color: colors.neutral[500] }}>
+                                  → {t.assigned_to_user_name || 'Media Team'}
+                                </Text>
+                              </View>
+                              <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900] }}>
+                                {t.title}
+                              </Text>
+                            </View>
+
+                            {/* Status Chip */}
+                            <View style={{
+                              backgroundColor: isCompleted ? '#dcfce7' : isUnderReview ? '#fef3c7' : isInProgress ? '#e0f2fe' : colors.neutral[100],
+                              paddingHorizontal: 8,
+                              paddingVertical: 3,
+                              borderRadius: 6
+                            }}>
+                              <Text style={{
+                                fontSize: 10,
+                                fontWeight: 'bold',
+                                color: isCompleted ? '#15803d' : isUnderReview ? '#b45309' : isInProgress ? '#0369a1' : colors.neutral[600]
+                              }}>
+                                {isCompleted ? 'Completed ✓' : isUnderReview ? 'Under Review' : isInProgress ? 'In Progress' : 'Pending'}
+                              </Text>
+                            </View>
+                          </View>
+
+                          {t.description ? (
+                            <Text style={{ fontSize: 11, color: colors.neutral[600], lineHeight: 16 }}>
+                              {t.description}
+                            </Text>
+                          ) : null}
+
+                          {/* Deliverable Info */}
+                          {t.deliverable_url || t.deliverable_notes ? (
+                            <View style={{ backgroundColor: '#ffffff', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#e2e8f0', gap: 4 }}>
+                              <Text style={{ fontSize: 9, fontWeight: 'bold', color: colors.neutral[500], textTransform: 'uppercase' }}>
+                                Deliverable Submitted:
+                              </Text>
+                              {t.deliverable_url ? (
+                                <Text numberOfLines={1} style={{ fontSize: 11, color: '#6d28d9', fontStyle: 'italic' }}>
+                                  🔗 {t.deliverable_url}
+                                </Text>
+                              ) : null}
+                              {t.deliverable_notes ? (
+                                <Text style={{ fontSize: 11, color: colors.neutral[700] }}>
+                                  {t.deliverable_notes}
+                                </Text>
+                              ) : null}
+                            </View>
+                          ) : null}
+
+                          {/* Card Footer */}
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 6, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                                <Sparkle size={10} color="#b45309" weight="fill" />
+                                <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#b45309' }}>
+                                  +{t.points_reward || 100} XP
+                                </Text>
+                              </View>
+                              {t.due_date ? (
+                                <Text style={{ fontSize: 10, color: colors.neutral[400] }}>
+                                  Due {new Date(t.due_date).toLocaleDateString()}
+                                </Text>
+                              ) : null}
+                            </View>
+
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              {/* Submit Deliverable Button for Assignee / Media Head */}
+                              {isAssignedToMe && !isCompleted && (
+                                <TouchableOpacity
+                                  onPress={() => {
+                                    setTargetDeliverableTask(t);
+                                    setDeliverableUrl(t.deliverable_url || '');
+                                    setDeliverableNotes(t.deliverable_notes || '');
+                                    setIsSubmitDeliverableModalOpen(true);
+                                  }}
+                                  style={{
+                                    backgroundColor: '#7c3aed',
+                                    paddingHorizontal: 10,
+                                    paddingVertical: 5,
+                                    borderRadius: 6
+                                  }}
+                                >
+                                  <Text style={{ fontSize: 11, color: '#ffffff', fontWeight: 'bold' }}>
+                                    {t.deliverable_url ? 'Update Deliverable' : 'Submit Deliverable'}
+                                  </Text>
+                                </TouchableOpacity>
+                              )}
+
+                              {/* Review Deliverable Button for Super Admin */}
+                              {canAssignTasks && (isUnderReview || isInProgress) && (
+                                <TouchableOpacity
+                                  onPress={() => {
+                                    setTargetReviewTask(t);
+                                    setReviewTaskPoints(String(t.points_reward || 100));
+                                    setReviewTaskFeedback(t.admin_feedback || '');
+                                    setIsReviewTaskModalOpen(true);
+                                  }}
+                                  style={{
+                                    backgroundColor: '#059669',
+                                    paddingHorizontal: 10,
+                                    paddingVertical: 5,
+                                    borderRadius: 6
+                                  }}
+                                >
+                                  <Text style={{ fontSize: 11, color: '#ffffff', fontWeight: 'bold' }}>
+                                    Review & Award XP
+                                  </Text>
+                                </TouchableOpacity>
+                              )}
+
+                              {/* Delete Task for Super Admin */}
+                              {canAssignTasks && (
+                                <TouchableOpacity
+                                  onPress={() => handleDeleteAssignedTask(t.id, t.title)}
+                                  style={{ padding: 4 }}
+                                >
+                                  <Trash size={14} color={colors.neutral[400]} />
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          </View>
+                        </View>
+                      );
+                    })
+                  )}
                 </View>
 
                 {/* Admin PR Review Queue */}
@@ -9723,6 +10787,9 @@ export default function App() {
       {renderReviewContributionModal()}
       {renderAdjustPointsModal()}
       {renderFabActionModal()}
+      {renderAssignTaskModal()}
+      {renderSubmitDeliverableModal()}
+      {renderReviewTaskModal()}
     </SafeAreaView>
   );
 }

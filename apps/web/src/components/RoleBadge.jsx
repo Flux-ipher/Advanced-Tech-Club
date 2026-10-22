@@ -6,6 +6,8 @@ export function RoleBadge({ role, size = 'sm' }) {
       case 'super_admin':
       case 'admin':
         return 'bg-primary-50 text-primary-700 border-primary-200';
+      case 'media_head':
+        return 'bg-violet-50 text-violet-700 border-violet-200';
       case 'member':
       default:
         return 'bg-neutral-100 text-neutral-700 border-neutral-200';
@@ -17,6 +19,8 @@ export function RoleBadge({ role, size = 'sm' }) {
       case 'super_admin':
       case 'admin':
         return 'Admin';
+      case 'media_head':
+        return 'Media Head';
       case 'member':
       default:
         return 'Member';

@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 
 export function HomePage() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, canManagePosts } = useAuth();
   const {
     announcements,
     loading,
@@ -89,7 +89,7 @@ export function HomePage() {
         pinned: newPinned,
         author_id: user?.id || 'admin',
         author_name: user?.full_name || 'Admin',
-        author_role: 'Admin',
+        author_role: user?.role === 'media_head' ? 'Media Head' : 'Admin',
         author_avatar: user?.avatar_url
       });
       setIsPostModalOpen(false);
@@ -127,7 +127,7 @@ export function HomePage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {isAdmin && (
+            {canManagePosts && (
               <button
                 onClick={() => setIsPostModalOpen(true)}
                 className="btn-primary text-sm shadow-md flex items-center gap-2 whitespace-nowrap"
@@ -223,7 +223,7 @@ export function HomePage() {
                     : 'Important club announcements, workshop releases, and hackathon notices will appear here.'
                 }
                 action={
-                  isAdmin
+                  canManagePosts
                     ? {
                         label: 'Post First Announcement',
                         onClick: () => setIsPostModalOpen(true)
@@ -239,7 +239,7 @@ export function HomePage() {
                 <AnnouncementCard
                   key={ann.id}
                   announcement={ann}
-                  isAdmin={isAdmin}
+                  isAdmin={canManagePosts}
                   onPin={pinAnnouncement}
                   onDelete={removeAnnouncement}
                 />
@@ -250,7 +250,7 @@ export function HomePage() {
                 <AnnouncementCard
                   key={ann.id}
                   announcement={ann}
-                  isAdmin={isAdmin}
+                  isAdmin={canManagePosts}
                   onPin={pinAnnouncement}
                   onDelete={removeAnnouncement}
                 />

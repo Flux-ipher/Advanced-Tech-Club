@@ -215,6 +215,11 @@ export function useAuth() {
   // Role Checks
   const isSuperAdmin = checkIsSuperAdmin({ profile, user });
   const isAdmin = checkIsAdmin({ profile, user });
+  const isMediaHead = Boolean((user?.role === 'media_head') || (profile?.role === 'media_head'));
+  const canManageMedia = isMediaHead || isAdmin || isSuperAdmin;
+  const canManagePosts = isMediaHead || isAdmin || isSuperAdmin;
+  const canAssignRoles = isSuperAdmin;
+  const canAssignTasks = isAdmin || isSuperAdmin;
   const isMember = Boolean(user);
   const isVerified = Boolean(user && user.is_verified);
   const isPendingVerification = Boolean(user && user.verification_status === 'pending');
@@ -452,6 +457,11 @@ export function useAuth() {
     error,
     isAdmin,
     isSuperAdmin,
+    isMediaHead,
+    canManageMedia,
+    canManagePosts,
+    canAssignRoles,
+    canAssignTasks,
     isMember,
     isVerified,
     isPendingVerification,

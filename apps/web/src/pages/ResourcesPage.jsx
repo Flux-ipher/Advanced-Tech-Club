@@ -38,7 +38,7 @@ import {
 } from 'lucide-react';
 
 export function ResourcesPage() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, canManageMedia, canManagePosts } = useAuth();
   const {
     resources,
     loading,
@@ -488,7 +488,7 @@ export function ResourcesPage() {
               </p>
             </div>
 
-            {isAdmin && (
+            {canManageMedia && (
               <button
                 onClick={() => setIsMemoryModalOpen(true)}
                 className="btn-primary text-sm shadow-sm flex items-center gap-2 self-start md:self-auto"
@@ -629,7 +629,7 @@ export function ResourcesPage() {
                       </span>
 
                       <div className="flex items-center gap-2">
-                        {isAdmin && (
+                        {canManageMedia && (
                           <div className="flex items-center gap-1">
                             <button
                               type="button"

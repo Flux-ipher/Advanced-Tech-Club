@@ -57,7 +57,7 @@ export async function updateProfile(userId, updates) {
 }
 
 export async function setRole(userId, newRole) {
-  if (!['member', 'admin', 'super_admin'].includes(newRole)) {
+  if (!['member', 'media_head', 'admin', 'super_admin'].includes(newRole)) {
     throw new Error(`Invalid role: ${newRole}`);
   }
 

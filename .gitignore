@@ -45,6 +45,7 @@ pnpm-debug.log*
 *.apk
 google-services.json
 **/google-services.json
+docs/
 
 # Editor directories and files
 .vscode/*
