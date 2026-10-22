@@ -841,16 +841,16 @@ export default function App() {
 
   // Available Technical Interests for Application
   const availableInterests = [
-    '🤖 AI & Machine Learning',
-    '☁️ Cloud & DevOps',
-    '📱 Mobile Development',
-    '🌐 Full-Stack Web',
-    '🛡️ Cybersecurity',
-    '⛓️ Web3 & Blockchain',
-    '🎨 UI/UX Design',
-    '⚡ Distributed Systems',
-    '🦾 Robotics & IoT',
-    '🐧 Open Source'
+    'AI & Machine Learning',
+    'Cloud & DevOps',
+    'Mobile Development',
+    'Full-Stack Web',
+    'Cybersecurity',
+    'Web3 & Blockchain',
+    'UI/UX Design',
+    'Distributed Systems',
+    'Robotics & IoT',
+    'Open Source'
   ];
 
   // =========================================================================
@@ -866,7 +866,15 @@ export default function App() {
       setApplyDept(user.department || user.branch || 'Computer Science & Engineering');
       setApplyYear(user.year || '2nd Year');
       if (Array.isArray(user.interests) && user.interests.length > 0) {
-        setApplyInterests(user.interests);
+        setApplyInterests(
+          Array.from(
+            new Set(
+              user.interests
+                .map((i) => (typeof i === 'string' ? i.replace(/^[^\w\s&/+-]+/, '').trim() : i))
+                .filter(Boolean)
+            )
+          )
+        );
       }
       setApplyGithub(user.github_url || '');
       setOnboardWhyJoin(user.why_join || '');
@@ -4816,7 +4824,7 @@ export default function App() {
               position: 'relative'
             }}
           >
-            <Text style={{ fontSize: 16 }}>🔔</Text>
+            <Bell size={18} color={colors.neutral[700]} weight="bold" />
             {unreadCount > 0 && (
               <View
                 style={{
@@ -4850,130 +4858,136 @@ export default function App() {
         </View>
       </View>
 
-      {/* SEARCH & FILTER BAR */}
-      <View style={{ backgroundColor: '#ffffff', paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.neutral[100] }}>
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: colors.neutral[100],
-            borderRadius: 10,
-            paddingHorizontal: 10,
-            paddingVertical: Platform.OS === 'ios' ? 8 : 4
-          }}
-        >
-          <Text style={{ fontSize: 12, marginRight: 6 }}>🔍</Text>
-          <TextInput
-            placeholder={`Search ${currentTab === 'home' ? 'announcements' : currentTab === 'events' ? 'workshops' : 'resources'}...`}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            style={{ flex: 1, fontSize: 13, color: colors.neutral[900] }}
-            clearButtonMode="while-editing"
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Text style={{ fontSize: 12, color: colors.neutral[400] }}>✕</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Category Filter Chips */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-            {currentTab === 'home' &&
-              ['all', 'hackathon', 'workshop', 'opportunity'].map((cat) => (
-                <TouchableOpacity
-                  key={cat}
-                  onPress={() => setFeedCategory(cat)}
-                  style={{
-                    paddingHorizontal: 10,
-                    paddingVertical: 4,
-                    borderRadius: 8,
-                    backgroundColor: feedCategory === cat ? colors.primary[500] : colors.neutral[100]
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 'bold',
-                      color: feedCategory === cat ? '#ffffff' : colors.neutral[600],
-                      textTransform: 'capitalize'
-                    }}
-                  >
-                    {cat}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-
-            {currentTab === 'events' &&
-              ['all', 'hackathon', 'workshop', 'technical', 'social'].map((cat) => (
-                <TouchableOpacity
-                  key={cat}
-                  onPress={() => setEventCategory(cat)}
-                  style={{
-                    paddingHorizontal: 10,
-                    paddingVertical: 4,
-                    borderRadius: 8,
-                    backgroundColor: eventCategory === cat ? colors.primary[500] : colors.neutral[100]
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 'bold',
-                      color: eventCategory === cat ? '#ffffff' : colors.neutral[600],
-                      textTransform: 'capitalize'
-                    }}
-                  >
-                    {cat}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-
-            {currentTab === 'resources' &&
-              ['all', 'guide', 'starter', 'cheatsheet', 'tool'].map((cat) => (
-                <TouchableOpacity
-                  key={cat}
-                  onPress={() => setResourceCategory(cat)}
-                  style={{
-                    paddingHorizontal: 10,
-                    paddingVertical: 4,
-                    borderRadius: 8,
-                    backgroundColor: resourceCategory === cat ? colors.primary[500] : colors.neutral[100]
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 'bold',
-                      color: resourceCategory === cat ? '#ffffff' : colors.neutral[600],
-                      textTransform: 'capitalize'
-                    }}
-                  >
-                    {cat}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-          </ScrollView>
-
-          {/* Saved Filter Pill Toggle */}
-          <TouchableOpacity
-            onPress={() => setShowSavedOnly(!showSavedOnly)}
+      {/* SEARCH & FILTER BAR (Hidden on Profile Tab) */}
+      {currentTab !== 'profile' && (
+        <View style={{ backgroundColor: '#ffffff', paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.neutral[100] }}>
+          <View
             style={{
-              paddingHorizontal: 9,
-              paddingVertical: 4,
-              borderRadius: 8,
-              backgroundColor: showSavedOnly ? colors.warning[100] : colors.neutral[100],
-              borderWidth: 1,
-              borderColor: showSavedOnly ? colors.warning[300] : 'transparent'
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: colors.neutral[100],
+              borderRadius: 10,
+              paddingHorizontal: 10,
+              paddingVertical: Platform.OS === 'ios' ? 8 : 4
             }}
           >
-            <Text style={{ fontSize: 11, fontWeight: 'bold', color: showSavedOnly ? colors.warning[800] : colors.neutral[600] }}>
-              {showSavedOnly ? '⭐ Saved' : 'All'}
-            </Text>
-          </TouchableOpacity>
+            <MagnifyingGlass size={14} color={colors.neutral[500]} style={{ marginRight: 6 }} />
+            <TextInput
+              placeholder={`Search ${currentTab === 'home' ? 'announcements' : currentTab === 'events' ? 'workshops' : 'resources'}...`}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              style={{ flex: 1, fontSize: 13, color: colors.neutral[900] }}
+              clearButtonMode="while-editing"
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <X size={13} color={colors.neutral[400]} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Category Filter Chips */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+              {currentTab === 'home' &&
+                ['all', 'hackathon', 'workshop', 'opportunity'].map((cat) => (
+                  <TouchableOpacity
+                    key={cat}
+                    onPress={() => setFeedCategory(cat)}
+                    style={{
+                      paddingHorizontal: 10,
+                      paddingVertical: 4,
+                      borderRadius: 8,
+                      backgroundColor: feedCategory === cat ? colors.primary[500] : colors.neutral[100]
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                        color: feedCategory === cat ? '#ffffff' : colors.neutral[600],
+                        textTransform: 'capitalize'
+                      }}
+                    >
+                      {cat}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+
+              {currentTab === 'events' &&
+                ['all', 'hackathon', 'workshop', 'technical', 'social'].map((cat) => (
+                  <TouchableOpacity
+                    key={cat}
+                    onPress={() => setEventCategory(cat)}
+                    style={{
+                      paddingHorizontal: 10,
+                      paddingVertical: 4,
+                      borderRadius: 8,
+                      backgroundColor: eventCategory === cat ? colors.primary[500] : colors.neutral[100]
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                        color: eventCategory === cat ? '#ffffff' : colors.neutral[600],
+                        textTransform: 'capitalize'
+                      }}
+                    >
+                      {cat}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+
+              {currentTab === 'resources' &&
+                ['all', 'guide', 'starter', 'cheatsheet', 'tool'].map((cat) => (
+                  <TouchableOpacity
+                    key={cat}
+                    onPress={() => setResourceCategory(cat)}
+                    style={{
+                      paddingHorizontal: 10,
+                      paddingVertical: 4,
+                      borderRadius: 8,
+                      backgroundColor: resourceCategory === cat ? colors.primary[500] : colors.neutral[100]
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                        color: resourceCategory === cat ? '#ffffff' : colors.neutral[600],
+                        textTransform: 'capitalize'
+                      }}
+                    >
+                      {cat}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+            </ScrollView>
+
+            {/* Saved Filter Pill Toggle */}
+            <TouchableOpacity
+              onPress={() => setShowSavedOnly(!showSavedOnly)}
+              style={{
+                paddingHorizontal: 9,
+                paddingVertical: 4,
+                borderRadius: 8,
+                backgroundColor: showSavedOnly ? colors.warning[100] : colors.neutral[100],
+                borderWidth: 1,
+                borderColor: showSavedOnly ? colors.warning[300] : 'transparent',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4
+              }}
+            >
+              {showSavedOnly && <Star size={11} color={colors.warning[800]} weight="fill" />}
+              <Text style={{ fontSize: 11, fontWeight: 'bold', color: showSavedOnly ? colors.warning[800] : colors.neutral[600] }}>
+                {showSavedOnly ? 'Saved' : 'All'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      )}
 
       {/* OFFLINE RESILIENCE BANNER */}
       {isOfflineMode && (
@@ -4990,7 +5004,7 @@ export default function App() {
           }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={{ fontSize: 11 }}>⚡</Text>
+            <Sparkle size={13} color="#38bdf8" weight="fill" />
             <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#f8fafc' }}>
               Offline Mode Active (Cached Platform Data)
             </Text>
@@ -5019,7 +5033,7 @@ export default function App() {
           }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
-            <Text style={{ fontSize: 13 }}>🚫</Text>
+            <X size={14} color="#dc2626" weight="bold" />
             <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#b91c1c' }} numberOfLines={1}>
               Application Declined by Club Admin (Ritesh Mishra)
             </Text>
@@ -5043,7 +5057,7 @@ export default function App() {
           }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
-            <Text style={{ fontSize: 13 }}>📝</Text>
+            <PencilSimple size={14} color={colors.primary[800]} weight="bold" />
             <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[800] }} numberOfLines={1}>
               Complete Student Profile to Unlock Member Features
             </Text>
@@ -5067,7 +5081,7 @@ export default function App() {
           }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={{ fontSize: 12 }}>⏳</Text>
+            <Clock size={14} color={colors.warning[800]} weight="bold" />
             <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.warning[800] }}>
               Application Under Review by Club Admin
             </Text>
@@ -5343,7 +5357,7 @@ export default function App() {
                   gap: 6
                 }}
               >
-                <Text style={{ fontSize: 12 }}>🔍</Text>
+                <MagnifyingGlass size={13} color={colors.neutral[700]} />
                 <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[800] }}>Check Status</Text>
               </TouchableOpacity>
 
@@ -5366,7 +5380,7 @@ export default function App() {
                   gap: 6
                 }}
               >
-                <Text style={{ fontSize: 12 }}>📝</Text>
+                <PencilSimple size={13} color={colors.primary[700]} weight="bold" />
                 <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[700] }}>Student Application</Text>
               </TouchableOpacity>
             </View>
@@ -5525,7 +5539,7 @@ export default function App() {
               {[
                 { id: 'all', label: 'All Workshops' },
                 { id: 'upcoming', label: 'Upcoming' },
-                { id: 'completed', label: '🏁 Concluded' }
+                { id: 'completed', label: 'Concluded' }
               ].map((tab) => {
                 const isSelected = eventStatusFilter === tab.id;
                 return (
@@ -5825,6 +5839,9 @@ export default function App() {
                   borderRadius: 10,
                   backgroundColor: tasksSubTab === 'vault' ? '#ffffff' : 'transparent',
                   alignItems: 'center',
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  gap: 5,
                   shadowColor: tasksSubTab === 'vault' ? '#000' : 'transparent',
                   shadowOffset: { width: 0, height: 2 },
                   shadowOpacity: tasksSubTab === 'vault' ? 0.08 : 0,
@@ -5832,6 +5849,7 @@ export default function App() {
                   elevation: tasksSubTab === 'vault' ? 2 : 0
                 }}
               >
+                <Folder size={13} color={tasksSubTab === 'vault' ? colors.neutral[900] : colors.neutral[500]} weight={tasksSubTab === 'vault' ? 'fill' : 'regular'} />
                 <Text
                   style={{
                     fontSize: 11,
@@ -5839,7 +5857,7 @@ export default function App() {
                     color: tasksSubTab === 'vault' ? colors.neutral[900] : colors.neutral[500]
                   }}
                 >
-                  ▤ Vault
+                  Vault
                 </Text>
               </TouchableOpacity>
 
@@ -5851,6 +5869,9 @@ export default function App() {
                   borderRadius: 10,
                   backgroundColor: tasksSubTab === 'gallery' ? '#ffffff' : 'transparent',
                   alignItems: 'center',
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  gap: 5,
                   shadowColor: tasksSubTab === 'gallery' ? '#000' : 'transparent',
                   shadowOffset: { width: 0, height: 2 },
                   shadowOpacity: tasksSubTab === 'gallery' ? 0.08 : 0,
@@ -5858,6 +5879,7 @@ export default function App() {
                   elevation: tasksSubTab === 'gallery' ? 2 : 0
                 }}
               >
+                <Trophy size={13} color={tasksSubTab === 'gallery' ? colors.warning[700] : colors.neutral[500]} weight={tasksSubTab === 'gallery' ? 'fill' : 'regular'} />
                 <Text
                   style={{
                     fontSize: 11,
@@ -5865,7 +5887,7 @@ export default function App() {
                     color: tasksSubTab === 'gallery' ? colors.warning[700] : colors.neutral[500]
                   }}
                 >
-                  🏆 Gallery
+                  Gallery
                 </Text>
               </TouchableOpacity>
 
@@ -5887,6 +5909,7 @@ export default function App() {
                   elevation: tasksSubTab === 'contributions' ? 2 : 0
                 }}
               >
+                <RocketLaunch size={13} color={tasksSubTab === 'contributions' ? colors.primary[700] : colors.neutral[500]} weight={tasksSubTab === 'contributions' ? 'fill' : 'regular'} />
                 <Text
                   style={{
                     fontSize: 11,
@@ -5894,7 +5917,7 @@ export default function App() {
                     color: tasksSubTab === 'contributions' ? colors.primary[700] : colors.neutral[500]
                   }}
                 >
-                  🚀 Tasks
+                  Tasks
                 </Text>
                 {contributionReports.filter((r) => r.status === 'pending').length > 0 && (
                   <View
@@ -6019,8 +6042,12 @@ export default function App() {
                             </Text>
                           </View>
 
-                          <TouchableOpacity onPress={() => handleToggleBookmark(res.id)}>
-                            <Text style={{ fontSize: 14 }}>{bookmarkedIds.includes(res.id) ? '⭐' : '☆'}</Text>
+                          <TouchableOpacity onPress={() => handleToggleBookmark(res.id)} style={{ padding: 4 }}>
+                            <Star
+                              size={18}
+                              color={bookmarkedIds.includes(res.id) ? colors.warning[500] : colors.neutral[300]}
+                              weight={bookmarkedIds.includes(res.id) ? 'fill' : 'regular'}
+                            />
                           </TouchableOpacity>
                         </View>
 
@@ -6303,7 +6330,7 @@ export default function App() {
                   }}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <Text style={{ fontSize: 18 }}>🚀</Text>
+                    <RocketLaunch size={18} color={colors.primary[400]} weight="bold" />
                     <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#ffffff' }}>
                       Earn XP Through Contributions
                     </Text>
@@ -6344,7 +6371,7 @@ export default function App() {
                   >
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Text style={{ fontSize: 16 }}>🛡️</Text>
+                        <Shield size={16} color="#5b21b6" weight="bold" />
                         <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#5b21b6' }}>
                           Admin Review Queue ({contributionReports.filter((r) => r.status === 'pending').length})
                         </Text>
@@ -6355,11 +6382,15 @@ export default function App() {
                           backgroundColor: '#6d28d9',
                           paddingHorizontal: 10,
                           paddingVertical: 5,
-                          borderRadius: 8
+                          borderRadius: 8,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 4
                         }}
                       >
+                        <Sparkle size={11} color="#ffffff" weight="fill" />
                         <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: 'bold' }}>
-                          ⭐ Manual Adjust
+                          Manual Adjust
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -6413,7 +6444,7 @@ export default function App() {
                                 numberOfLines={1}
                                 style={{ flex: 1, fontSize: 10, color: colors.primary[600], fontStyle: 'italic', marginRight: 10 }}
                               >
-                                🔗 {r.proof_url}
+                                {r.proof_url}
                               </Text>
                               <TouchableOpacity
                                 onPress={() => {
@@ -6441,7 +6472,9 @@ export default function App() {
 
                   {contributionReports.length === 0 ? (
                     <View style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 24, borderWidth: 1, borderColor: colors.neutral[200], alignItems: 'center' }}>
-                      <Text style={{ fontSize: 24, marginBottom: 8 }}>📝</Text>
+                      <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: colors.neutral[100], alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+                        <FileText size={24} color={colors.neutral[500]} />
+                      </View>
                       <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.neutral[800], marginBottom: 4 }}>
                         No Contributions Recorded Yet
                       </Text>
@@ -6498,9 +6531,15 @@ export default function App() {
                                   ? colors.success[200]
                                   : isPending
                                   ? colors.warning[200]
-                                  : colors.danger[200]
+                                  : colors.danger[200],
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 4
                               }}
                             >
+                              {isApproved && <Sparkle size={10} color={colors.success[700]} weight="fill" />}
+                              {isPending && <Clock size={10} color={colors.warning[700]} weight="bold" />}
+                              {isRejected && <X size={10} color={colors.danger[700]} weight="bold" />}
                               <Text
                                 style={{
                                   fontSize: 10,
@@ -6513,10 +6552,10 @@ export default function App() {
                                 }}
                               >
                                 {isApproved
-                                  ? `+${r.points_awarded || 100} XP 🎉`
+                                  ? `+${r.points_awarded || 100} XP`
                                   : isPending
-                                  ? 'Pending ⏳'
-                                  : 'Declined ❌'}
+                                  ? 'Pending'
+                                  : 'Declined'}
                               </Text>
                             </View>
                           </View>
@@ -6529,7 +6568,7 @@ export default function App() {
 
                           {r.proof_url ? (
                             <Text numberOfLines={1} style={{ fontSize: 10, color: colors.primary[600], marginTop: 2 }}>
-                              🔗 Proof: {r.proof_url}
+                              Proof: {r.proof_url}
                             </Text>
                           ) : null}
 
@@ -6592,7 +6631,7 @@ export default function App() {
                         style={{ width: 60, height: 60, borderRadius: 30, borderWidth: 2, borderColor: colors.primary[500] }}
                       />
                       <View style={{ position: 'absolute', bottom: -2, right: -2, backgroundColor: colors.primary[500], borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#ffffff' }}>
-                        <Text style={{ fontSize: 10 }}>📷</Text>
+                        <Camera size={11} color="#ffffff" weight="bold" />
                       </View>
                     </TouchableOpacity>
 
@@ -6610,21 +6649,24 @@ export default function App() {
                           </Text>
                         </View>
                         {currentUser.is_verified ? (
-                          <View style={{ backgroundColor: colors.success[50], paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: colors.success[200] }}>
+                          <View style={{ backgroundColor: colors.success[50], paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: colors.success[200], flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <SealCheck size={11} color={colors.success[700]} weight="bold" />
                             <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.success[700] }}>
-                              ✓ Verified
+                              Verified
                             </Text>
                           </View>
                         ) : currentUser.verification_status === 'rejected' ? (
-                          <View style={{ backgroundColor: '#fef2f2', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#fecaca' }}>
+                          <View style={{ backgroundColor: '#fef2f2', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#fecaca', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <X size={10} color="#dc2626" weight="bold" />
                             <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#dc2626' }}>
-                              🚫 Declined
+                              Declined
                             </Text>
                           </View>
                         ) : (
-                          <View style={{ backgroundColor: colors.warning[50], paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: colors.warning[200] }}>
+                          <View style={{ backgroundColor: colors.warning[50], paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: colors.warning[200], flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Clock size={10} color={colors.warning[700]} weight="bold" />
                             <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.warning[700] }}>
-                              ⏳ Pending
+                              Pending
                             </Text>
                           </View>
                         )}
@@ -6635,9 +6677,10 @@ export default function App() {
                   <View style={{ flexDirection: 'row', gap: 8, marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.neutral[100] }}>
                     <TouchableOpacity
                       onPress={() => setIsQrPassOpen(true)}
-                      style={{ flex: 1, backgroundColor: colors.neutral[900], paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
+                      style={{ flex: 1, backgroundColor: colors.neutral[900], paddingVertical: 10, borderRadius: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}
                     >
-                      <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>🎟️ Digital QR Pass</Text>
+                      <QrCode size={14} color="#ffffff" weight="bold" />
+                      <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>Digital QR Pass</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -6648,10 +6691,14 @@ export default function App() {
                         paddingVertical: 10,
                         borderRadius: 10,
                         alignItems: 'center',
+                        flexDirection: 'row',
+                        justifyContent: 'center',
+                        gap: 6,
                         borderWidth: 1,
                         borderColor: currentUser.verification_status === 'rejected' ? '#fecaca' : colors.primary[200]
                       }}
                     >
+                      <PencilSimple size={13} color={currentUser.verification_status === 'rejected' ? '#dc2626' : colors.primary[700]} weight="bold" />
                       <Text
                         style={{
                           color: currentUser.verification_status === 'rejected' ? '#dc2626' : colors.primary[700],
@@ -6659,7 +6706,7 @@ export default function App() {
                           fontSize: 12
                         }}
                       >
-                        {currentUser.verification_status === 'rejected' ? '📝 Re-Submit App' : '📝 Edit Application'}
+                        {currentUser.verification_status === 'rejected' ? 'Re-Submit App' : 'Edit Application'}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -6678,7 +6725,7 @@ export default function App() {
                     }}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Text style={{ fontSize: 18 }}>🚫</Text>
+                      <X size={18} color="#dc2626" weight="bold" />
                       <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#991b1b' }}>
                         Student Application Declined
                       </Text>
@@ -6693,11 +6740,15 @@ export default function App() {
                         paddingVertical: 10,
                         borderRadius: 10,
                         alignItems: 'center',
+                        flexDirection: 'row',
+                        justifyContent: 'center',
+                        gap: 6,
                         marginTop: 4
                       }}
                     >
+                      <PencilSimple size={13} color="#ffffff" weight="bold" />
                       <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>
-                        📝 Update & Re-Submit Application ↺
+                        Update & Re-Submit Application
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -6722,7 +6773,10 @@ export default function App() {
                     <Text style={{ fontSize: 10, color: colors.primary[600], marginTop: 2, fontWeight: 'bold' }}>Leaderboard ❯</Text>
                   </TouchableOpacity>
                   <View style={{ flex: 1, backgroundColor: '#fff7ed', borderWidth: 1, borderColor: '#fed7aa', borderRadius: 14, padding: 12, alignItems: 'center' }}>
-                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#c2410c' }}>{memberStreak} 🔥</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#c2410c' }}>{memberStreak}</Text>
+                      <Flame size={17} color="#f97316" weight="fill" />
+                    </View>
                     <Text style={{ fontSize: 10, color: '#9a3412', marginTop: 2, fontWeight: 'bold' }}>Day Streak</Text>
                   </View>
                 </View>
@@ -6738,9 +6792,12 @@ export default function App() {
                   }}
                 >
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900] }}>
-                      🎖️ Badges & Accolades ({earnedBadgesList.length}/{allBadgesList.length})
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Medal size={16} color={colors.primary[600]} weight="fill" />
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900] }}>
+                        Badges & Accolades ({earnedBadgesList.length}/{allBadgesList.length})
+                      </Text>
+                    </View>
                     <TouchableOpacity onPress={openLeaderboard}>
                       <Text style={{ fontSize: 11, color: colors.primary[600], fontWeight: 'bold' }}>
                         Leaderboard ❯
@@ -6766,16 +6823,26 @@ export default function App() {
                             alignItems: 'center'
                           }}
                         >
-                          <Text style={{ fontSize: 26, opacity: isUnlocked ? 1 : 0.4 }}>
-                            {b.icon || '🎖️'}
-                          </Text>
+                          <View
+                            style={{
+                              width: 44,
+                              height: 44,
+                              borderRadius: 22,
+                              backgroundColor: isUnlocked ? '#f3e8ff' : '#f1f5f9',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              marginBottom: 4
+                            }}
+                          >
+                            <Medal size={22} color={isUnlocked ? '#9333ea' : colors.neutral[400]} weight={isUnlocked ? 'fill' : 'regular'} />
+                          </View>
                           <Text
                             style={{
                               fontSize: 11,
                               fontWeight: 'bold',
                               color: isUnlocked ? '#581c87' : colors.neutral[400],
                               textAlign: 'center',
-                              marginTop: 4
+                              marginTop: 2
                             }}
                             numberOfLines={1}
                           >
@@ -6833,19 +6900,25 @@ export default function App() {
                     <View style={{ marginTop: 4 }}>
                       <Text style={{ fontSize: 11, color: colors.neutral[500], marginBottom: 6 }}>Technical Interests & Tracks</Text>
                       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                        {(currentUser.interests || ['AI & Machine Learning', 'Cloud & DevOps', 'Full-Stack Web']).map((tag) => (
+                        {Array.from(
+                          new Set(
+                            (currentUser.interests || ['AI & Machine Learning', 'Cloud & DevOps', 'Full-Stack Web'])
+                              .map((tag) => (typeof tag === 'string' ? tag.replace(/^[^\w\s&/+-]+/, '').trim() : tag) || tag)
+                              .filter(Boolean)
+                          )
+                        ).map((cleanedTag) => (
                           <View
-                            key={tag}
+                            key={cleanedTag}
                             style={{
                               backgroundColor: colors.primary[50],
                               borderWidth: 1,
                               borderColor: colors.primary[100],
                               paddingHorizontal: 8,
-                              paddingVertical: 3,
+                              paddingVertical: 4,
                               borderRadius: 6
                             }}
                           >
-                            <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary[700] }}>{tag}</Text>
+                            <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary[700] }}>{cleanedTag}</Text>
                           </View>
                         ))}
                       </View>
@@ -6869,9 +6942,15 @@ export default function App() {
                     <Text style={{ fontSize: 10, color: colors.neutral[500], marginTop: 2 }}>Bookmarks</Text>
                   </View>
                   <View style={{ flex: 1, backgroundColor: '#ffffff', borderWidth: 1, borderColor: colors.neutral[200], borderRadius: 14, padding: 12, alignItems: 'center' }}>
-                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: currentUser.is_verified ? colors.success[700] : currentUser.verification_status === 'rejected' ? '#dc2626' : colors.warning[700] }}>
-                      {currentUser.is_verified ? '✓' : currentUser.verification_status === 'rejected' ? '🚫' : '⏳'}
-                    </Text>
+                    <View style={{ height: 24, justifyContent: 'center', alignItems: 'center' }}>
+                      {currentUser.is_verified ? (
+                        <CheckCircle size={20} color={colors.success[600]} weight="fill" />
+                      ) : currentUser.verification_status === 'rejected' ? (
+                        <X size={20} color="#dc2626" weight="bold" />
+                      ) : (
+                        <Clock size={20} color={colors.warning[600]} weight="bold" />
+                      )}
+                    </View>
                     <Text style={{ fontSize: 10, color: colors.neutral[500], marginTop: 2 }}>
                       {currentUser.is_verified ? 'Verified' : currentUser.verification_status === 'rejected' ? 'Declined' : 'Pending'}
                     </Text>
@@ -6905,10 +6984,11 @@ export default function App() {
 
                       <TouchableOpacity
                         onPress={() => setIsAnalyticsModalOpen(true)}
-                        style={{ flex: 1, backgroundColor: '#ffffff', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.neutral[200], alignItems: 'center' }}
+                        style={{ flex: 1, backgroundColor: '#ffffff', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.neutral[200], alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}
                       >
+                        <Trophy size={13} color={colors.neutral[800]} weight="bold" />
                         <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[800] }}>
-                          📊 Analytics
+                          Analytics
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -6916,10 +6996,11 @@ export default function App() {
                     <View style={{ flexDirection: 'row', gap: 8 }}>
                       <TouchableOpacity
                         onPress={() => setIsAdjustPointsOpen(true)}
-                        style={{ flex: 1, backgroundColor: colors.primary[50], padding: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.primary[200], alignItems: 'center' }}
+                        style={{ flex: 1, backgroundColor: colors.primary[50], padding: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.primary[200], alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4 }}
                       >
+                        <Sparkle size={13} color={colors.primary[800]} weight="fill" />
                         <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[800] }}>
-                          ⭐ Adjust Points (+/-)
+                          Adjust Points
                         </Text>
                       </TouchableOpacity>
 
@@ -6928,10 +7009,11 @@ export default function App() {
                           setCurrentTab('resources');
                           setTasksSubTab('contributions');
                         }}
-                        style={{ flex: 1, backgroundColor: '#f5f3ff', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#ddd6fe', alignItems: 'center' }}
+                        style={{ flex: 1, backgroundColor: '#f5f3ff', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#ddd6fe', alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4 }}
                       >
+                        <FileText size={13} color="#6d28d9" weight="bold" />
                         <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#6d28d9' }}>
-                          📝 PR Reviews ({contributionReports.filter((r) => r.status === 'pending').length})
+                          PR Reviews ({contributionReports.filter((r) => r.status === 'pending').length})
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -6951,8 +7033,9 @@ export default function App() {
                         gap: 6
                       }}
                     >
+                      <Camera size={14} color="#6d28d9" weight="bold" />
                       <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#6d28d9' }}>
-                        📷 Scan Student Event QR Pass
+                        Scan Student Event QR Pass
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -6988,7 +7071,10 @@ export default function App() {
                       >
                         <View style={{ flex: 1, marginRight: 8 }}>
                           <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.neutral[800] }}>{matched.title}</Text>
-                          <Text style={{ fontSize: 10, color: colors.neutral[500] }}>📍 {matched.location}</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                            <MapPin size={11} color={colors.neutral[500]} />
+                            <Text style={{ fontSize: 10, color: colors.neutral[500] }}>{matched.location}</Text>
+                          </View>
                         </View>
                         <TouchableOpacity
                           onPress={() => handleToggleEventRSVP(id)}
@@ -7020,7 +7106,9 @@ export default function App() {
               </>
             ) : (
               <View style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: colors.neutral[200] }}>
-                <Text style={{ fontSize: 32, marginBottom: 8 }}>👤</Text>
+                <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.neutral[100], alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                  <User size={28} color={colors.neutral[500]} />
+                </View>
                 <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.neutral[900] }}>Guest Session Active</Text>
                 <Text style={{ fontSize: 12, color: colors.neutral[500], textAlign: 'center', marginTop: 4, marginBottom: 16 }}>
                   Sign in or create an account to unlock your digital campus pass, RSVP for workshops, and download vault materials.
@@ -7111,16 +7199,19 @@ export default function App() {
                       </Text>
                     </View>
                     {currentUser?.is_verified ? (
-                      <View style={{ backgroundColor: colors.success[50], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                        <Text style={{ fontSize: 9, fontWeight: 'bold', color: colors.success[700] }}>✓ Verified</Text>
+                      <View style={{ backgroundColor: colors.success[50], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                        <SealCheck size={10} color={colors.success[700]} weight="bold" />
+                        <Text style={{ fontSize: 9, fontWeight: 'bold', color: colors.success[700] }}>Verified</Text>
                       </View>
                     ) : currentUser?.verification_status === 'rejected' ? (
-                      <View style={{ backgroundColor: '#fef2f2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#fecaca' }}>
-                        <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#dc2626' }}>🚫 Declined</Text>
+                      <View style={{ backgroundColor: '#fef2f2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#fecaca', flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                        <X size={10} color="#dc2626" weight="bold" />
+                        <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#dc2626' }}>Declined</Text>
                       </View>
                     ) : (
-                      <View style={{ backgroundColor: colors.warning[50], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                        <Text style={{ fontSize: 9, fontWeight: 'bold', color: colors.warning[700] }}>⏳ Review Pending</Text>
+                      <View style={{ backgroundColor: colors.warning[50], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                        <Clock size={10} color={colors.warning[700]} weight="bold" />
+                        <Text style={{ fontSize: 9, fontWeight: 'bold', color: colors.warning[700] }}>Review Pending</Text>
                       </View>
                     )}
                   </View>
@@ -7144,7 +7235,7 @@ export default function App() {
                     gap: 8
                   }}
                 >
-                  <Text style={{ fontSize: 20 }}>👑</Text>
+                  <Trophy size={18} color="#6d28d9" weight="fill" />
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#6d28d9' }}>
                       Highest Tier: Club Legend & Admin
@@ -7170,7 +7261,7 @@ export default function App() {
                     gap: 8
                   }}
                 >
-                  <Text style={{ fontSize: 16 }}>🚫</Text>
+                  <X size={16} color="#dc2626" weight="bold" />
                   <Text style={{ fontSize: 10, color: '#b91c1c', flex: 1, lineHeight: 14 }}>
                     Application Declined: This Digital Pass is inactive until your student application is verified by Club Admin.
                   </Text>
@@ -7191,7 +7282,7 @@ export default function App() {
                     gap: 8
                   }}
                 >
-                  <Text style={{ fontSize: 16 }}>🎯</Text>
+                  <Sparkle size={16} color={colors.primary[600]} weight="fill" />
                   <Text style={{ fontSize: 10, color: colors.primary[800], flex: 1, lineHeight: 14 }}>
                     Present this QR code to the Club Admin at the workshop door to enter and record attendance.
                   </Text>
@@ -7272,7 +7363,7 @@ export default function App() {
                   ATC-{currentUser?.student_id || 'MEMBER-2026'}
                 </Text>
                 <Text style={{ fontSize: 10, color: colors.primary[600], fontWeight: 'bold' }}>
-                  {copiedPassToken ? '✓ Copied' : '📋 Copy'}
+                  {copiedPassToken ? '✓ Copied' : 'Copy'}
                 </Text>
               </TouchableOpacity>
 
@@ -7302,7 +7393,7 @@ export default function App() {
                     gap: 6
                   }}
                 >
-                  <Text style={{ fontSize: 13 }}>📤</Text>
+                  <ShareNetwork size={14} color={colors.primary[800]} weight="bold" />
                   <Text style={{ color: colors.primary[800], fontWeight: 'bold', fontSize: 12 }}>Share Pass</Text>
                 </TouchableOpacity>
 
@@ -7363,47 +7454,20 @@ export default function App() {
                     {statusSearchResult.full_name}
                   </Text>
                   {statusSearchResult.is_verified ? (
-                    <Text
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 'bold',
-                        color: colors.success[700],
-                        backgroundColor: colors.success[100],
-                        paddingHorizontal: 6,
-                        paddingVertical: 2,
-                        borderRadius: 4
-                      }}
-                    >
-                      ✓ Verified
-                    </Text>
+                    <View style={{ backgroundColor: colors.success[100], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                      <SealCheck size={11} color={colors.success[700]} weight="bold" />
+                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.success[700] }}>Verified</Text>
+                    </View>
                   ) : statusSearchResult.verification_status === 'rejected' ? (
-                    <Text
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 'bold',
-                        color: '#dc2626',
-                        backgroundColor: '#fee2e2',
-                        paddingHorizontal: 6,
-                        paddingVertical: 2,
-                        borderRadius: 4
-                      }}
-                    >
-                      🚫 Declined
-                    </Text>
+                    <View style={{ backgroundColor: '#fee2e2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                      <X size={11} color="#dc2626" weight="bold" />
+                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#dc2626' }}>Declined</Text>
+                    </View>
                   ) : (
-                    <Text
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 'bold',
-                        color: colors.warning[700],
-                        backgroundColor: colors.warning[100],
-                        paddingHorizontal: 6,
-                        paddingVertical: 2,
-                        borderRadius: 4
-                      }}
-                    >
-                      ⏳ Pending Review
-                    </Text>
+                    <View style={{ backgroundColor: colors.warning[100], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                      <Clock size={11} color={colors.warning[700]} weight="bold" />
+                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.warning[700] }}>Pending Review</Text>
+                    </View>
                   )}
                 </View>
                 <Text style={{ fontSize: 11, color: colors.neutral[500], marginTop: 4 }}>
@@ -7426,11 +7490,15 @@ export default function App() {
                         backgroundColor: '#dc2626',
                         paddingVertical: 8,
                         borderRadius: 8,
-                        alignItems: 'center'
+                        alignItems: 'center',
+                        flexDirection: 'row',
+                        justifyContent: 'center',
+                        gap: 6
                       }}
                     >
+                      <PencilSimple size={12} color="#ffffff" weight="bold" />
                       <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 11 }}>
-                        📝 Re-Submit Application ↺
+                        Re-Submit Application
                       </Text>
                     </TouchableOpacity>
                   </View>
