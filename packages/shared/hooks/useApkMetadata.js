@@ -19,6 +19,14 @@ export function useApkMetadata() {
       return;
     }
 
+    // On production (advclub.online), /atc-release.apk redirects to GitHub CDN which blocks client-side CORS HEAD requests.
+    // Use the verified APP_RELEASE metadata directly to avoid browser console errors.
+    if (typeof window !== 'undefined' && window.location.hostname.includes('advclub.online')) {
+      cachedApkSize = APP_RELEASE.sizeShort;
+      cachedApkSizeDetailed = APP_RELEASE.size;
+      return;
+    }
+
     let isMounted = true;
     fetch(APP_RELEASE.downloadUrl, { method: 'HEAD' })
       .then((res) => {

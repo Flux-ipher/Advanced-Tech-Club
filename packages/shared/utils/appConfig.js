@@ -3,12 +3,12 @@
  * Single source of truth for companion Android APK binaries and release versions.
  */
 export const APP_RELEASE = {
-  version: '2.0.0',
+  version: '2.4.3',
   build: 'Release · Gradle Engine',
-  size: '88.35 MB',
-  sizeShort: '88MB',
-  sizeBytes: 88353915,
+  size: '89.92 MB',
+  sizeShort: '90MB',
+  sizeBytes: 89926506,
   downloadUrl: '/atc-release.apk',
-  fileName: 'atc-mobile-release.apk',
+  fileName: 'atc-release.apk',
   sha256Verified: true,
 };
