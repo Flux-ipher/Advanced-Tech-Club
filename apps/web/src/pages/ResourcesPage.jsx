@@ -31,7 +31,10 @@ import {
   Camera,
   Heart,
   X,
-  Users
+  Users,
+  Pencil,
+  Trash2,
+  Calendar
 } from 'lucide-react';
 
 export function ResourcesPage() {
@@ -43,7 +46,7 @@ export function ResourcesPage() {
     removeResource,
     downloadResource
   } = useResources();
-  const { memories, loading: galleryLoading, addMemory } = useVaultGallery();
+  const { memories, loading: galleryLoading, addMemory, editMemory, removeMemory, toggleLike, likedIds } = useVaultGallery();
   const apk = useApkMetadata();
 
   const [vaultView, setVaultView] = useState('resources'); // 'resources' | 'gallery'
@@ -58,7 +61,75 @@ export function ResourcesPage() {
   const [memImageUrl, setMemImageUrl] = useState('');
   const [memAchievers, setMemAchievers] = useState('');
   const [memDescription, setMemDescription] = useState('');
+  const [memEventDate, setMemEventDate] = useState('');
   const [memSubmitting, setMemSubmitting] = useState(false);
+
+  // Edit Memory Form
+  const [editingMemory, setEditingMemory] = useState(null);
+  const [isEditMemoryModalOpen, setIsEditMemoryModalOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editCategory, setEditCategory] = useState('hackathon');
+  const [editAwardTitle, setEditAwardTitle] = useState('');
+  const [editImageUrl, setEditImageUrl] = useState('');
+  const [editAchievers, setEditAchievers] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editEventDate, setEditEventDate] = useState('');
+  const [editSubmitting, setEditSubmitting] = useState(false);
+
+  const openEditMemory = (mem) => {
+    setEditingMemory(mem);
+    setEditTitle(mem.title || '');
+    setEditCategory(mem.category || 'hackathon');
+    setEditAwardTitle(mem.award_title || '');
+    setEditImageUrl(mem.image_url || '');
+    setEditAchievers(Array.isArray(mem.achievers) ? mem.achievers.join(', ') : (mem.achievers || ''));
+    setEditDescription(mem.description || '');
+    setEditEventDate(mem.event_date || '');
+    setIsEditMemoryModalOpen(true);
+  };
+
+  const handleUpdateMemory = async (e) => {
+    e.preventDefault();
+    if (!editingMemory || !editTitle.trim() || !editImageUrl.trim()) return;
+    try {
+      setEditSubmitting(true);
+      const updated = await editMemory(editingMemory.id, {
+        title: editTitle.trim(),
+        category: editCategory,
+        award_title: editAwardTitle.trim(),
+        image_url: editImageUrl.trim(),
+        achievers: editAchievers ? editAchievers.split(',').map((s) => s.trim()).filter(Boolean) : [],
+        description: editDescription.trim(),
+        event_date: editEventDate || new Date().toISOString().split('T')[0]
+      });
+      setIsEditMemoryModalOpen(false);
+      setEditingMemory(null);
+      if (selectedMemory && selectedMemory.id === editingMemory.id) {
+        setSelectedMemory((prev) => ({
+          ...prev,
+          ...updated
+        }));
+      }
+    } catch (err) {
+      alert('Failed to update memory: ' + (err.message || 'Unknown error'));
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
+  const handleDeleteMemory = async (memId, title) => {
+    if (!window.confirm(`Are you sure you want to delete "${title || 'this memory'}" from Campus Gallery?`)) {
+      return;
+    }
+    try {
+      await removeMemory(memId);
+      if (selectedMemory && selectedMemory.id === memId) {
+        setSelectedMemory(null);
+      }
+    } catch (err) {
+      alert('Failed to delete memory: ' + (err.message || 'Unknown error'));
+    }
+  };
 
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -482,8 +553,23 @@ export function ResourcesPage() {
 
                     {/* Top Badges */}
                     <div className="absolute top-3 left-3 flex flex-wrap gap-2">
-                      <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-black/60 text-white border border-white/20 backdrop-blur-md">
-                        {mem.category === 'hackathon' ? '🏆 Hackathon' : mem.category === 'contributor' ? '⭐ Top Contributor' : '📸 Campus Event'}
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-black/60 text-white border border-white/20 backdrop-blur-md flex items-center gap-1.5">
+                        {mem.category === 'hackathon' ? (
+                          <>
+                            <Trophy className="w-3 h-3 text-amber-400" />
+                            <span>Hackathon</span>
+                          </>
+                        ) : mem.category === 'contributor' ? (
+                          <>
+                            <Star className="w-3 h-3 text-sky-400" />
+                            <span>Top Contributor</span>
+                          </>
+                        ) : (
+                          <>
+                            <Camera className="w-3 h-3 text-emerald-400" />
+                            <span>Campus Event</span>
+                          </>
+                        )}
                       </span>
                       {mem.award_title && (
                         <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/90 text-amber-950 shadow-sm flex items-center gap-1 backdrop-blur-md">
@@ -537,11 +623,55 @@ export function ResourcesPage() {
                     )}
 
                     <div className="pt-3 border-t border-neutral-100 flex items-center justify-between text-xs text-neutral-400">
-                      <span>Recorded on {mem.event_date || 'Campus Archive'}</span>
-                      <span className="flex items-center gap-1 text-primary-600 font-bold">
-                        <Heart className="w-3.5 h-3.5 fill-primary-600" />
-                        {mem.likes_count || 42} Kudos
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5 text-neutral-400" />
+                        <span>{mem.event_date || 'Campus Archive'}</span>
                       </span>
+
+                      <div className="flex items-center gap-2">
+                        {isAdmin && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditMemory(mem);
+                              }}
+                              className="p-1.5 rounded-lg text-neutral-500 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                              title="Edit Memory"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteMemory(mem.id, mem.title);
+                              }}
+                              className="p-1.5 rounded-lg text-neutral-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                              title="Delete Memory"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleLike(mem.id);
+                          }}
+                          className={`flex items-center gap-1 font-bold px-2.5 py-1 rounded-full transition-all text-xs ${
+                            likedIds.includes(mem.id)
+                              ? 'bg-rose-50 text-rose-600 border border-rose-200'
+                              : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                          }`}
+                        >
+                          <Heart className={`w-3.5 h-3.5 ${likedIds.includes(mem.id) ? 'fill-rose-500 text-rose-500' : 'text-neutral-400'}`} />
+                          <span>{mem.likes_count || 0} Kudos</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -576,15 +706,54 @@ export function ResourcesPage() {
                 </div>
 
                 <div className="p-6 text-white space-y-3">
-                  <div className="flex flex-wrap gap-2 items-center">
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary-500/20 text-primary-300 border border-primary-500/30">
-                      {selectedMemory.category.toUpperCase()}
-                    </span>
-                    {selectedMemory.award_title && (
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-amber-950">
-                        🏆 {selectedMemory.award_title}
+                  <div className="flex flex-wrap gap-2 items-center justify-between">
+                    <div className="flex flex-wrap gap-2 items-center">
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary-500/20 text-primary-300 border border-primary-500/30 flex items-center gap-1">
+                        {selectedMemory.category === 'hackathon' ? <Trophy className="w-3 h-3" /> : selectedMemory.category === 'contributor' ? <Star className="w-3 h-3" /> : <Camera className="w-3 h-3" />}
+                        <span>{selectedMemory.category.toUpperCase()}</span>
                       </span>
-                    )}
+                      {selectedMemory.award_title && (
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-amber-950 flex items-center gap-1">
+                          <Trophy className="w-3 h-3" />
+                          <span>{selectedMemory.award_title}</span>
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {isAdmin && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => openEditMemory(selectedMemory)}
+                            className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold flex items-center gap-1 transition-colors"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteMemory(selectedMemory.id, selectedMemory.title)}
+                            className="px-2.5 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 text-xs font-bold flex items-center gap-1 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Delete</span>
+                          </button>
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => toggleLike(selectedMemory.id)}
+                        className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all ${
+                          likedIds.includes(selectedMemory.id)
+                            ? 'bg-rose-500 text-white shadow-md'
+                            : 'bg-white/10 text-white hover:bg-white/20'
+                        }`}
+                      >
+                        <Heart className={`w-3.5 h-3.5 ${likedIds.includes(selectedMemory.id) ? 'fill-white' : ''}`} />
+                        <span>{selectedMemory.likes_count || 0} Kudos</span>
+                      </button>
+                    </div>
                   </div>
 
                   <h3 className="text-xl font-bold text-white">{selectedMemory.title}</h3>
@@ -733,6 +902,142 @@ export function ResourcesPage() {
                     className="btn-primary text-sm"
                   >
                     {memSubmitting ? 'Publishing...' : 'Add to Campus Gallery'}
+                  </button>
+                </div>
+              </form>
+            </Modal>
+          )}
+
+          {/* Admin Edit Campus Memory Modal */}
+          {isEditMemoryModalOpen && editingMemory && (
+            <Modal
+              isOpen={isEditMemoryModalOpen}
+              onClose={() => {
+                setIsEditMemoryModalOpen(false);
+                setEditingMemory(null);
+              }}
+              title="Edit Campus Memory / Recognition"
+              maxWidth="max-w-xl"
+            >
+              <form onSubmit={handleUpdateMemory} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase text-neutral-700 mb-1">
+                    Memory Title *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 1st Place at SIH 2025"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-neutral-700 mb-1">
+                      Category
+                    </label>
+                    <select
+                      value={editCategory}
+                      onChange={(e) => setEditCategory(e.target.value)}
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500"
+                    >
+                      <option value="hackathon">Hackathon Win</option>
+                      <option value="contributor">Top Contributor</option>
+                      <option value="event">Campus Event</option>
+                      <option value="project">Flagship Project</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-neutral-700 mb-1">
+                      Award / Honor Title
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 1st Prize · Gold Trophy"
+                      value={editAwardTitle}
+                      onChange={(e) => setEditAwardTitle(e.target.value)}
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-neutral-700 mb-1">
+                    Student Honorees (Comma separated names)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Ritesh Mishra, Aryan Sharma, Sneha Patel"
+                    value={editAchievers}
+                    onChange={(e) => setEditAchievers(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-neutral-700 mb-1">
+                    Event Date
+                  </label>
+                  <input
+                    type="date"
+                    value={editEventDate}
+                    onChange={(e) => setEditEventDate(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-neutral-700 mb-1">
+                    Photo URL *
+                  </label>
+                  <input
+                    type="url"
+                    required
+                    placeholder="https://images.unsplash.com/... or uploaded photo link"
+                    value={editImageUrl}
+                    onChange={(e) => setEditImageUrl(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500 mb-2"
+                  />
+                  {editImageUrl && (
+                    <div className="relative h-32 rounded-xl overflow-hidden border border-neutral-200 mt-2">
+                      <img src={editImageUrl} alt="Preview" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-neutral-700 mb-1">
+                    Story & Impact Summary
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="Describe the milestone or achievement..."
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-300 focus:outline-none focus:border-primary-500 resize-none"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-200">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditMemoryModalOpen(false);
+                      setEditingMemory(null);
+                    }}
+                    className="btn-secondary text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={editSubmitting}
+                    className="btn-primary text-sm"
+                  >
+                    {editSubmitting ? 'Saving Changes...' : 'Save Changes'}
                   </button>
                 </div>
               </form>

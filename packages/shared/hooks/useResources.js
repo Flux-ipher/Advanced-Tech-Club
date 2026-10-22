@@ -5,10 +5,14 @@ import {
   deleteResource,
   incrementDownloadCount,
   getVaultGalleryMemories,
-  addVaultGalleryMemory
+  addVaultGalleryMemory,
+  updateVaultGalleryMemory,
+  deleteVaultGalleryMemory,
+  toggleLikeVaultGalleryMemory
 } from '../api/resources.js';
 
 const CACHE_KEY = 'atc_cache_resources';
+const LIKED_MEMORIES_KEY = 'atc_liked_memories';
 
 function loadCachedResources() {
   if (typeof window === 'undefined') return [];
@@ -90,6 +94,15 @@ export function useResources() {
 export function useVaultGallery() {
   const [memories, setMemories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [likedIds, setLikedIds] = useState(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = window.localStorage.getItem(LIKED_MEMORIES_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      return [];
+    }
+  });
 
   const fetchMemories = useCallback(async () => {
     try {
@@ -113,11 +126,53 @@ export function useVaultGallery() {
     return created;
   };
 
+  const editMemory = async (id, memory) => {
+    const updated = await updateVaultGalleryMemory(id, memory);
+    setMemories((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, ...updated } : m))
+    );
+    return updated;
+  };
+
+  const removeMemory = async (id) => {
+    await deleteVaultGalleryMemory(id);
+    setMemories((prev) => prev.filter((m) => m.id !== id));
+  };
+
+  const toggleLike = async (id) => {
+    const isLiked = likedIds.includes(id);
+    const target = memories.find((m) => m.id === id);
+    const currentLikes = target?.likes_count || 0;
+    const nextLikes = isLiked ? Math.max(0, currentLikes - 1) : currentLikes + 1;
+
+    // Optimistically update memory count
+    setMemories((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, likes_count: nextLikes } : m))
+    );
+
+    // Optimistically update liked IDs set
+    const updatedLiked = isLiked
+      ? likedIds.filter((item) => item !== id)
+      : [...likedIds, id];
+    setLikedIds(updatedLiked);
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(LIKED_MEMORIES_KEY, JSON.stringify(updatedLiked));
+      } catch (e) {}
+    }
+
+    await toggleLikeVaultGalleryMemory(id, isLiked, currentLikes);
+  };
+
   return {
     memories,
     loading,
+    likedIds,
     refresh: fetchMemories,
-    addMemory
+    addMemory,
+    editMemory,
+    removeMemory,
+    toggleLike
   };
 }
 

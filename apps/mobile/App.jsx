@@ -62,7 +62,11 @@ import {
 } from '@atc/shared/api/gamification';
 import {
   getVaultGalleryMemories,
-  addVaultGalleryMemory
+  addVaultGalleryMemory,
+  updateVaultGalleryMemory,
+  deleteVaultGalleryMemory,
+  toggleLikeVaultGalleryMemory,
+  deleteResource
 } from '@atc/shared/api/resources';
 import { idempotency } from '@atc/shared/utils/idempotency';
 import { canStudentCheckIn, validateAttendanceCheckInTransition } from '@atc/shared/utils/stateMachines';
@@ -83,7 +87,33 @@ import {
   Sparkle,
   PushPin,
   MagnifyingGlass,
-  ArrowRight
+  ArrowRight,
+  Heart,
+  Trash,
+  PencilSimple,
+  ShareNetwork,
+  ArrowLeft,
+  ArrowSquareOut,
+  Package,
+  SealCheck,
+  DownloadSimple,
+  Bell,
+  IdentificationCard,
+  Flame,
+  Eye,
+  EyeSlash,
+  X,
+  FileText,
+  Megaphone,
+  RocketLaunch,
+  Medal,
+  Camera,
+  Check,
+  Star,
+  BookOpen,
+  Shield,
+  Users,
+  MapPin
 } from 'phosphor-react-native';
 
 try {
@@ -531,6 +561,17 @@ export default function App() {
         console.warn('[ATC Mobile] Gallery fetch note:', gErr);
       }
 
+      // Load Liked Memories from disk
+      try {
+        const likedFile = `${FileSystem.documentDirectory}atc_liked_memories.json`;
+        const likedInfo = await FileSystem.getInfoAsync(likedFile);
+        if (likedInfo.exists) {
+          const raw = await FileSystem.readAsStringAsync(likedFile);
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) setLikedMemoryIds(parsed);
+        }
+      } catch (lErr) {}
+
       // Load Real Notifications from Supabase notifications_log
       try {
         const { data: dbNotifs } = await supabase
@@ -786,6 +827,17 @@ export default function App() {
   const [newMemImage, setNewMemImage] = useState('https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=1200&q=80');
   const [newMemAchievers, setNewMemAchievers] = useState('');
   const [newMemDesc, setNewMemDesc] = useState('');
+  const [likedMemoryIds, setLikedMemoryIds] = useState([]);
+  const [isEditMemoryModalOpen, setIsEditMemoryModalOpen] = useState(false);
+  const [editingMemory, setEditingMemory] = useState(null);
+  const [editMemTitle, setEditMemTitle] = useState('');
+  const [editMemCategory, setEditMemCategory] = useState('hackathon');
+  const [editMemAward, setEditMemAward] = useState('');
+  const [editMemImage, setEditMemImage] = useState('');
+  const [editMemAchievers, setEditMemAchievers] = useState('');
+  const [editMemDesc, setEditMemDesc] = useState('');
+  const [editMemDate, setEditMemDate] = useState('');
+  const [editMemSubmitting, setEditMemSubmitting] = useState(false);
 
   // Available Technical Interests for Application
   const availableInterests = [
@@ -2039,27 +2091,30 @@ export default function App() {
       <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center', padding: 20 }}>
         <View style={{ backgroundColor: '#ffffff', borderRadius: 24, padding: 20, maxHeight: '85%' }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <View>
-              <Text style={{ fontSize: 17, fontWeight: 'bold', color: colors.neutral[900] }}>
-                🏆 ATC Leaderboard & XP
-              </Text>
-              <Text style={{ fontSize: 11, color: colors.neutral[500] }}>
-                Spring 2026 Campus Developer Standings
-              </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Trophy size={20} color={colors.primary[600]} weight="bold" />
+              <View>
+                <Text style={{ fontSize: 17, fontWeight: 'bold', color: colors.neutral[900] }}>
+                  ATC Leaderboard & XP
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.neutral[500] }}>
+                  Spring 2026 Campus Developer Standings
+                </Text>
+              </View>
             </View>
             <TouchableOpacity
               onPress={() => setIsLeaderboardOpen(false)}
-              style={{ backgroundColor: colors.neutral[100], paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 }}
+              style={{ backgroundColor: colors.neutral[100], paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8 }}
             >
-              <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.neutral[600] }}>✕</Text>
+              <X size={14} color={colors.neutral[600]} weight="bold" />
             </TouchableOpacity>
           </View>
 
           {/* Top 3 Podium Cards */}
           <View style={{ flexDirection: 'row', gap: 6, marginBottom: 14, justifyContent: 'center' }}>
             {leaderboardList.filter((m) => m.show_on_leaderboard !== false).slice(0, 3).map((item, idx) => {
-              const medals = ['🥇', '🥈', '🥉'];
               const bgColors = ['#fef3c7', '#f1f5f9', '#ffedd5'];
+              const medalColors = ['#d97706', '#64748b', '#b45309'];
               return (
                 <View
                   key={item.user_id || idx}
@@ -2073,7 +2128,7 @@ export default function App() {
                     alignItems: 'center'
                   }}
                 >
-                  <Text style={{ fontSize: 18 }}>{medals[idx]}</Text>
+                  <Medal size={20} color={medalColors[idx]} weight="fill" />
                   <Image
                     source={{ uri: item.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80' }}
                     style={{ width: 36, height: 36, borderRadius: 18, marginVertical: 4 }}
@@ -2144,9 +2199,12 @@ export default function App() {
                         </View>
                       )}
                     </View>
-                    <Text style={{ fontSize: 10, color: colors.neutral[400] }}>
-                      {m.branch || 'CSE'} · {m.checkin_streak || 0}d streak 🔥
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
+                      <Text style={{ fontSize: 10, color: colors.neutral[400] }}>
+                        {m.branch || 'CSE'} · {m.checkin_streak || 0}d streak
+                      </Text>
+                      <Flame size={11} color="#f97316" weight="fill" />
+                    </View>
                   </View>
                   <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.primary[700] }}>
                     {m.total_points} XP
@@ -2173,19 +2231,32 @@ export default function App() {
                           const updatedRank = await getMyRank(currentUser.id);
                           setMemberRank(updatedRank);
                         }
-                        triggerToast(newVis ? `✓ ${m.full_name} visible` : `✕ ${m.full_name} hidden`);
+                        triggerToast(newVis ? `${m.full_name} visible` : `${m.full_name} hidden`);
                       }}
                       style={{
                         paddingHorizontal: 8,
-                        paddingVertical: 4,
+                        paddingVertical: 5,
                         borderRadius: 6,
-                        backgroundColor: m.show_on_leaderboard !== false ? colors.success[50] : colors.neutral[200],
-                        marginLeft: 8
+                        backgroundColor: m.show_on_leaderboard !== false ? colors.success[50] : colors.neutral[100],
+                        borderWidth: 1,
+                        borderColor: m.show_on_leaderboard !== false ? colors.success[200] : colors.neutral[300],
+                        marginLeft: 8,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 4
                       }}
                     >
-                      <Text style={{ fontSize: 9, fontWeight: 'bold', color: m.show_on_leaderboard !== false ? colors.success[700] : colors.neutral[600] }}>
-                        {m.show_on_leaderboard !== false ? '👁 On' : '✕ Off'}
-                      </Text>
+                      {m.show_on_leaderboard !== false ? (
+                        <>
+                          <Eye size={11} color={colors.success[700]} weight="bold" />
+                          <Text style={{ fontSize: 9, fontWeight: 'bold', color: colors.success[700] }}>On</Text>
+                        </>
+                      ) : (
+                        <>
+                          <EyeSlash size={11} color={colors.neutral[600]} weight="bold" />
+                          <Text style={{ fontSize: 9, fontWeight: 'bold', color: colors.neutral[600] }}>Off</Text>
+                        </>
+                      )}
                     </TouchableOpacity>
                   )}
                 </View>
@@ -3699,7 +3770,7 @@ export default function App() {
                 Quick Actions
               </Text>
               <TouchableOpacity onPress={() => setIsFabActionMenuOpen(false)} style={{ padding: 4 }}>
-                <Text style={{ fontSize: 14, color: colors.neutral[400] }}>✕</Text>
+                <X size={16} color={colors.neutral[500]} weight="bold" />
               </TouchableOpacity>
             </View>
 
@@ -3713,7 +3784,9 @@ export default function App() {
                     }}
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#f5f3ff', padding: 12, borderRadius: 14, borderWidth: 1, borderColor: '#ddd6fe' }}
                   >
-                    <Text style={{ fontSize: 20 }}>📷</Text>
+                    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#ede9fe', alignItems: 'center', justifyContent: 'center' }}>
+                      <Camera size={20} color="#6d28d9" weight="bold" />
+                    </View>
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#6d28d9' }}>Scan Student Event Pass</Text>
                       <Text style={{ fontSize: 11, color: colors.neutral[500] }}>Verify QR door check-in & record attendance</Text>
@@ -3727,7 +3800,9 @@ export default function App() {
                     }}
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.primary[50], padding: 12, borderRadius: 14, borderWidth: 1, borderColor: colors.primary[200] }}
                   >
-                    <Text style={{ fontSize: 20 }}>⭐</Text>
+                    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary[100], alignItems: 'center', justifyContent: 'center' }}>
+                      <Sparkle size={20} color={colors.primary[600]} weight="fill" />
+                    </View>
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.primary[900] }}>Award / Deduct Member XP</Text>
                       <Text style={{ fontSize: 11, color: colors.neutral[500] }}>Manually reward points for contributions & PRs</Text>
@@ -3742,7 +3817,9 @@ export default function App() {
                     }}
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.neutral[50], padding: 12, borderRadius: 14, borderWidth: 1, borderColor: colors.neutral[200] }}
                   >
-                    <Text style={{ fontSize: 20 }}>📝</Text>
+                    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.neutral[200], alignItems: 'center', justifyContent: 'center' }}>
+                      <FileText size={20} color={colors.neutral[700]} weight="bold" />
+                    </View>
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900] }}>Review Student PRs & Submissions</Text>
                       <Text style={{ fontSize: 11, color: colors.neutral[500] }}>Verify open PRs and approve reward points</Text>
@@ -3756,7 +3833,9 @@ export default function App() {
                     }}
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.neutral[50], padding: 12, borderRadius: 14, borderWidth: 1, borderColor: colors.neutral[200] }}
                   >
-                    <Text style={{ fontSize: 20 }}>📢</Text>
+                    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.neutral[200], alignItems: 'center', justifyContent: 'center' }}>
+                      <Megaphone size={20} color={colors.neutral[700]} weight="bold" />
+                    </View>
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900] }}>Post Campus Announcement</Text>
                       <Text style={{ fontSize: 11, color: colors.neutral[500] }}>Broadcast to all registered club members</Text>
@@ -3772,7 +3851,9 @@ export default function App() {
                     }}
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.primary[50], padding: 12, borderRadius: 14, borderWidth: 1, borderColor: colors.primary[200] }}
                   >
-                    <Text style={{ fontSize: 20 }}>🪪</Text>
+                    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary[100], alignItems: 'center', justifyContent: 'center' }}>
+                      <IdentificationCard size={20} color={colors.primary[600]} weight="bold" />
+                    </View>
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.primary[900] }}>Digital Campus Pass</Text>
                       <Text style={{ fontSize: 11, color: colors.neutral[500] }}>Show QR pass for workshop door entry</Text>
@@ -3786,7 +3867,9 @@ export default function App() {
                     }}
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#f0fdf4', padding: 12, borderRadius: 14, borderWidth: 1, borderColor: '#bbf7d0' }}
                   >
-                    <Text style={{ fontSize: 20 }}>🚀</Text>
+                    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#dcfce7', alignItems: 'center', justifyContent: 'center' }}>
+                      <RocketLaunch size={20} color="#15803d" weight="bold" />
+                    </View>
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#15803d' }}>Submit Contribution / PR</Text>
                       <Text style={{ fontSize: 11, color: colors.neutral[500] }}>Submit your merged GitHub PR to earn XP</Text>
@@ -3800,7 +3883,9 @@ export default function App() {
                     }}
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.neutral[50], padding: 12, borderRadius: 14, borderWidth: 1, borderColor: colors.neutral[200] }}
                   >
-                    <Text style={{ fontSize: 20 }}>🏆</Text>
+                    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.neutral[200], alignItems: 'center', justifyContent: 'center' }}>
+                      <Trophy size={20} color={colors.neutral[700]} weight="bold" />
+                    </View>
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.neutral[900] }}>XP Leaderboard & Badges</Text>
                       <Text style={{ fontSize: 11, color: colors.neutral[500] }}>View campus rankings and unlocked badges</Text>
@@ -4005,7 +4090,132 @@ export default function App() {
       console.warn('[ATC Mobile] Supabase memory insert note:', e);
     }
 
-    triggerToast('Campus Memory Published to Vault! 🏆');
+    triggerToast('✓ Campus Memory Published to Vault');
+  };
+
+  const handleToggleLikeMemory = async (memId) => {
+    const isLiked = likedMemoryIds.includes(memId);
+    const target = galleryMemories.find((m) => m.id === memId);
+    const curLikes = target?.likes_count || 0;
+    const nextLikes = isLiked ? Math.max(0, curLikes - 1) : curLikes + 1;
+
+    setGalleryMemories((prev) =>
+      prev.map((m) => (m.id === memId ? { ...m, likes_count: nextLikes } : m))
+    );
+    if (selectedGalleryMemory && selectedGalleryMemory.id === memId) {
+      setSelectedGalleryMemory((prev) => ({ ...prev, likes_count: nextLikes }));
+    }
+
+    const updated = isLiked
+      ? likedMemoryIds.filter((id) => id !== memId)
+      : [...likedMemoryIds, memId];
+    setLikedMemoryIds(updated);
+
+    try {
+      await FileSystem.writeAsStringAsync(
+        `${FileSystem.documentDirectory}atc_liked_memories.json`,
+        JSON.stringify(updated)
+      );
+    } catch (e) {}
+
+    await toggleLikeVaultGalleryMemory(memId, isLiked, curLikes);
+  };
+
+  const openEditMemoryModal = (mem) => {
+    setEditingMemory(mem);
+    setEditMemTitle(mem.title || '');
+    setEditMemCategory(mem.category || 'hackathon');
+    setEditMemAward(mem.award_title || '');
+    setEditMemImage(mem.image_url || '');
+    setEditMemAchievers(Array.isArray(mem.achievers) ? mem.achievers.join(', ') : (mem.achievers || ''));
+    setEditMemDesc(mem.description || '');
+    setEditMemDate(mem.event_date || '');
+    setIsEditMemoryModalOpen(true);
+  };
+
+  const handleUpdateMemory = async () => {
+    if (!editingMemory || !editMemTitle.trim() || !editMemImage.trim()) {
+      triggerToast('Please provide title and image URL');
+      return;
+    }
+    try {
+      setEditMemSubmitting(true);
+      const payload = {
+        title: editMemTitle.trim(),
+        category: editMemCategory,
+        award_title: editMemAward.trim(),
+        image_url: editMemImage.trim(),
+        achievers: editMemAchievers
+          ? editMemAchievers.split(',').map((s) => s.trim()).filter(Boolean)
+          : [],
+        description: editMemDesc.trim(),
+        event_date: editMemDate || new Date().toISOString().split('T')[0]
+      };
+      await updateVaultGalleryMemory(editingMemory.id, payload);
+      setGalleryMemories((prev) =>
+        prev.map((m) => (m.id === editingMemory.id ? { ...m, ...payload } : m))
+      );
+      if (selectedGalleryMemory && selectedGalleryMemory.id === editingMemory.id) {
+        setSelectedGalleryMemory((prev) => ({ ...prev, ...payload }));
+      }
+      setIsEditMemoryModalOpen(false);
+      setEditingMemory(null);
+      triggerToast('✓ Campus Memory updated');
+    } catch (err) {
+      triggerToast('✕ Failed to update memory');
+    } finally {
+      setEditMemSubmitting(false);
+    }
+  };
+
+  const handleDeleteMemory = (memId, title) => {
+    Alert.alert(
+      'Delete Campus Memory?',
+      `Are you sure you want to permanently remove "${title || 'this memory'}" from Campus Gallery?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteVaultGalleryMemory(memId);
+              setGalleryMemories((prev) => prev.filter((m) => m.id !== memId));
+              if (selectedGalleryMemory && selectedGalleryMemory.id === memId) {
+                setSelectedGalleryMemory(null);
+              }
+              triggerToast('✓ Memory deleted from gallery');
+            } catch (err) {
+              triggerToast('✕ Failed to delete memory');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleDeleteResource = (resourceId, title) => {
+    Alert.alert(
+      'Delete Resource?',
+      `Are you sure you want to permanently delete "${title || 'this resource'}" from the Knowledge Vault?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteResource(resourceId);
+              setResources((prev) => prev.filter((r) => r.id !== resourceId));
+              setSelectedResource(null);
+              triggerToast('✓ Resource removed from Vault');
+            } catch (err) {
+              triggerToast('✕ Failed to delete resource');
+            }
+          }
+        }
+      ]
+    );
   };
 
   // Admin Approve Member with permanent Supabase DB persistence
@@ -4952,7 +5162,7 @@ export default function App() {
                 }}
               >
                 <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: '#eff6ff', justifyContent: 'center', alignItems: 'center', marginBottom: 4 }}>
-                  <Text style={{ fontSize: 16 }}>🚀</Text>
+                  <RocketLaunch size={18} color="#2563eb" weight="bold" />
                 </View>
                 <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[900] }}>Workshops</Text>
                 <Text style={{ fontSize: 9, color: colors.neutral[400] }}>{events.length} active</Text>
@@ -4976,7 +5186,7 @@ export default function App() {
                 }}
               >
                 <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: '#f0fdf4', justifyContent: 'center', alignItems: 'center', marginBottom: 4 }}>
-                  <Text style={{ fontSize: 16 }}>📚</Text>
+                  <BookOpen size={18} color="#16a34a" weight="bold" />
                 </View>
                 <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[900] }}>Vault</Text>
                 <Text style={{ fontSize: 9, color: colors.neutral[400] }}>{resources.length} guides</Text>
@@ -5000,7 +5210,7 @@ export default function App() {
                 }}
               >
                 <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: '#faf5ff', justifyContent: 'center', alignItems: 'center', marginBottom: 4 }}>
-                  <Text style={{ fontSize: 16 }}>🪪</Text>
+                  <IdentificationCard size={18} color="#9333ea" weight="bold" />
                 </View>
                 <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[900] }}>Pass</Text>
                 <Text style={{ fontSize: 9, color: colors.neutral[400] }}>Digital QR</Text>
@@ -5024,7 +5234,7 @@ export default function App() {
                 }}
               >
                 <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: '#fffbeb', justifyContent: 'center', alignItems: 'center', marginBottom: 4 }}>
-                  <Text style={{ fontSize: 16 }}>🏆</Text>
+                  <Trophy size={18} color="#d97706" weight="bold" />
                 </View>
                 <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[900] }}>Ranks</Text>
                 <Text style={{ fontSize: 9, color: colors.neutral[400] }}>{memberPoints} XP</Text>
@@ -5045,7 +5255,7 @@ export default function App() {
               >
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={{ fontSize: 12 }}>🛡️</Text>
+                    <Shield size={13} color="#93c5fd" weight="bold" />
                     <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#93c5fd' }}>
                       Admin Command Console
                     </Text>
@@ -5069,7 +5279,7 @@ export default function App() {
                       gap: 4
                     }}
                   >
-                    <Text style={{ fontSize: 12 }}>📷</Text>
+                    <Camera size={13} color="#ffffff" weight="bold" />
                     <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>Scan Pass</Text>
                   </TouchableOpacity>
 
@@ -5088,7 +5298,7 @@ export default function App() {
                       borderColor: '#334155'
                     }}
                   >
-                    <Text style={{ fontSize: 12 }}>📢</Text>
+                    <Megaphone size={13} color="#ffffff" weight="bold" />
                     <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>Broadcast</Text>
                   </TouchableOpacity>
 
@@ -5107,7 +5317,7 @@ export default function App() {
                       borderColor: '#334155'
                     }}
                   >
-                    <Text style={{ fontSize: 12 }}>👥</Text>
+                    <Users size={13} color="#ffffff" weight="bold" />
                     <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>
                       Verify ({pendingMembers.length})
                     </Text>
@@ -5235,14 +5445,21 @@ export default function App() {
                         {ann.category}
                       </Text>
                       {ann.pinned && (
-                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.warning[800], backgroundColor: colors.warning[100], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                          📌 PINNED
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: colors.warning[100], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                          <PushPin size={10} color={colors.warning[800]} weight="fill" />
+                          <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.warning[800] }}>
+                            PINNED
+                          </Text>
+                        </View>
                       )}
                     </View>
 
                     <TouchableOpacity onPress={() => handleToggleBookmark(ann.id)}>
-                      <Text style={{ fontSize: 14 }}>{bookmarkedIds.includes(ann.id) ? '⭐' : '☆'}</Text>
+                      <Star
+                        size={16}
+                        color={bookmarkedIds.includes(ann.id) ? '#f59e0b' : colors.neutral[400]}
+                        weight={bookmarkedIds.includes(ann.id) ? 'fill' : 'regular'}
+                      />
                     </TouchableOpacity>
                   </View>
 
@@ -5260,7 +5477,7 @@ export default function App() {
                         onPress={() => handleReact(ann.id, 'fire')}
                         style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.neutral[100], paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, gap: 4 }}
                       >
-                        <Text style={{ fontSize: 11 }}>🔥</Text>
+                        <Flame size={12} color="#f97316" weight="fill" />
                         <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700] }}>
                           {reactions[ann.id]?.fire || 0}
                         </Text>
@@ -5270,7 +5487,7 @@ export default function App() {
                         onPress={() => handleReact(ann.id, 'rocket')}
                         style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.neutral[100], paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, gap: 4 }}
                       >
-                        <Text style={{ fontSize: 11 }}>🚀</Text>
+                        <RocketLaunch size={12} color="#2563eb" weight="fill" />
                         <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700] }}>
                           {reactions[ann.id]?.rocket || 0}
                         </Text>
@@ -5280,15 +5497,16 @@ export default function App() {
                         onPress={() => handleReact(ann.id, 'heart')}
                         style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.neutral[100], paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, gap: 4 }}
                       >
-                        <Text style={{ fontSize: 11 }}>❤️</Text>
+                        <Heart size={12} color="#ef4444" weight="fill" />
                         <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700] }}>
                           {reactions[ann.id]?.heart || 0}
                         </Text>
                       </TouchableOpacity>
                     </View>
 
-                    <TouchableOpacity onPress={() => handleShare(ann.title, ann.body)}>
-                      <Text style={{ fontSize: 12, color: colors.neutral[500], fontWeight: 'bold' }}>Share ↗</Text>
+                    <TouchableOpacity onPress={() => handleShare(ann.title, ann.body)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <ShareNetwork size={13} color={colors.neutral[500]} weight="bold" />
+                      <Text style={{ fontSize: 12, color: colors.neutral[500], fontWeight: 'bold' }}>Share</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -5466,9 +5684,10 @@ export default function App() {
                             {evt.category}
                           </Text>
                           {isCompleted ? (
-                            <View style={{ backgroundColor: '#1e293b', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                            <View style={{ backgroundColor: '#1e293b', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                              <CheckCircle size={10} color="#f8fafc" weight="bold" />
                               <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#f8fafc' }}>
-                                🏁 Concluded
+                                Concluded
                               </Text>
                             </View>
                           ) : (
@@ -5492,18 +5711,27 @@ export default function App() {
                       </Text>
 
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
-                        <Text style={{ fontSize: 11, color: colors.neutral[600] }}>
-                          📅 {new Date(evt.date || evt.start_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <CalendarBlank size={12} color={colors.neutral[600]} />
+                          <Text style={{ fontSize: 11, color: colors.neutral[600] }}>
+                            {new Date(evt.date || evt.start_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </Text>
+                        </View>
                         <Text style={{ fontSize: 11, color: colors.neutral[300] }}>•</Text>
-                        <Text style={{ fontSize: 11, color: colors.neutral[600] }}>
-                          📍 {evt.location}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <MapPin size={12} color={colors.neutral[600]} />
+                          <Text style={{ fontSize: 11, color: colors.neutral[600] }}>
+                            {evt.location}
+                          </Text>
+                        </View>
                       </View>
 
-                      <Text style={{ fontSize: 11, color: colors.neutral[500], marginBottom: 10 }}>
-                        👥 {evt.registrations_count || (isRSVPed ? 1 : 0)} registered / {evt.capacity || 100} capacity ({spotsLeft > 0 ? `${spotsLeft} spots left` : 'Full'})
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 10 }}>
+                        <Users size={12} color={colors.neutral[500]} />
+                        <Text style={{ fontSize: 11, color: colors.neutral[500] }}>
+                          {evt.registrations_count || (isRSVPed ? 1 : 0)} registered / {evt.capacity || 100} capacity ({spotsLeft > 0 ? `${spotsLeft} spots left` : 'Full'})
+                        </Text>
+                      </View>
 
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.neutral[100] }}>
                         <TouchableOpacity
@@ -5521,8 +5749,9 @@ export default function App() {
                           }}
                         >
                           <Text style={{ color: colors.primary[700], fontSize: 11, fontWeight: 'bold' }}>
-                            Details →
+                            Details
                           </Text>
+                          <ArrowRight size={11} color={colors.primary[700]} weight="bold" />
                         </TouchableOpacity>
 
                         {isCompleted ? (
@@ -5531,11 +5760,15 @@ export default function App() {
                               backgroundColor: '#1e293b',
                               paddingHorizontal: 12,
                               paddingVertical: 6,
-                              borderRadius: 8
+                              borderRadius: 8,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 4
                             }}
                           >
+                            <CheckCircle size={11} color="#f8fafc" weight="bold" />
                             <Text style={{ color: '#f8fafc', fontSize: 11, fontWeight: 'bold' }}>
-                              🏁 Concluded
+                              Concluded
                             </Text>
                           </View>
                         ) : (
@@ -5545,11 +5778,15 @@ export default function App() {
                               backgroundColor: isRSVPed ? colors.success[500] : colors.primary[500],
                               paddingHorizontal: 14,
                               paddingVertical: 6,
-                              borderRadius: 8
+                              borderRadius: 8,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 4
                             }}
                           >
+                            {isRSVPed && <Check size={12} color="#ffffff" weight="bold" />}
                             <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>
-                              {isRSVPed ? '✓ Reserved' : 'RSVP Now'}
+                              {isRSVPed ? 'Reserved' : 'RSVP Now'}
                             </Text>
                           </TouchableOpacity>
                         )}
@@ -5834,32 +6071,46 @@ export default function App() {
                 <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
                   {[
                     { id: 'All', label: 'All Memories' },
-                    { id: 'hackathon', label: '🏆 Hackathons' },
-                    { id: 'contributor', label: '⭐ Top Contributors' },
-                    { id: 'event', label: '📸 Events' }
-                  ].map((cat) => (
-                    <TouchableOpacity
-                      key={cat.id}
-                      onPress={() => setGalleryFilter(cat.id)}
-                      style={{
-                        paddingHorizontal: 10,
-                        paddingVertical: 5,
-                        borderRadius: 8,
-                        backgroundColor: galleryFilter === cat.id ? colors.neutral[900] : colors.neutral[100]
-                      }}
-                    >
-                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: galleryFilter === cat.id ? '#ffffff' : colors.neutral[600] }}>
-                        {cat.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                    { id: 'hackathon', label: 'Hackathons', icon: Trophy },
+                    { id: 'contributor', label: 'Top Contributors', icon: Star },
+                    { id: 'event', label: 'Events', icon: Camera }
+                  ].map((cat) => {
+                    const IconComp = cat.icon;
+                    const isSelected = galleryFilter === cat.id;
+                    return (
+                      <TouchableOpacity
+                        key={cat.id}
+                        onPress={() => setGalleryFilter(cat.id)}
+                        style={{
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          borderRadius: 8,
+                          backgroundColor: isSelected ? colors.neutral[900] : colors.neutral[100],
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 4
+                        }}
+                      >
+                        {IconComp && (
+                          <IconComp
+                            size={11}
+                            color={isSelected ? '#ffffff' : colors.neutral[600]}
+                            weight={isSelected ? 'fill' : 'regular'}
+                          />
+                        )}
+                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: isSelected ? '#ffffff' : colors.neutral[600] }}>
+                          {cat.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
 
                 {/* Memories List */}
                 {galleryMemories.length === 0 ? (
                   <View style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 24, alignItems: 'center', borderWidth: 1, borderColor: colors.neutral[200] }}>
-                    <Text style={{ fontSize: 24, marginBottom: 8 }}>📸</Text>
-                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 4 }}>
+                    <Camera size={32} color={colors.neutral[400]} />
+                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.neutral[900], marginTop: 8, marginBottom: 4 }}>
                       Campus Memories Loading
                     </Text>
                     <Text style={{ fontSize: 12, color: colors.neutral[500], textAlign: 'center' }}>
@@ -5869,87 +6120,168 @@ export default function App() {
                 ) : (
                   galleryMemories
                     .filter((m) => galleryFilter === 'All' || m.category === galleryFilter)
-                    .map((mem) => (
-                      <View
-                        key={mem.id}
-                        style={{
-                          backgroundColor: '#ffffff',
-                          borderRadius: 16,
-                          borderWidth: 1,
-                          borderColor: colors.neutral[200],
-                          overflow: 'hidden',
-                          shadowColor: '#000',
-                          shadowOffset: { width: 0, height: 1 },
-                          shadowOpacity: 0.05,
-                          shadowRadius: 3,
-                          elevation: 1
-                        }}
-                      >
-                        <TouchableOpacity
-                          activeOpacity={0.9}
-                          onPress={() => setSelectedGalleryMemory(mem)}
-                          style={{ position: 'relative', height: 160, backgroundColor: '#0f172a' }}
+                    .map((mem) => {
+                      const isLiked = likedMemoryIds.includes(mem.id);
+                      return (
+                        <View
+                          key={mem.id}
+                          style={{
+                            backgroundColor: '#ffffff',
+                            borderRadius: 16,
+                            borderWidth: 1,
+                            borderColor: colors.neutral[200],
+                            overflow: 'hidden',
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 1 },
+                            shadowOpacity: 0.05,
+                            shadowRadius: 3,
+                            elevation: 1
+                          }}
                         >
-                          <Image
-                            source={{ uri: mem.image_url }}
-                            style={{ width: '100%', height: '100%' }}
-                            resizeMode="cover"
-                          />
-                          <View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.2)' }} />
+                          <TouchableOpacity
+                            activeOpacity={0.9}
+                            onPress={() => setSelectedGalleryMemory(mem)}
+                            style={{ position: 'relative', height: 160, backgroundColor: '#0f172a' }}
+                          >
+                            <Image
+                              source={{ uri: mem.image_url }}
+                              style={{ width: '100%', height: '100%' }}
+                              resizeMode="cover"
+                            />
+                            <View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.2)' }} />
 
-                          {/* Top Badges */}
-                          <View style={{ position: 'absolute', top: 10, left: 10, flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
-                            <View style={{ backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                              <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#ffffff', textTransform: 'uppercase' }}>
-                                {mem.category === 'hackathon' ? '🏆 Hackathon' : mem.category === 'contributor' ? '⭐ Contributor' : '📸 Event'}
-                              </Text>
-                            </View>
-                            {mem.award_title && (
-                              <View style={{ backgroundColor: '#f59e0b', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                                <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#78350f' }}>
-                                  {mem.award_title}
+                            {/* Top Badges */}
+                            <View style={{ position: 'absolute', top: 10, left: 10, flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                              <View style={{ backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                {mem.category === 'hackathon' ? (
+                                  <Trophy size={11} color="#fcd34d" weight="fill" />
+                                ) : mem.category === 'contributor' ? (
+                                  <Star size={11} color="#38bdf8" weight="fill" />
+                                ) : (
+                                  <Camera size={11} color="#a7f3d0" weight="fill" />
+                                )}
+                                <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#ffffff', textTransform: 'uppercase' }}>
+                                  {mem.category === 'hackathon' ? 'Hackathon' : mem.category === 'contributor' ? 'Contributor' : 'Event'}
                                 </Text>
                               </View>
-                            )}
-                          </View>
-                        </TouchableOpacity>
-
-                        <View style={{ padding: 14 }}>
-                          <Text style={{ fontSize: 15, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 4 }}>
-                            {mem.title}
-                          </Text>
-                          <Text style={{ fontSize: 12, color: colors.neutral[600], lineHeight: 18, marginBottom: 10 }}>
-                            {mem.description}
-                          </Text>
-
-                          {mem.achievers && mem.achievers.length > 0 && (
-                            <View style={{ marginBottom: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.neutral[100] }}>
-                              <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.neutral[400], textTransform: 'uppercase', marginBottom: 4 }}>
-                                Recognized Students:
-                              </Text>
-                              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
-                                {mem.achievers.map((ach, i) => (
-                                  <View key={i} style={{ backgroundColor: colors.primary[50], paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
-                                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[700] }}>
-                                      {ach}
-                                    </Text>
-                                  </View>
-                                ))}
-                              </View>
+                              {mem.award_title ? (
+                                <View style={{ backgroundColor: '#f59e0b', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                  <Trophy size={10} color="#78350f" weight="fill" />
+                                  <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#78350f' }}>
+                                    {mem.award_title}
+                                  </Text>
+                                </View>
+                              ) : null}
                             </View>
-                          )}
 
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.neutral[100] }}>
-                            <Text style={{ fontSize: 10, color: colors.neutral[400] }}>
-                              📅 {mem.event_date || 'Campus Archive'}
+                            {/* Admin Quick Action Buttons */}
+                            {isAdmin && (
+                              <View style={{ position: 'absolute', top: 10, right: 10, flexDirection: 'row', gap: 6 }}>
+                                <TouchableOpacity
+                                  onPress={() => openEditMemoryModal(mem)}
+                                  style={{
+                                    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+                                    width: 30,
+                                    height: 30,
+                                    borderRadius: 15,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    shadowColor: '#000',
+                                    shadowOffset: { width: 0, height: 1 },
+                                    shadowOpacity: 0.2,
+                                    shadowRadius: 2,
+                                    elevation: 2
+                                  }}
+                                  accessibilityLabel="Edit Memory"
+                                >
+                                  <PencilSimple size={14} color={colors.neutral[800]} weight="bold" />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  onPress={() => handleDeleteMemory(mem.id, mem.title)}
+                                  style={{
+                                    backgroundColor: 'rgba(254, 242, 242, 0.95)',
+                                    width: 30,
+                                    height: 30,
+                                    borderRadius: 15,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    shadowColor: '#000',
+                                    shadowOffset: { width: 0, height: 1 },
+                                    shadowOpacity: 0.2,
+                                    shadowRadius: 2,
+                                    elevation: 2
+                                  }}
+                                  accessibilityLabel="Delete Memory"
+                                >
+                                  <Trash size={14} color="#dc2626" weight="bold" />
+                                </TouchableOpacity>
+                              </View>
+                            )}
+                          </TouchableOpacity>
+
+                          <View style={{ padding: 14 }}>
+                            <Text style={{ fontSize: 15, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 4 }}>
+                              {mem.title}
                             </Text>
-                            <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[600] }}>
-                              ❤️ {mem.likes_count || 42} Kudos
+                            <Text style={{ fontSize: 12, color: colors.neutral[600], lineHeight: 18, marginBottom: 10 }}>
+                              {mem.description}
                             </Text>
+
+                            {mem.achievers && mem.achievers.length > 0 && (
+                              <View style={{ marginBottom: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.neutral[100] }}>
+                                <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.neutral[400], textTransform: 'uppercase', marginBottom: 4 }}>
+                                  Recognized Students:
+                                </Text>
+                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                                  {mem.achievers.map((ach, i) => (
+                                    <View key={i} style={{ backgroundColor: colors.primary[50], paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                                      <Star size={9} color={colors.primary[600]} weight="fill" />
+                                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[700] }}>
+                                        {ach}
+                                      </Text>
+                                    </View>
+                                  ))}
+                                </View>
+                              </View>
+                            )}
+
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.neutral[100] }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                <CalendarBlank size={12} color={colors.neutral[400]} />
+                                <Text style={{ fontSize: 10, color: colors.neutral[400] }}>
+                                  {mem.event_date || 'Campus Archive'}
+                                </Text>
+                              </View>
+
+                              <TouchableOpacity
+                                onPress={() => handleToggleLikeMemory(mem.id)}
+                                activeOpacity={0.7}
+                                style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  gap: 5,
+                                  backgroundColor: isLiked ? '#fef2f2' : colors.neutral[50],
+                                  borderWidth: 1,
+                                  borderColor: isLiked ? '#fecaca' : colors.neutral[200],
+                                  paddingHorizontal: 9,
+                                  paddingVertical: 4,
+                                  borderRadius: 8
+                                }}
+                              >
+                                <Heart
+                                  size={13}
+                                  color={isLiked ? '#ef4444' : colors.neutral[500]}
+                                  weight={isLiked ? 'fill' : 'regular'}
+                                />
+                                <Text style={{ fontSize: 11, fontWeight: 'bold', color: isLiked ? '#dc2626' : colors.neutral[700] }}>
+                                  {mem.likes_count || 0} Kudos
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
                           </View>
                         </View>
-                      </View>
-                    ))
+                      );
+                    })
                 )}
               </View>
             )}
@@ -7762,31 +8094,22 @@ export default function App() {
 
       {/* FULL-SCREEN DEDICATED RESOURCE DETAILS SCREEN */}
       <Modal visible={!!selectedResource} animationType="slide" presentationStyle="fullScreen">
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#0b0f19' }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+          <StatusBar barStyle="dark-content" backgroundColor="#f8fafc" />
           {selectedResource && (() => {
             const resUrl = selectedResource.url || selectedResource.file_url || '';
             const isGithub = resUrl.includes('github.com') || selectedResource.category === 'github';
             const isArticle = resUrl.includes('medium.com') || resUrl.includes('dev.to') || selectedResource.category === 'article' || selectedResource.category === 'blog';
             const isPlatform = !isGithub && !isArticle && resUrl.startsWith('http') && !resUrl.endsWith('.pdf') && !resUrl.endsWith('.zip');
-            
-            let actionText = 'Download Vault Asset 💾';
-            let actionType = 'download';
-            if (isGithub) {
-              actionText = 'Open GitHub Repository ↗';
-              actionType = 'external';
-            } else if (isArticle) {
-              actionText = 'Read Article / Paper ↗';
-              actionType = 'external';
-            } else if (isPlatform) {
-              actionText = 'Launch Web Platform ↗';
-              actionType = 'external';
-            }
+
+            const actionLabel = isGithub ? 'GitHub Repo ↗' : isArticle ? 'Read Article ↗' : isPlatform ? 'Launch Platform ↗' : 'Download Asset';
+            const actionType = (isGithub || isArticle || isPlatform) ? 'external' : 'download';
 
             return (
-              <View style={{ flex: 1, backgroundColor: '#0b0f19' }}>
+              <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
                 <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
                   {/* HERO BANNER SECTION */}
-                  <View style={{ position: 'relative', width: '100%', height: 230, backgroundColor: '#1e293b' }}>
+                  <View style={{ position: 'relative', width: '100%', height: 240, backgroundColor: '#0f172a' }}>
                     <Image
                       source={{
                         uri: selectedResource.cover_image || selectedResource.image_url || 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=1200&q=80'
@@ -7800,35 +8123,37 @@ export default function App() {
                         left: 0,
                         right: 0,
                         bottom: 0,
-                        backgroundColor: 'rgba(11, 15, 25, 0.45)'
+                        backgroundColor: 'rgba(0, 0, 0, 0.25)'
                       }}
                     />
 
                     {/* CATEGORY & FORMAT BADGE OVERLAY */}
-                    <View style={{ position: 'absolute', bottom: 14, left: 18, flexDirection: 'row', gap: 6 }}>
+                    <View style={{ position: 'absolute', bottom: 14, left: 16, flexDirection: 'row', gap: 6, alignItems: 'center' }}>
                       <View
                         style={{
-                          backgroundColor: 'rgba(14, 165, 233, 0.9)',
+                          backgroundColor: 'rgba(15, 23, 42, 0.85)',
                           paddingHorizontal: 10,
                           paddingVertical: 4,
-                          borderRadius: 8
+                          borderRadius: 6,
+                          borderWidth: 1,
+                          borderColor: 'rgba(255, 255, 255, 0.2)'
                         }}
                       >
-                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#ffffff', textTransform: 'uppercase' }}>
+                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary[300], textTransform: 'uppercase' }}>
                           {selectedResource.category || 'Engineering Asset'}
                         </Text>
                       </View>
                       <View
                         style={{
-                          backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                          backgroundColor: '#ffffff',
                           paddingHorizontal: 8,
                           paddingVertical: 4,
-                          borderRadius: 8,
+                          borderRadius: 6,
                           borderWidth: 1,
-                          borderColor: 'rgba(255, 255, 255, 0.2)'
+                          borderColor: colors.neutral[200]
                         }}
                       >
-                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#94a3b8' }}>
+                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.neutral[700] }}>
                           {selectedResource.format || selectedResource.file_type || (isGithub ? 'GITHUB' : 'DOCUMENT')}
                         </Text>
                       </View>
@@ -7836,80 +8161,83 @@ export default function App() {
                   </View>
 
                   {/* BODY CONTENT */}
-                  <View style={{ padding: 20 }}>
-                    <Text style={{ fontSize: 22, fontWeight: 'extrabold', color: '#ffffff', lineHeight: 28, marginBottom: 12 }}>
+                  <View style={{ padding: 18 }}>
+                    <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.neutral[900], lineHeight: 26, marginBottom: 8 }}>
                       {selectedResource.title}
                     </Text>
 
-                    {/* METADATA CHIPS */}
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-                      <View style={{ backgroundColor: '#1e293b', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: '#334155' }}>
-                        <Text style={{ fontSize: 11, color: '#94a3b8' }}>
-                          👤 {selectedResource.author_name || 'ATC Engineering Division'}
+                    {/* METADATA CHIPS (CLEAN PHOSPHOR ICONS, ZERO EMOJIS) */}
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+                      <View style={{ backgroundColor: '#ffffff', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.neutral[200], flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                        <User size={13} color={colors.neutral[600]} />
+                        <Text style={{ fontSize: 11, color: colors.neutral[700], fontWeight: '600' }}>
+                          {selectedResource.author_name || 'ATC Engineering Core'}
                         </Text>
                       </View>
                       {selectedResource.file_size ? (
-                        <View style={{ backgroundColor: '#1e293b', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: '#334155' }}>
-                          <Text style={{ fontSize: 11, color: '#94a3b8' }}>
-                            📦 {selectedResource.file_size}
+                        <View style={{ backgroundColor: '#ffffff', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.neutral[200], flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                          <Package size={13} color={colors.neutral[600]} />
+                          <Text style={{ fontSize: 11, color: colors.neutral[700], fontWeight: '600' }}>
+                            {selectedResource.file_size}
                           </Text>
                         </View>
                       ) : null}
-                      <View style={{ backgroundColor: '#1e293b', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: '#334155' }}>
-                        <Text style={{ fontSize: 11, color: '#38bdf8' }}>
-                          ⭐ Verified Campus Asset
+                      <View style={{ backgroundColor: colors.primary[50], paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.primary[200], flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                        <SealCheck size={13} color={colors.primary[600]} weight="fill" />
+                        <Text style={{ fontSize: 11, color: colors.primary[700], fontWeight: 'bold' }}>
+                          Verified Campus Asset
                         </Text>
                       </View>
                     </View>
 
                     {/* TAGS */}
                     {Array.isArray(selectedResource.tags) && selectedResource.tags.length > 0 && (
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
                         {selectedResource.tags.map((tag, i) => (
                           <View
                             key={i}
                             style={{
-                              backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                              backgroundColor: colors.primary[50],
                               paddingHorizontal: 8,
                               paddingVertical: 3,
                               borderRadius: 6,
                               borderWidth: 1,
-                              borderColor: 'rgba(56, 189, 248, 0.25)'
+                              borderColor: colors.primary[200]
                             }}
                           >
-                            <Text style={{ fontSize: 11, color: '#38bdf8', fontWeight: 'bold' }}>#{tag}</Text>
+                            <Text style={{ fontSize: 11, color: colors.primary[700], fontWeight: '600' }}>#{tag}</Text>
                           </View>
                         ))}
                       </View>
                     )}
 
-                    {/* ABOUT RESOURCE */}
-                    <View style={{ backgroundColor: '#131b2e', borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#1e293b' }}>
-                      <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#38bdf8', textTransform: 'uppercase', marginBottom: 8, letterSpacing: 0.5 }}>
+                    {/* OVERVIEW & DOSSIER */}
+                    <View style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: colors.neutral[200] }}>
+                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[400], textTransform: 'uppercase', marginBottom: 8, letterSpacing: 0.5 }}>
                         Overview & Dossier
                       </Text>
-                      <Text style={{ fontSize: 13, color: '#cbd5e1', lineHeight: 21 }}>
+                      <Text style={{ fontSize: 13, color: colors.neutral[700], lineHeight: 20 }}>
                         {selectedResource.description || 'Comprehensive technical documentation and architectural reference for club members.'}
                       </Text>
                     </View>
 
                     {/* CURRICULUM & MODULE BREAKDOWN */}
-                    <View style={{ backgroundColor: '#131b2e', borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#1e293b' }}>
-                      <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#a78bfa', textTransform: 'uppercase', marginBottom: 10, letterSpacing: 0.5 }}>
+                    <View style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: colors.neutral[200] }}>
+                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[700], textTransform: 'uppercase', marginBottom: 10, letterSpacing: 0.5 }}>
                         Core Architecture & Modules
                       </Text>
                       <View style={{ gap: 8 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                          <Text style={{ color: '#10b981', fontSize: 14 }}>✓</Text>
-                          <Text style={{ fontSize: 12, color: '#e2e8f0', flex: 1 }}>Deep Dive: Distributed state management & cache invalidation</Text>
+                          <CheckCircle size={15} color={colors.success[600]} weight="fill" />
+                          <Text style={{ fontSize: 12, color: colors.neutral[800], flex: 1 }}>Deep Dive: Distributed state management & cache invalidation</Text>
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                          <Text style={{ color: '#10b981', fontSize: 14 }}>✓</Text>
-                          <Text style={{ fontSize: 12, color: '#e2e8f0', flex: 1 }}>Hands-on Labs: Production deployment pipeline and test harness</Text>
+                          <CheckCircle size={15} color={colors.success[600]} weight="fill" />
+                          <Text style={{ fontSize: 12, color: colors.neutral[800], flex: 1 }}>Hands-on Labs: Production deployment pipeline and test harness</Text>
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                          <Text style={{ color: '#10b981', fontSize: 14 }}>✓</Text>
-                          <Text style={{ fontSize: 12, color: '#e2e8f0', flex: 1 }}>Engineering Best Practices: Rate limiting, tokens and RBAC</Text>
+                          <CheckCircle size={15} color={colors.success[600]} weight="fill" />
+                          <Text style={{ fontSize: 12, color: colors.neutral[800], flex: 1 }}>Engineering Best Practices: Rate limiting, tokens and RBAC</Text>
                         </View>
                       </View>
                     </View>
@@ -7921,50 +8249,51 @@ export default function App() {
                           handleShare(selectedResource.title, `Resource link: ${resUrl}`);
                         }}
                         style={{
-                          backgroundColor: '#0f172a',
+                          backgroundColor: '#ffffff',
                           padding: 12,
                           borderRadius: 12,
                           borderWidth: 1,
-                          borderColor: '#334155',
+                          borderColor: colors.neutral[200],
                           flexDirection: 'row',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          marginBottom: 16
+                          marginBottom: 14
                         }}
                       >
                         <View style={{ flex: 1, marginRight: 10 }}>
-                          <Text style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', fontWeight: 'bold' }}>Resource Location / Target</Text>
-                          <Text style={{ fontSize: 12, color: '#38bdf8', marginTop: 2 }} numberOfLines={1}>{resUrl}</Text>
+                          <Text style={{ fontSize: 10, color: colors.neutral[400], textTransform: 'uppercase', fontWeight: 'bold' }}>Resource Location / Target</Text>
+                          <Text style={{ fontSize: 12, color: colors.primary[600], marginTop: 2 }} numberOfLines={1}>{resUrl}</Text>
                         </View>
-                        <View style={{ backgroundColor: '#1e293b', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
-                          <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#94a3b8' }}>Share Link</Text>
+                        <View style={{ backgroundColor: colors.neutral[100], paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <ShareNetwork size={12} color={colors.neutral[600]} />
+                          <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.neutral[600] }}>Share</Text>
                         </View>
                       </TouchableOpacity>
                     ) : null}
                   </View>
                 </ScrollView>
 
-                {/* STICKY BOTTOM ACTION BAR (ERGONOMIC THUMB ZONE: BACK, SHARE & ACTION) */}
+                {/* STICKY BOTTOM ACTION BAR (ERGONOMIC THUMB ZONE: BACK, SHARE, ACTION & ADMIN DELETE) */}
                 <View
                   style={{
                     position: 'absolute',
                     bottom: 0,
                     left: 0,
                     right: 0,
-                    backgroundColor: '#0b0f19',
+                    backgroundColor: '#ffffff',
                     paddingHorizontal: 16,
                     paddingTop: 12,
                     paddingBottom: Platform.OS === 'ios' ? 28 : 16,
                     borderTopWidth: 1,
-                    borderTopColor: '#1e293b',
+                    borderTopColor: colors.neutral[200],
                     flexDirection: 'row',
                     gap: 8,
                     alignItems: 'center',
                     shadowColor: '#000000',
-                    shadowOffset: { width: 0, height: -3 },
-                    shadowOpacity: 0.2,
-                    shadowRadius: 6,
-                    elevation: 10,
+                    shadowOffset: { width: 0, height: -2 },
+                    shadowOpacity: 0.06,
+                    shadowRadius: 4,
+                    elevation: 8,
                     zIndex: 99
                   }}
                 >
@@ -7975,7 +8304,7 @@ export default function App() {
                       height: 48,
                       paddingHorizontal: 14,
                       borderRadius: 14,
-                      backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                      backgroundColor: '#eff6ff',
                       borderWidth: 1.5,
                       borderColor: '#3b82f6',
                       flexDirection: 'row',
@@ -7985,8 +8314,8 @@ export default function App() {
                     }}
                     accessibilityLabel="Back"
                   >
-                    <Text style={{ fontSize: 16, color: '#60a5fa', fontWeight: 'bold' }}>←</Text>
-                    <Text style={{ fontSize: 12, color: '#60a5fa', fontWeight: 'bold' }}>Back</Text>
+                    <ArrowLeft size={16} color="#1d4ed8" weight="bold" />
+                    <Text style={{ fontSize: 12, color: '#1d4ed8', fontWeight: 'bold' }}>Back</Text>
                   </TouchableOpacity>
 
                   {/* BOTTOM SHARE BUTTON */}
@@ -8001,7 +8330,7 @@ export default function App() {
                       height: 48,
                       paddingHorizontal: 14,
                       borderRadius: 14,
-                      backgroundColor: 'rgba(139, 92, 246, 0.15)',
+                      backgroundColor: '#f5f3ff',
                       borderWidth: 1.5,
                       borderColor: '#8b5cf6',
                       flexDirection: 'row',
@@ -8011,8 +8340,8 @@ export default function App() {
                     }}
                     accessibilityLabel="Share"
                   >
-                    <Text style={{ fontSize: 16, color: '#c084fc', fontWeight: 'bold' }}>↗</Text>
-                    <Text style={{ fontSize: 12, color: '#c084fc', fontWeight: 'bold' }}>Share</Text>
+                    <ShareNetwork size={16} color="#6d28d9" weight="bold" />
+                    <Text style={{ fontSize: 12, color: '#6d28d9', fontWeight: 'bold' }}>Share</Text>
                   </TouchableOpacity>
 
                   {/* PRIMARY ACTION (DOWNLOAD / GITHUB / ARTICLE / PLATFORM) */}
@@ -8027,21 +8356,44 @@ export default function App() {
                     style={{
                       flex: 1,
                       height: 48,
-                      backgroundColor: isGithub ? '#238636' : isArticle ? '#d97706' : '#2563eb',
+                      backgroundColor: isGithub ? '#15803d' : isArticle ? '#d97706' : colors.primary[600],
                       borderRadius: 14,
                       alignItems: 'center',
                       justifyContent: 'center',
-                      shadowColor: '#2563eb',
+                      flexDirection: 'row',
+                      gap: 6,
+                      shadowColor: colors.primary[600],
                       shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.3,
+                      shadowOpacity: 0.25,
                       shadowRadius: 4,
-                      elevation: 4
+                      elevation: 3
                     }}
                   >
+                    <ArrowSquareOut size={16} color="#ffffff" weight="bold" />
                     <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
-                      {actionText}
+                      {actionLabel}
                     </Text>
                   </TouchableOpacity>
+
+                  {/* ADMIN DELETE RESOURCE BUTTON */}
+                  {isAdmin && (
+                    <TouchableOpacity
+                      onPress={() => handleDeleteResource(selectedResource.id, selectedResource.title)}
+                      style={{
+                        height: 48,
+                        width: 48,
+                        borderRadius: 14,
+                        backgroundColor: '#fef2f2',
+                        borderWidth: 1.5,
+                        borderColor: '#ef4444',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                      accessibilityLabel="Delete Resource"
+                    >
+                      <Trash size={18} color="#dc2626" weight="bold" />
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             );
@@ -8426,7 +8778,7 @@ export default function App() {
                   </Text>
                 </View>
                 <TouchableOpacity onPress={() => setIsCreateMemoryModalOpen(false)} style={{ padding: 4 }}>
-                  <Text style={{ fontSize: 16, color: colors.neutral[400] }}>✕</Text>
+                  <X size={18} color={colors.neutral[500]} />
                 </TouchableOpacity>
               </View>
 
@@ -8438,9 +8790,9 @@ export default function App() {
                   </Text>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                     {[
-                      { id: 'hackathon', label: '🏆 Hackathon Victory' },
-                      { id: 'contributor', label: '⭐ Top Contributors' },
-                      { id: 'workshop', label: '📸 Event Moments' }
+                      { id: 'hackathon', label: 'Hackathon Victory' },
+                      { id: 'contributor', label: 'Top Contributors' },
+                      { id: 'workshop', label: 'Event Moments' }
                     ].map((cat) => (
                       <TouchableOpacity
                         key={cat.id}
@@ -8479,7 +8831,7 @@ export default function App() {
                     Award / Recognition Note
                   </Text>
                   <TextInput
-                    placeholder="e.g. 🏆 1st Runner Up ($1,200 Cash Prize)"
+                    placeholder="e.g. 1st Runner Up ($1,200 Cash Prize)"
                     value={newMemAward}
                     onChangeText={setNewMemAward}
                     style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: colors.neutral[900] }}
@@ -8518,7 +8870,7 @@ export default function App() {
                       <Image source={{ uri: newMemImage }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                       <View style={{ position: 'absolute', bottom: 6, left: 6, backgroundColor: 'rgba(15, 23, 42, 0.75)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
                         <Text style={{ fontSize: 9, color: '#ffffff', fontWeight: 'bold' }}>
-                          {newMemImage.startsWith('data:') ? '📷 Device Photo Selected' : '🔗 Image Loaded'}
+                          {newMemImage.startsWith('data:') ? 'Device Photo Selected' : 'Image Loaded'}
                         </Text>
                       </View>
                     </View>
@@ -8542,7 +8894,7 @@ export default function App() {
                         borderRadius: 10
                       }}
                     >
-                      <Text style={{ fontSize: 14 }}>📁</Text>
+                      <Folder size={14} color="#1d4ed8" weight="bold" />
                       <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#1d4ed8' }}>Choose from Device</Text>
                     </TouchableOpacity>
 
@@ -8560,7 +8912,7 @@ export default function App() {
                         borderRadius: 10
                       }}
                     >
-                      <Text style={{ fontSize: 13 }}>📸</Text>
+                      <Camera size={14} color={colors.neutral[700]} weight="bold" />
                     </TouchableOpacity>
                   </View>
 
@@ -8602,7 +8954,7 @@ export default function App() {
                   onPress={handleAdminCreateMemory}
                   style={{ flex: 1.5, backgroundColor: colors.primary[500], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
                 >
-                  <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>Publish to Vault 🏆</Text>
+                  <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>Publish to Vault</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -8612,74 +8964,344 @@ export default function App() {
 
       {/* CAMPUS GALLERY LIGHTBOX MODAL */}
       <Modal visible={!!selectedGalleryMemory} animationType="fade" transparent>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
-          {selectedGalleryMemory && (
-            <View style={{ width: '100%', maxWidth: 400, backgroundColor: '#111827', borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: '#374151' }}>
-              <View style={{ position: 'relative', width: '100%', height: 260 }}>
-                <Image
-                  source={{ uri: selectedGalleryMemory.image_url }}
-                  style={{ width: '100%', height: '100%', resizeMode: 'cover' }}
-                />
-                <TouchableOpacity
-                  onPress={() => setSelectedGalleryMemory(null)}
-                  style={{
-                    position: 'absolute',
-                    top: 14,
-                    right: 14,
-                    width: 36,
-                    height: 36,
-                    borderRadius: 18,
-                    backgroundColor: 'rgba(0,0,0,0.7)',
-                    justifyContent: 'center',
-                    alignItems: 'center'
-                  }}
-                >
-                  <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold' }}>✕</Text>
-                </TouchableOpacity>
-              </View>
+        <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.75)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+          {selectedGalleryMemory && (() => {
+            const isLiked = likedMemoryIds.includes(selectedGalleryMemory.id);
+            return (
+              <View style={{ width: '100%', maxWidth: 420, backgroundColor: '#ffffff', borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: colors.neutral[200], shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 12 }}>
+                <View style={{ position: 'relative', width: '100%', height: 260, backgroundColor: '#0f172a' }}>
+                  <Image
+                    source={{ uri: selectedGalleryMemory.image_url }}
+                    style={{ width: '100%', height: '100%', resizeMode: 'cover' }}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setSelectedGalleryMemory(null)}
+                    style={{
+                      position: 'absolute',
+                      top: 14,
+                      right: 14,
+                      width: 36,
+                      height: 36,
+                      borderRadius: 18,
+                      backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                      justifyContent: 'center',
+                      alignItems: 'center'
+                    }}
+                    accessibilityLabel="Close"
+                  >
+                    <X size={18} color="#ffffff" weight="bold" />
+                  </TouchableOpacity>
 
-              <View style={{ padding: 18 }}>
-                {selectedGalleryMemory.award_title ? (
-                  <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start', marginBottom: 8 }}>
-                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#b45309' }}>
-                      {selectedGalleryMemory.award_title}
+                  {/* Category badge */}
+                  <View style={{ position: 'absolute', top: 14, left: 14, backgroundColor: 'rgba(15, 23, 42, 0.75)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    {selectedGalleryMemory.category === 'hackathon' ? (
+                      <Trophy size={12} color="#fcd34d" weight="fill" />
+                    ) : selectedGalleryMemory.category === 'contributor' ? (
+                      <Star size={12} color="#38bdf8" weight="fill" />
+                    ) : (
+                      <Camera size={12} color="#a7f3d0" weight="fill" />
+                    )}
+                    <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#ffffff', textTransform: 'uppercase' }}>
+                      {selectedGalleryMemory.category}
                     </Text>
                   </View>
-                ) : null}
+                </View>
 
-                <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#ffffff', marginBottom: 8 }}>
-                  {selectedGalleryMemory.title}
-                </Text>
-
-                <Text style={{ fontSize: 12, color: '#9ca3af', lineHeight: 18, marginBottom: 12 }}>
-                  {selectedGalleryMemory.description}
-                </Text>
-
-                {Array.isArray(selectedGalleryMemory.achievers) && selectedGalleryMemory.achievers.length > 0 && (
-                  <View style={{ marginBottom: 14 }}>
-                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#60a5fa', marginBottom: 6 }}>
-                      Campus Achievers:
-                    </Text>
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                      {selectedGalleryMemory.achievers.map((ach, i) => (
-                        <View key={i} style={{ backgroundColor: '#1f2937', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: '#374151' }}>
-                          <Text style={{ fontSize: 11, color: '#e5e7eb' }}>⭐ {ach}</Text>
-                        </View>
-                      ))}
+                <View style={{ padding: 18 }}>
+                  {selectedGalleryMemory.award_title ? (
+                    <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start', marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Trophy size={12} color="#b45309" weight="fill" />
+                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#b45309' }}>
+                        {selectedGalleryMemory.award_title}
+                      </Text>
                     </View>
-                  </View>
-                )}
+                  ) : null}
 
-                <TouchableOpacity
-                  onPress={() => setSelectedGalleryMemory(null)}
-                  style={{ backgroundColor: '#374151', paddingVertical: 12, borderRadius: 12, alignItems: 'center' }}
-                >
-                  <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>Close</Text>
+                  <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.neutral[900], marginBottom: 8 }}>
+                    {selectedGalleryMemory.title}
+                  </Text>
+
+                  <Text style={{ fontSize: 12, color: colors.neutral[600], lineHeight: 18, marginBottom: 12 }}>
+                    {selectedGalleryMemory.description}
+                  </Text>
+
+                  {Array.isArray(selectedGalleryMemory.achievers) && selectedGalleryMemory.achievers.length > 0 && (
+                    <View style={{ marginBottom: 14, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.neutral[100] }}>
+                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[700], marginBottom: 6 }}>
+                        Campus Achievers:
+                      </Text>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                        {selectedGalleryMemory.achievers.map((ach, i) => (
+                          <View key={i} style={{ backgroundColor: colors.primary[50], paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: colors.primary[100], flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Star size={10} color={colors.primary[600]} weight="fill" />
+                            <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary[800] }}>{ach}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Actions Bar: Like + Admin (Edit, Delete) + Close */}
+                  <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.neutral[100] }}>
+                    <TouchableOpacity
+                      onPress={() => handleToggleLikeMemory(selectedGalleryMemory.id)}
+                      activeOpacity={0.7}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        backgroundColor: isLiked ? '#fef2f2' : '#f8fafc',
+                        borderWidth: 1,
+                        borderColor: isLiked ? '#fecaca' : colors.neutral[200],
+                        paddingHorizontal: 12,
+                        paddingVertical: 10,
+                        borderRadius: 12
+                      }}
+                    >
+                      <Heart
+                        size={16}
+                        color={isLiked ? '#ef4444' : colors.neutral[600]}
+                        weight={isLiked ? 'fill' : 'regular'}
+                      />
+                      <Text style={{ fontSize: 12, fontWeight: 'bold', color: isLiked ? '#dc2626' : colors.neutral[700] }}>
+                        {selectedGalleryMemory.likes_count || 0} Kudos
+                      </Text>
+                    </TouchableOpacity>
+
+                    {isAdmin && (
+                      <>
+                        <TouchableOpacity
+                          onPress={() => {
+                            const mem = selectedGalleryMemory;
+                            setSelectedGalleryMemory(null);
+                            openEditMemoryModal(mem);
+                          }}
+                          style={{
+                            backgroundColor: colors.neutral[100],
+                            width: 40,
+                            height: 40,
+                            borderRadius: 12,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderWidth: 1,
+                            borderColor: colors.neutral[200]
+                          }}
+                          accessibilityLabel="Edit Memory"
+                        >
+                          <PencilSimple size={18} color={colors.neutral[700]} weight="bold" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          onPress={() => handleDeleteMemory(selectedGalleryMemory.id, selectedGalleryMemory.title)}
+                          style={{
+                            backgroundColor: '#fef2f2',
+                            width: 40,
+                            height: 40,
+                            borderRadius: 12,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderWidth: 1,
+                            borderColor: '#fee2e2'
+                          }}
+                          accessibilityLabel="Delete Memory"
+                        >
+                          <Trash size={18} color="#dc2626" weight="bold" />
+                        </TouchableOpacity>
+                      </>
+                    )}
+
+                    <TouchableOpacity
+                      onPress={() => setSelectedGalleryMemory(null)}
+                      style={{ flex: 1, backgroundColor: colors.neutral[900], paddingVertical: 10, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>Close</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            );
+          })()}
+        </View>
+      </Modal>
+
+      {/* ADMIN EDIT CAMPUS MEMORY MODAL */}
+      <Modal visible={isEditMemoryModalOpen} animationType="slide" transparent>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 16 }}
+        >
+          <View style={{ backgroundColor: '#ffffff', borderRadius: 24, padding: 20, maxHeight: '90%' }}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <View>
+                  <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.neutral[900] }}>
+                    Edit Campus Memory
+                  </Text>
+                  <Text style={{ fontSize: 11, color: colors.neutral[500] }}>
+                    Update details, awards or cover image
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setIsEditMemoryModalOpen(false)} style={{ padding: 4 }}>
+                  <X size={18} color={colors.neutral[500]} />
                 </TouchableOpacity>
               </View>
-            </View>
-          )}
-        </View>
+
+              <View style={{ gap: 12 }}>
+                {/* Category */}
+                <View>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                    Memory Category
+                  </Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                    {[
+                      { id: 'hackathon', label: 'Hackathon Victory' },
+                      { id: 'contributor', label: 'Top Contributors' },
+                      { id: 'workshop', label: 'Event Moments' }
+                    ].map((cat) => (
+                      <TouchableOpacity
+                        key={cat.id}
+                        onPress={() => setEditMemCategory(cat.id)}
+                        style={{
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          borderRadius: 8,
+                          backgroundColor: editMemCategory === cat.id ? colors.primary[500] : colors.neutral[100]
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: editMemCategory === cat.id ? '#ffffff' : colors.neutral[700] }}>
+                          {cat.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Title */}
+                <View>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                    Title *
+                  </Text>
+                  <TextInput
+                    placeholder="Memory title"
+                    value={editMemTitle}
+                    onChangeText={setEditMemTitle}
+                    style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: colors.neutral[900] }}
+                  />
+                </View>
+
+                {/* Award */}
+                <View>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                    Award / Recognition Note
+                  </Text>
+                  <TextInput
+                    placeholder="Award title or recognition"
+                    value={editMemAward}
+                    onChangeText={setEditMemAward}
+                    style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: colors.neutral[900] }}
+                  />
+                </View>
+
+                {/* Achievers */}
+                <View>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                    Recognized Achievers (comma-separated)
+                  </Text>
+                  <TextInput
+                    placeholder="Ritesh Mishra, Student 2"
+                    value={editMemAchievers}
+                    onChangeText={setEditMemAchievers}
+                    style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: colors.neutral[900] }}
+                  />
+                </View>
+
+                {/* Photo Image */}
+                <View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700] }}>
+                      Photo / Memory Cover Image *
+                    </Text>
+                    {editMemImage ? (
+                      <TouchableOpacity onPress={() => setEditMemImage('')}>
+                        <Text style={{ fontSize: 10, color: '#ef4444', fontWeight: 'bold' }}>Clear Image</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+
+                  {editMemImage ? (
+                    <View style={{ width: '100%', height: 110, borderRadius: 12, overflow: 'hidden', marginBottom: 8, borderWidth: 1, borderColor: colors.neutral[300] }}>
+                      <Image source={{ uri: editMemImage }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                    </View>
+                  ) : null}
+
+                  <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8 }}>
+                    <TouchableOpacity
+                      onPress={() => handlePickImageFromDevice(setEditMemImage)}
+                      style={{
+                        flex: 1,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        backgroundColor: '#eff6ff',
+                        borderWidth: 1.5,
+                        borderColor: '#3b82f6',
+                        paddingVertical: 9,
+                        paddingHorizontal: 8,
+                        borderRadius: 10
+                      }}
+                    >
+                      <Folder size={14} color="#1d4ed8" weight="bold" />
+                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#1d4ed8' }}>Choose from Device</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <TextInput
+                    placeholder="Direct image URL (https://...)"
+                    value={editMemImage.startsWith('data:') ? 'Uploaded from Device' : editMemImage}
+                    onChangeText={(val) => setEditMemImage(val)}
+                    style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 12, color: colors.neutral[900] }}
+                  />
+                </View>
+
+                {/* Description */}
+                <View>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.neutral[700], marginBottom: 4 }}>
+                    Story Description
+                  </Text>
+                  <TextInput
+                    placeholder="Description of the event or achievement..."
+                    value={editMemDesc}
+                    onChangeText={setEditMemDesc}
+                    multiline
+                    numberOfLines={3}
+                    style={{ backgroundColor: colors.neutral[50], borderWidth: 1, borderColor: colors.neutral[300], borderRadius: 10, padding: 10, fontSize: 12, height: 70, textAlignVertical: 'top' }}
+                  />
+                </View>
+              </View>
+
+              {/* Action Buttons */}
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
+                <TouchableOpacity
+                  onPress={() => setIsEditMemoryModalOpen(false)}
+                  style={{ flex: 1, backgroundColor: colors.neutral[100], paddingVertical: 12, borderRadius: 10, alignItems: 'center' }}
+                >
+                  <Text style={{ color: colors.neutral[700], fontWeight: 'bold', fontSize: 13 }}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleUpdateMemory}
+                  disabled={editMemSubmitting}
+                  style={{ flex: 1.5, backgroundColor: colors.primary[500], paddingVertical: 12, borderRadius: 10, alignItems: 'center', opacity: editMemSubmitting ? 0.7 : 1 }}
+                >
+                  <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
+                    {editMemSubmitting ? 'Saving...' : 'Save Changes'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* PROFILE AVATAR CUSTOMIZER MODAL */}

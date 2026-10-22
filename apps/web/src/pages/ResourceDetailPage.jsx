@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@atc/shared/hooks/useAuth';
-import { getResourceById, getResources, incrementDownloadCount } from '@atc/shared/api/resources';
+import { getResourceById, getResources, incrementDownloadCount, deleteResource } from '@atc/shared/api/resources';
 import { formatRelativeTime } from '@atc/shared/utils/formatters';
 import {
   ArrowLeft,
@@ -25,7 +25,8 @@ import {
   FileText,
   Layers,
   Terminal,
-  Cpu
+  Cpu,
+  Trash2
 } from 'lucide-react';
 
 export function ResourceDetailPage() {
@@ -129,6 +130,18 @@ export function ResourceDetailPage() {
     const url = resource.file_url || resource.url;
     if (url && url !== '#') {
       window.open(url, '_blank');
+    }
+  };
+
+  const handleDeleteResource = async () => {
+    if (!window.confirm(`Are you sure you want to permanently delete "${resource.title}" from the Knowledge Vault?`)) {
+      return;
+    }
+    try {
+      await deleteResource(resource.id);
+      navigate(vaultPath);
+    } catch (err) {
+      alert('Failed to delete resource: ' + (err.message || 'Unknown error'));
     }
   };
 
@@ -245,6 +258,18 @@ export function ResourceDetailPage() {
             <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-primary-600' : ''}`} />
             <span>{isBookmarked ? 'Saved' : 'Bookmark'}</span>
           </button>
+
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={handleDeleteResource}
+              className="p-2 rounded-lg bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 hover:text-red-700 shadow-xs transition-colors flex items-center gap-1.5 text-xs font-semibold"
+              title="Delete Resource"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Delete</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -304,6 +329,16 @@ export function ResourceDetailPage() {
             <p className="text-[11px] text-center text-neutral-400">
               {action.subtext}
             </p>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={handleDeleteResource}
+                className="w-full py-2 px-3 text-xs font-bold text-red-400 bg-red-500/10 hover:bg-red-500/20 rounded-xl border border-red-500/30 transition-colors flex items-center justify-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Resource</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

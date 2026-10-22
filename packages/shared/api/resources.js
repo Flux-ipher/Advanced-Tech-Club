@@ -191,7 +191,34 @@ export async function getVaultGalleryMemories() {
     console.warn('[ATC Gallery] Live memories fetch note:', err);
   }
 
-  return initialGalleryMemories;
+  let deletedIds = [];
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem('atc_deleted_gallery_memories');
+      if (raw) deletedIds = JSON.parse(raw);
+    }
+  } catch (e) {}
+
+  try {
+    const { data, error } = await supabase
+      .from('vault_gallery')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!error && data && data.length > 0) {
+      return data
+        .filter((item) => !deletedIds.includes(item.id))
+        .map((item) => ({
+          ...item,
+          tags: Array.isArray(item.tags) ? item.tags : (typeof item.tags === 'string' ? [item.tags] : []),
+          achievers: Array.isArray(item.achievers) ? item.achievers : (typeof item.achievers === 'string' ? [item.achievers] : [])
+        }));
+    }
+  } catch (err) {
+    console.warn('[ATC Gallery] Live memories fetch note:', err);
+  }
+
+  return initialGalleryMemories.filter((item) => !deletedIds.includes(item.id));
 }
 
 export async function addVaultGalleryMemory(memory) {
@@ -220,4 +247,79 @@ export async function addVaultGalleryMemory(memory) {
     throw error;
   }
   return data;
+}
+
+export async function updateVaultGalleryMemory(id, memory) {
+  const payload = {
+    title: memory.title,
+    description: memory.description || '',
+    image_url: memory.image_url,
+    category: memory.category || 'event',
+    tags: Array.isArray(memory.tags) ? memory.tags : [],
+    achievers: Array.isArray(memory.achievers) ? memory.achievers : [],
+    award_title: memory.award_title || '',
+    event_date: memory.event_date || new Date().toISOString().split('T')[0]
+  };
+
+  try {
+    const { data, error } = await supabase
+      .from('vault_gallery')
+      .update(payload)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (!error && data) {
+      return data;
+    }
+  } catch (err) {
+    console.warn('[ATC Gallery] Live memory update note:', err);
+  }
+
+  return { id, ...payload };
+}
+
+export async function deleteVaultGalleryMemory(id) {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem('atc_deleted_gallery_memories');
+      const list = raw ? JSON.parse(raw) : [];
+      if (!list.includes(id)) {
+        list.push(id);
+        localStorage.setItem('atc_deleted_gallery_memories', JSON.stringify(list));
+      }
+    }
+  } catch (e) {}
+
+  try {
+    const { error } = await supabase
+      .from('vault_gallery')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.warn('[ATC Gallery] Live memory delete warning:', error);
+    }
+  } catch (err) {
+    console.warn('[ATC Gallery] Error deleting memory:', err);
+  }
+
+  return true;
+}
+
+export async function toggleLikeVaultGalleryMemory(id, isCurrentlyLiked, currentLikes = 0) {
+  const newLikes = isCurrentlyLiked ? Math.max(0, currentLikes - 1) : currentLikes + 1;
+  try {
+    const { error } = await supabase
+      .from('vault_gallery')
+      .update({ likes_count: newLikes })
+      .eq('id', id);
+
+    if (error) {
+      console.warn('[ATC Gallery] live like update note:', error);
+    }
+  } catch (err) {
+    console.warn('[ATC Gallery] toggleLike error:', err);
+  }
+  return { success: true, newLikes, isLiked: !isCurrentlyLiked };
 }
