@@ -14,11 +14,14 @@ import {
   User
 } from 'lucide-react';
 
-export function PortalHeader({ collapsed, onToggleCollapse, onOpenMobile }) {
+export function PortalHeader({ isPinned, onTogglePin, collapsed, onToggleCollapse, onOpenMobile }) {
   const { user, signOut } = useAuth();
   const apk = useApkMetadata();
   const location = useLocation();
   const navigate = useNavigate();
+
+  const handleToggle = onTogglePin || onToggleCollapse;
+  const isPinnedActive = isPinned !== undefined ? isPinned : !collapsed;
 
   const handleSignOut = async () => {
     await signOut();
@@ -57,11 +60,15 @@ export function PortalHeader({ collapsed, onToggleCollapse, onOpenMobile }) {
           <Menu className="w-5 h-5" />
         </button>
 
-        {/* Desktop Collapse Toggle */}
+        {/* Desktop Pin / Auto-collapse Toggle */}
         <button
-          onClick={onToggleCollapse}
-          className="hidden lg:flex p-2 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 transition-colors"
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          onClick={handleToggle}
+          className={`hidden lg:flex p-2 rounded-lg transition-colors ${
+            isPinnedActive
+              ? 'text-primary-600 bg-primary-50 hover:bg-primary-100'
+              : 'text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100'
+          }`}
+          title={isPinnedActive ? 'Unpin sidebar (auto-collapse on mouse leave)' : 'Pin sidebar open'}
         >
           <PanelLeft className="w-5 h-5" />
         </button>
