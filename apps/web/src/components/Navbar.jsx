@@ -81,9 +81,11 @@ export function Navbar() {
           {/* Logo & Brand Name */}
           <div className="flex items-center gap-6 lg:gap-8 shrink-0">
             <Link to="/" className="flex items-center gap-3 group shrink-0">
-              <div className="w-9 h-9 rounded-xl bg-primary-500 text-white flex items-center justify-center font-bold text-sm shadow-sm group-hover:bg-primary-600 transition-colors shrink-0">
-                ATC
-              </div>
+              <img
+                src="/logo.png"
+                alt="Advanced Tech Club Logo"
+                className="w-9 h-9 rounded-xl object-contain shadow-sm border border-neutral-200/80 bg-white group-hover:scale-105 transition-transform shrink-0"
+              />
               <div className="flex flex-col justify-center">
                 <span className="text-sm sm:text-base font-extrabold text-neutral-900 tracking-tight leading-none group-hover:text-primary-600 transition-colors whitespace-nowrap">
                   Advanced Tech Club

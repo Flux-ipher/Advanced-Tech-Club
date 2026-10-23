@@ -162,6 +162,11 @@ export function ApplyPage() {
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       {/* Header */}
       <div className="text-center max-w-xl mx-auto mb-10">
+        <img
+          src="/logo.png"
+          alt="Advanced Tech Club Logo"
+          className="w-16 h-16 rounded-2xl object-contain mx-auto mb-4 shadow-sm border border-neutral-200/80 bg-white p-1"
+        />
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-50 text-primary-700 text-xs font-semibold uppercase tracking-wider mb-3">
           <Sparkles className="w-3.5 h-3.5 text-primary-500" />
           <span>Membership Enrollment</span>

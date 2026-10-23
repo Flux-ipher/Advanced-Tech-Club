@@ -55,9 +55,11 @@ export function VerificationStatusPage() {
     <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
       {/* Header */}
       <div className="text-center space-y-2">
-        <div className="w-12 h-12 bg-primary-50 text-primary-600 rounded-2xl flex items-center justify-center mx-auto border border-primary-200">
-          <ShieldCheck className="w-6 h-6" />
-        </div>
+        <img
+          src="/logo.png"
+          alt="Advanced Tech Club Logo"
+          className="w-16 h-16 rounded-2xl object-contain mx-auto shadow-sm border border-neutral-200/80 bg-white p-1"
+        />
         <h1 className="text-3xl font-extrabold text-neutral-900 tracking-tight">
           Membership Verification Status
         </h1>

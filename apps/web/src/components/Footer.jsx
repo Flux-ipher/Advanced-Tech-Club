@@ -7,9 +7,11 @@ export function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg bg-primary-500 text-white flex items-center justify-center font-bold text-xs">
-              ATC
-            </div>
+            <img
+              src="/logo.png"
+              alt="ATC Logo"
+              className="w-8 h-8 rounded-lg object-contain border border-neutral-200/80 bg-white shadow-xs"
+            />
             <div>
               <p className="font-semibold text-neutral-900">Advanced Tech Club</p>
               <p className="text-xs text-neutral-400">Unified Web & Mobile Campus Platform · VooDoo Design System</p>

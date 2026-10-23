@@ -21,7 +21,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0597ff"
+        "backgroundColor": "#f7f7f8"
       },
       "package": "advancedtechclub.vercel.app",
       "permissions": [

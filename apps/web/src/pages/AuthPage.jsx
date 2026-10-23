@@ -106,9 +106,11 @@ export function AuthPage() {
       <div className="w-full max-w-md space-y-6">
         {/* Brand Header */}
         <div className="text-center space-y-2">
-          <div className="w-12 h-12 rounded-2xl bg-primary-500 text-white flex items-center justify-center font-bold text-lg mx-auto shadow-sm font-voodoo">
-            ATC
-          </div>
+          <img
+            src="/logo.png"
+            alt="Advanced Tech Club Logo"
+            className="w-16 h-16 rounded-2xl object-contain mx-auto shadow-sm border border-neutral-200/80 bg-white p-1"
+          />
           <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">
             {mode === 'login' ? 'Sign into ATC Hub' : 'Create Member Account'}
           </h1>

@@ -5133,24 +5133,17 @@ export default function App() {
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.neutral[900], justifyContent: 'center', alignItems: 'center' }}>
         <StatusBar barStyle="light-content" backgroundColor={colors.neutral[900]} />
         <View style={{ alignItems: 'center' }}>
-          <View
+          <Image
+            source={require('./assets/logo.png')}
             style={{
-              width: 72,
-              height: 72,
-              borderRadius: 24,
-              backgroundColor: colors.primary[500],
-              justifyContent: 'center',
-              alignItems: 'center',
-              shadowColor: colors.primary[500],
-              shadowOffset: { width: 0, height: 6 },
-              shadowOpacity: 0.5,
-              shadowRadius: 12,
-              elevation: 8,
-              marginBottom: 20
+              width: 84,
+              height: 84,
+              borderRadius: 22,
+              marginBottom: 20,
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.15)'
             }}
-          >
-            <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 28, letterSpacing: -1 }}>ATC</Text>
-          </View>
+          />
           <Text style={{ color: '#ffffff', fontSize: 22, fontWeight: 'bold', letterSpacing: -0.5 }}>
             Advanced Tech Club
           </Text>
@@ -5204,24 +5197,17 @@ export default function App() {
           >
             {/* Brand Header */}
             <View style={{ alignItems: 'center', marginBottom: 28 }}>
-              <View
+              <Image
+                source={require('./assets/logo.png')}
                 style={{
-                  width: 64,
-                  height: 64,
+                  width: 76,
+                  height: 76,
                   borderRadius: 20,
-                  backgroundColor: colors.primary[500],
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  shadowColor: colors.primary[500],
-                  shadowOffset: { width: 0, height: 6 },
-                  shadowOpacity: 0.5,
-                  shadowRadius: 12,
-                  elevation: 6,
-                  marginBottom: 16
+                  marginBottom: 16,
+                  borderWidth: 1,
+                  borderColor: 'rgba(255,255,255,0.15)'
                 }}
-              >
-                <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 24, letterSpacing: -1 }}>ATC</Text>
-              </View>
+              />
               <Text style={{ color: '#ffffff', fontSize: 24, fontWeight: 'bold', letterSpacing: -0.5 }}>
                 Advanced Tech Club
               </Text>
@@ -5534,23 +5520,16 @@ export default function App() {
         }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View
+          <Image
+            source={require('./assets/logo.png')}
             style={{
               width: 38,
               height: 38,
               borderRadius: 10,
-              backgroundColor: colors.primary[500],
-              justifyContent: 'center',
-              alignItems: 'center',
-              shadowColor: colors.primary[500],
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.3,
-              shadowRadius: 4,
-              elevation: 3
+              borderWidth: 1,
+              borderColor: colors.neutral[200]
             }}
-          >
-            <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 15 }}>ATC</Text>
-          </View>
+          />
           <View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Text style={{ fontWeight: 'bold', fontSize: 16, color: colors.neutral[900] }}>
@@ -8222,7 +8201,10 @@ export default function App() {
               }}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.success[400] }} />
+                <Image
+                  source={require('./assets/logo.png')}
+                  style={{ width: 22, height: 22, borderRadius: 6 }}
+                />
                 <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: 'bold', letterSpacing: 0.5 }}>
                   OFFICIAL CAMPUS PASS
                 </Text>

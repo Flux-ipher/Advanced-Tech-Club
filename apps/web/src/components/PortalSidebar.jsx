@@ -72,9 +72,11 @@ export function PortalSidebar({ collapsed, onToggleCollapse, mobileOpen, onClose
               collapsed ? 'justify-center w-full' : ''
             }`}
           >
-            <div className="w-9 h-9 rounded-xl bg-primary-500 text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
-              ATC
-            </div>
+            <img
+              src="/logo.png"
+              alt="ATC Logo"
+              className="w-9 h-9 rounded-xl object-contain shadow-sm border border-neutral-200/80 bg-white shrink-0"
+            />
             {!collapsed && (
               <div className="overflow-hidden">
                 <span className="font-extrabold text-sm text-neutral-900 tracking-tight block leading-none truncate">
