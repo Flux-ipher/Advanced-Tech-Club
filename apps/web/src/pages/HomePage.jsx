@@ -87,10 +87,10 @@ export function HomePage() {
         category: newCategory,
         media_url: newMediaUrl.trim() || null,
         pinned: newPinned,
-        author_id: user?.id || 'admin',
-        author_name: user?.full_name || 'Admin',
+        author_id: user?.id || 'usr-1',
+        author_name: user?.full_name || (user?.role === 'media_head' ? 'Media Head' : 'Club Admin'),
         author_role: user?.role === 'media_head' ? 'Media Head' : 'Admin',
-        author_avatar: user?.avatar_url
+        author_avatar: user?.avatar_url || null
       });
       setIsPostModalOpen(false);
       setNewTitle('');

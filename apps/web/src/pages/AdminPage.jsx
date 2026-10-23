@@ -112,10 +112,10 @@ export function AdminPage() {
       category: annCategory,
       pinned: annPinned,
       media_url: annMedia.trim() || null,
-      author_id: user?.id,
-      author_name: user?.full_name,
-      author_role: 'Admin',
-      author_avatar: user?.avatar_url
+      author_id: user?.id || 'usr-1',
+      author_name: user?.full_name || 'Club Admin',
+      author_role: user?.role === 'media_head' ? 'Media Head' : 'Admin',
+      author_avatar: user?.avatar_url || null
     });
     setAnnSuccess(true);
     setAnnTitle('');
