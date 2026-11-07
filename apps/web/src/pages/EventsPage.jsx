@@ -84,8 +84,8 @@ export function EventsPage() {
         location: location.trim(),
         capacity: Number(capacity) || 100,
         category,
-        author_id: user?.id || 'admin',
-        author_name: user?.full_name || 'Club Lead'
+        author_id: user?.id || 'Zp2JThOUCAbl7aF1TT4DQHUH0Dk2',
+        author_name: user?.full_name || 'Club Admin'
       });
       setIsCreateModalOpen(false);
       setTitle('');

@@ -69,6 +69,8 @@ import {
   deleteResource
 } from '@atc/shared/api/resources';
 import { setRole } from '@atc/shared/api/profiles';
+import { createEvent } from '@atc/shared/api/events';
+import { createAnnouncement } from '@atc/shared/api/announcements';
 import {
   fetchAssignedTasks,
   createAssignedTask,
@@ -4705,29 +4707,35 @@ export default function App() {
   };
 
   // Admin Quick Post Announcement
-  const handleAdminPostAnnouncement = () => {
+  const handleAdminPostAnnouncement = async () => {
     if (!newAnnTitle.trim() || !newAnnBody.trim()) {
       Alert.alert('Required', 'Please enter a title and message.');
       return;
     }
-    const created = {
-      id: `ann-${Date.now()}`,
+    const annPayload = {
       title: newAnnTitle.trim(),
       body: newAnnBody.trim(),
       category: newAnnCategory,
       pinned: newAnnPinned,
+      author_id: currentUser?.id,
       author_name: currentUser?.full_name || 'Club Admin',
       author_role: 'Admin',
-      author_avatar: currentUser?.avatar_url,
-      created_at: new Date().toISOString()
+      author_avatar: currentUser?.avatar_url
     };
-    setAnnouncements((prev) => [created, ...prev]);
-    setIsBroadcastModalOpen(false);
-    setNewAnnTitle('');
-    setNewAnnBody('');
-    setNewAnnPinned(false);
-    Analytics.adminPostedAnnouncement();
-    triggerToast('Broadcast Pushed to Campus Devices 📢');
+
+    try {
+      const persisted = await createAnnouncement(annPayload);
+      setAnnouncements((prev) => [persisted, ...prev.filter((a) => a.id !== persisted.id)]);
+      setIsBroadcastModalOpen(false);
+      setNewAnnTitle('');
+      setNewAnnBody('');
+      setNewAnnPinned(false);
+      Analytics.adminPostedAnnouncement();
+      triggerToast('Broadcast Pushed to Campus Devices 📢');
+    } catch (err) {
+      console.error('[ATC Mobile] Create announcement error:', err);
+      Alert.alert('Error', 'Failed to publish broadcast: ' + (err.message || 'Please check connection'));
+    }
   };
 
   // Native Device Image Picker (Dual Support: Device Gallery & Custom URL)
@@ -4770,54 +4778,43 @@ export default function App() {
       Alert.alert('Required', 'Please enter an event title and location.');
       return;
     }
-    const created = {
-      id: `evt-${Date.now()}`,
+
+    const startIso = newEventDate ? new Date(newEventDate + 'T10:00:00Z').toISOString() : new Date().toISOString();
+    const eventPayload = {
       title: newEventTitle.trim(),
       description: newEventDesc.trim() || 'Hands-on campus engineering workshop led by ATC.',
       location: newEventLocation.trim(),
       category: newEventCategory,
       capacity: Number(newEventCapacity) || 80,
-      registrations_count: 1,
-      start_at: new Date(newEventDate + 'T10:00:00Z').toISOString(),
+      start_at: startIso,
       date: newEventDate,
       time: `${newEventStartTime} - ${newEventEndTime}`,
       banner_url: newEventBanner || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=1200&q=80',
       image: newEventBanner || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=1200&q=80',
       tags: newEventTags,
       points: Number(newEventPoints) || 50,
+      author_id: currentUser?.id,
       author_name: currentUser?.full_name || 'Club Admin (Ritesh Mishra)',
-      author_role: 'Admin',
-      status: 'upcoming',
-      is_completed: false
+      author_role: 'Admin'
     };
 
-    setEvents((prev) => [created, ...prev]);
-    setIsCreateEventModalOpen(false);
-    setNewEventTitle('');
-    setNewEventDesc('');
-    setNewEventLocation('');
-
-    // Persist to Supabase if live
     try {
-      await supabase.from('events').insert([{
-        title: created.title,
-        description: created.description,
-        location: created.location,
-        category: created.category,
-        capacity: created.capacity,
-        start_at: created.start_at,
-        date: created.date,
-        banner_url: created.banner_url,
-        image: created.image,
-        tags: created.tags,
-        author_id: currentUser?.id && !currentUser.id.startsWith('user-') ? currentUser.id : null
-      }]);
-    } catch (e) {
-      console.warn('[ATC Mobile] Supabase event insert note:', e);
-    }
+      const persisted = await createEvent(eventPayload);
+      setEvents((prev) => [persisted, ...prev.filter((e) => e.id !== persisted.id)]);
+      setIsCreateEventModalOpen(false);
+      setNewEventTitle('');
+      setNewEventDesc('');
+      setNewEventLocation('');
 
-    triggerToast('New Workshop Published! 📅', true);
-    sendDevicePushNotification('📅 New Workshop: ' + created.title, `${created.date} @ ${created.location} · +${created.points} XP`);
+      triggerToast('New Workshop Published! 📅', true);
+      sendDevicePushNotification(
+        '📅 New Workshop: ' + persisted.title,
+        `${newEventDate} @ ${persisted.location} · +${persisted.points || 50} XP`
+      );
+    } catch (err) {
+      console.error('[ATC Mobile] Create event error:', err);
+      Alert.alert('Error', 'Failed to publish workshop: ' + (err.message || 'Please check connection'));
+    }
   };
 
   // Admin Campus Memory Creator

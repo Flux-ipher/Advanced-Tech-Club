@@ -127,26 +127,30 @@ export function AdminPage() {
 
   const handleCreateEvent = async (e) => {
     e.preventDefault();
-    await addEvent({
-      title: evtTitle.trim(),
-      description: evtDesc.trim(),
-      banner_url: evtBanner.trim() || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=1200&q=80',
-      start_at: new Date(evtStart).toISOString(),
-      end_at: evtEnd ? new Date(evtEnd).toISOString() : new Date(evtStart).toISOString(),
-      location: evtLocation.trim(),
-      capacity: Number(evtCapacity) || 100,
-      category: evtCategory,
-      author_id: user?.id,
-      author_name: user?.full_name
-    });
-    setEvtSuccess(true);
-    setEvtTitle('');
-    setEvtDesc('');
-    setEvtBanner('');
-    setEvtStart('');
-    setEvtEnd('');
-    setEvtLocation('');
-    setTimeout(() => setEvtSuccess(false), 3000);
+    try {
+      await addEvent({
+        title: evtTitle.trim(),
+        description: evtDesc.trim(),
+        banner_url: evtBanner.trim() || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=1200&q=80',
+        start_at: new Date(evtStart).toISOString(),
+        end_at: evtEnd ? new Date(evtEnd).toISOString() : new Date(evtStart).toISOString(),
+        location: evtLocation.trim(),
+        capacity: Number(evtCapacity) || 100,
+        category: evtCategory,
+        author_id: user?.id || 'Zp2JThOUCAbl7aF1TT4DQHUH0Dk2',
+        author_name: user?.full_name || 'Club Admin'
+      });
+      setEvtSuccess(true);
+      setEvtTitle('');
+      setEvtDesc('');
+      setEvtBanner('');
+      setEvtStart('');
+      setEvtEnd('');
+      setEvtLocation('');
+      setTimeout(() => setEvtSuccess(false), 3000);
+    } catch (err) {
+      alert(err.message || 'Error creating event');
+    }
   };
 
   const handleUploadResource = async (e) => {

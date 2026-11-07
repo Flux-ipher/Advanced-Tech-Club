@@ -9,6 +9,7 @@ export default defineConfig(({ mode }) => {
   const env = { ...rootEnv, ...localEnv };
 
   return {
+    root: path.resolve(__dirname),
     plugins: [react()],
     resolve: {
       alias: {
